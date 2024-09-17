@@ -55,6 +55,7 @@ Para iniciar o projeto, execute o Apache Tomcat pelo NetBeans e acesse o sistema
 ## 📚 Referência
 - [Gson](https://mvnrepository.com/artifact/com.google.code.gson/gson)
 - [PostgreSQL Documentação](https://www.postgresql.org/docs/)
+- [Data Table](https://datatables.net/)
 
 ## 📄 Licença
 Este projeto está sob a licença MIT. Para mais detalhes, consulte o arquivo [LICENSE](LICENSE).
