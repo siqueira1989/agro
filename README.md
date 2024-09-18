@@ -51,6 +51,7 @@ Para iniciar o projeto, execute o Apache Tomcat pelo NetBeans e acesse o sistema
 - [Elica Oliveira](https://www.linkedin.com/in/elica-oliveira/)
 - [Maiza Lavor](https://www.linkedin.com/in/maizalavor/)
 - [Luciano Aparecido de Siqueira](https://www.linkedin.com/in/luciano-aparecido-de-siqueira/)
+- [Felipe Pereira Da Silva](https://www.linkedin.com/in/felipe-pereira-da-silva-3155b3154/)
 
 ## 📚 Referência
 - [Gson](https://mvnrepository.com/artifact/com.google.code.gson/gson)
