@@ -1,10 +1,10 @@
 
 package Model.Model;
 public class Endereco {
-    private int idendereco;
+        private int idendereco;
 	private String Endereco; 
 	private  String Cep;
-    private String Bairro;
+        private String Bairro;
 	private String Cidade;
 	private String Estado;
 	private String Pais;

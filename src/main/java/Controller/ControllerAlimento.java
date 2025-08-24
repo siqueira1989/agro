@@ -1,7 +1,11 @@
 package Controller;
 
+
 import Model.Dao.AlimentoClassificacaoDao;
 import Model.Dao.AlimentoDAO;
+import Model.Model.Alimento;
+import Model.Model.AlimentoClassificacao;
+import Model.Model.Classificacao;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
@@ -59,6 +63,7 @@ public class ControllerAlimento extends HttpServlet {
                 // Extraindo os demais parâmetros do JSON
                 String alimento = jsonObject.get("alimento").getAsString();
                 String variedade = jsonObject.get("variedade").getAsString();
+                String tipo = jsonObject.get("tipo").getAsString();
                 List<String> classificacoes = gson.fromJson(jsonObject.get("classificacoes"), List.class);
 
                 // Logs para depuração
@@ -66,21 +71,34 @@ public class ControllerAlimento extends HttpServlet {
                 System.out.println("Alimento: " + alimento);
                 System.out.println("Variedade: " + variedade);
                 System.out.println("Classificações 2: " + classificacoes);
+                System.out.println("tipo: " + tipo);
                 
                 // Obtém o número antes do loop
-               /* int numero = alimentodao.RetornoIdAlimento();
-                System.out.println("Número gerado: " + numero);
-
+                int numero = alimentoclassificacaodao.RetornoIdAlimento();
+               System.out.println("Número gerado: " + numero);
+ Alimento alimentoObj= new Alimento();
+                alimentoObj.setNomeproduto(alimento);
+                alimentoObj.setTipoproduto(tipo);
+                alimentoObj.setVariedadealimento(variedade);
+                alimentoObj.setSituacaoproduto(true);
+                 alimentodao.addAlimento(alimentoObj);
+              
                 // Loop para cadastrar cada classificação no banco de dados
-                for (String classificacaoId : classificacoes) {
+               for (String classificacaoId : classificacoes) {
                     AlimentoClassificacao alimentoClassificacao = new AlimentoClassificacao();
-                    alimentoClassificacao.setIdClassificacao(Integer.parseInt(classificacaoId));
-                    alimentoClassificacao.setIdAlimento(numero); // Associando ao alimento gerado
-
+                    // Instanciando  dentro da  setClassificacao
+                     alimentoClassificacao.setClassificacao(new Classificacao());
+                    alimentoClassificacao.getClassificacao().setIdclassificacao(Integer.parseInt(classificacaoId));
+                   alimentoClassificacao.setAlimento(new Alimento());
+                    alimentoClassificacao.getAlimento().setIdproduto(numero+1); // Associando ao alimento gerado
                     // Inserindo no banco de dados
-                    alimentoclassificacaodao.cadastro(alimentoClassificacao, numero);
+                  alimentoclassificacaodao.addAlimentoClassificacao(alimentoClassificacao);
                 }
-*/
+                // Cadastro produto
+              
+                
+               
+         
                 // Resposta de sucesso
                 response.setContentType("application/json");
                 response.getWriter().write("{\"message\": \"Alimento cadastrado com sucesso!\"}");

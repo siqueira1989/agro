@@ -91,6 +91,56 @@ public class ClassificacaoDAO {
             System.out.println("Erro no cadastro: "+e.getMessage());
 		}
     }
+// Metodo de Criação de busca existente
+     public boolean VerificacaoClassificacao (String classificacao) throws SQLException {
+		 PostgresConnection conn = new PostgresConnection();
+		 Connection conexao= conn.getConnection();
+		 
+	        boolean verificacaoclassificacao = false;
 
+	        // Substitua pelo seu método de obter conexão com o banco de dados
+	        try {
+	        	 String sql = "SELECT COUNT(*) FROM classificacao WHERE classificacao = ?";
+	             PreparedStatement stmt = conexao.prepareStatement(sql);
+	             // Definindo o valor do parâmetro da consulta
+	             stmt.setString(1, classificacao);
+	             ResultSet rs = stmt.executeQuery();
+	             if (rs.next()) {
+	                    // Verificando se a contagem é maior que zero
+	                    verificacaoclassificacao = rs.getInt(1)>0;
+	                }
+
+
+	        } catch (SQLException e) {
+	            System.out.println("Erro no nivel dao: "+e.getMessage()); // Tratar exceções de forma adequada na sua aplicação
+	        }
+   
+	        return verificacaoclassificacao;
+	    }
+          public boolean VerificacaoClassificacaoAlimento (int idclassificacao) throws SQLException {
+		 PostgresConnection conn = new PostgresConnection();
+		 Connection conexao= conn.getConnection();
+		 
+	        boolean verificacaoclassificacao = false;
+
+	        // Substitua pelo seu método de obter conexão com o banco de dados
+	        try {
+	        	 String sql = "SELECT COUNT(*) FROM alimentoclassificacao ac inner join classificacao c on ac.idclassificacao = c.idclassificacao where ac.idclassificacao=?";
+	             PreparedStatement stmt = conexao.prepareStatement(sql);
+	             // Definindo o valor do parâmetro da consulta
+	             stmt.setInt(1, idclassificacao);
+	             ResultSet rs = stmt.executeQuery();
+	             if (rs.next()) {
+	                    // Verificando se a contagem é maior que zero
+	                    verificacaoclassificacao = rs.getInt(1)>0;
+	                }
+
+
+	        } catch (SQLException e) {
+	            System.out.println("Erro no nivel dao: "+e.getMessage()); // Tratar exceções de forma adequada na sua aplicação
+	        }
+   
+	        return verificacaoclassificacao;
+	    }
 }
 

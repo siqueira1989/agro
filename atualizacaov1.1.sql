@@ -5,7 +5,7 @@ create table alimento(
 )
 
 create table alimentoclassificacao(
-	idalimentoclassificao serial primary key,
+	idalimentoclassificacao serial primary key,
 	idalimento int,
 	idclassificacao int,
 	CONSTRAINT fk_alimento  FOREIGN KEY (idalimento) REFERENCES alimento(idalimento),

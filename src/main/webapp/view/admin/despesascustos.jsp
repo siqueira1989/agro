@@ -16,83 +16,99 @@
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
         <!-- CSS customizado -->
         <link href="../../CSS/estilo.css" rel="stylesheet">
-        <script type="text/javascript" src="../../JS/main.js"></script>  
+         <script src="../../JS/main.js?<%= System.currentTimeMillis()%>"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.mask/1.14.16/jquery.mask.min.js"></script>
 
-        <script>
-            $(document).ready(function () {
-    // Verificando mensagem
-    var mensagem = '<%= request.getAttribute("Mensagem") != null ? request.getAttribute("Mensagem") : "" %>';
-    var atributo = '<%= request.getAttribute("Atributo") != null ? request.getAttribute("Atributo") : "" %>';
-    if (mensagem && atributo) {
-        mostrarAlerta(mensagem, atributo);
-    }
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.mask/1.14.16/jquery.mask.min.js"></script>
 
-    // Carrega os dados imediatamente
-    CarregarDadosDespesasCustos();
+<script>
+    $(document).ready(function () {
+        // Aplica a máscara ao campo de cadastro (já está no DOM)
+        $('#valor').mask('000.000.000,00', {reverse: true});
 
-    // Atualiza os dados a cada 10 segundos
-    setInterval(function () {
-        CarregarDadosDespesasCustos();
-    }, 20000);
-
-    // Máscara para campo de valor (moeda BRL)
-    $('#valor, #atualizacaoValor').on('input', function () {
-        let value = $(this).val();
-        $(this).val(formatarMoeda(value));
-    });
-
-    $('#formCadastro').on('submit', function (event) {
-        event.preventDefault();
-
-        let despesa = $('#despesascustos').val().trim();
-        let unidade = $('#unidade').val().trim();
-        let valor = $('#valor').val().trim();
-        let tipo = $('#tipo').val().trim();
-
-        // Validações
-        if (despesa.length === 0 || unidade.length === 0 || valor.length === 0 || tipo.length === 0) {
-            ExibirAlerta('Erro', 'Todos os campos são obrigatórios.');
-            return;
-        }
-        if (despesa.length > 50 || unidade.length > 2 || tipo.length > 20) {
-            ExibirAlerta('Erro', 'Um ou mais campos excedem o tamanho máximo permitido.');
-            return;
-        }
-        if (!/^\d{1,3}(\.\d{3})*,\d{2}$/.test(valor)) {
-            ExibirAlerta('Erro', 'O valor deve estar no formato de decimal (1.234,56).');
-            return;
-        }
-
-        salvarDespesasCustos(despesa, unidade, valor, tipo);
-    });
-
-    $('#formAtualizacao').on('submit', function(event) {
-        event.preventDefault();
-        let id = $('#atualizacaoId').val();
-        let despesa = $('#atualizacaoDespesa').val().trim();
-        let unidade = $('#atualizacaoUnidade').val().trim();
-        let valor = $('#atualizacaoValor').val().trim();
-        let tipo = $('#atualizacaoTipo').val().trim();
-
-        // Validações
-        if (despesa.length === 0 || unidade.length === 0 || valor.length === 0 || tipo.length === 0) {
-            ExibirAlerta('Erro', 'Todos os campos são obrigatórios.');
-            return;
-        }
-        if (despesa.length > 50 || unidade.length > 2 || tipo.length > 20) {
-            ExibirAlerta('Erro', 'Um ou mais campos excedem o tamanho máximo permitido.');
-            return;
-        }
-        if (!/^\d{1,3}(\.\d{3})*,\d{2}$/.test(valor)) {
-            ExibirAlerta('Erro', 'O valor deve estar no formato de moeda brasileira (1.234,56).');
-            return;
-        }
-
-        atualizarDespesasCustos(id, despesa, unidade, valor, tipo);
-    });
+        // Aplica a máscara ao campo de atualização quando o modal for exibido
+      $('#modalAtualizacao').on('shown.bs.modal', function () {
+    let campo = $('#atualizacaoValor');
+    campo.unmask(); // remove qualquer máscara antiga
+    campo.mask('000.000.000,00', {reverse: true}); // reaplica
 });
 
-            </script>  
+        // Carrega dados
+        CarregarDadosDespesasCustos();
+        setInterval(function () {
+            CarregarDadosDespesasCustos();
+        }, 10000);
+
+        // SUBMIT CADASTRO
+        $('#formCadastro').on('submit', function (event) {
+            event.preventDefault();
+
+            let despesa = $('#despesascustos').val().trim();
+            let unidade = $('#unidade').val().trim();
+            let valor = $('#valor').val().trim();
+            let tipo = $('#tipo').val().trim();
+
+            if (!despesa || !unidade || !valor || !tipo) {
+                mostrarAlerta('Todos os campos são obrigatórios.', 'danger', '#alertModalCadastro');
+                return;
+            }
+            if (despesa.length > 50 || unidade.length > 2 || tipo.length > 20) {
+                mostrarAlerta('Um ou mais campos excedem o tamanho máximo permitido.', 'warning', '#alertModalCadastro', 4000);
+                return;
+            }
+            if (!/^\d{1,3}(\.\d{3})*,\d{2}$/.test(valor)) {
+                mostrarAlerta('O valor deve estar no formato de moeda brasileira (1.234,56).', 'warning', '#alertModalCadastro', 4000);
+                return;
+            }
+
+            salvarDespesasCustos(despesa, unidade, valor, tipo);
+        });
+
+        // SUBMIT ATUALIZAÇÃO
+        $('#formAtualizacao').on('submit', function (event) {
+            event.preventDefault();
+
+            let id = $('#atualizacaoId').val();
+            let despesa = $('#atualizacaoDespesa').val().trim();
+            let unidade = $('#atualizacaoUnidade').val().trim();
+            let valor = $('#atualizacaoValor').val().trim();
+            let tipo = $('#atualizacaoTipo').val().trim();
+
+            if (!despesa || !unidade || !valor || !tipo) {
+                ExibirAlerta('Erro', 'Todos os campos são obrigatórios.');
+                return;
+            }
+            if (despesa.length > 50 || unidade.length > 2 || tipo.length > 20) {
+                ExibirAlerta('Erro', 'Um ou mais campos excedem o tamanho máximo permitido.');
+                return;
+            }
+            if (!/^\d{1,3}(\.\d{3})*,\d{2}$/.test(valor)) {
+                ExibirAlerta('Erro', 'O valor deve estar no formato de moeda brasileira (1.234,56).');
+                return;
+            }
+
+            atualizarDespesasCustos(id, despesa, unidade, valor, tipo);
+        });
+
+        // Reset modal cadastro
+        $('#modalCadastro').on('show.bs.modal', function () {
+            $('#formCadastro')[0].reset();
+            $('#alertModalCadastro')
+                .removeClass('alert-success alert-danger alert-warning alert-info')
+                .addClass('d-none')
+                .empty();
+        });
+
+        $('#modalCadastro').on('hidden.bs.modal', function () {
+            $('#formCadastro')[0].reset();
+            $('#alertModalCadastro')
+                .removeClass('alert-success alert-danger alert-warning alert-info')
+                .addClass('d-none')
+                .empty();
+        });
+    });
+</script>
+
     </head>
     <body>
         <header>
@@ -135,6 +151,12 @@
                         </button>
                     </div>
                     <div class="modal-body">
+                        <!-- NOVO: contêiner de alerta do modal -->
+                        <div id="alertModalCadastro" class="alert  d-none" role="alert">
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
                         <form id="formCadastro">
                             <div class="form-group">
                                 <label for="despesascustos">Despesa/Custo:</label>
@@ -173,6 +195,8 @@
                         </button>
                     </div>
                     <div class="modal-body">
+                        <!-- NOVO -->
+                        <div id="alertModalAtualizacao" class="alert d-none" role="alert"></div>
                         <form id="formAtualizacao">
                             <input type="hidden" id="atualizacaoId" name="id">
                             <div class="form-group">

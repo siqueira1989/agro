@@ -9,7 +9,7 @@ public class Produto {
     private double valorvendaproduto;
     private boolean situacaoproduto;
     private String tipoproduto;
-
+ public Produto() { }
     public Produto(int idproduto, String nomeproduto, double quantidadeproduto, double valorunitarioproduto, double valorvendaproduto, boolean situacaoproduto, String tipoproduto) {
         this.idproduto = idproduto;
         this.nomeproduto = nomeproduto;

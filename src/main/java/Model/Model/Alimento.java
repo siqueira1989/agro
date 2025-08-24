@@ -8,6 +8,8 @@ package Model.Model;
 public class Alimento extends Produto {
 
     private String variedadealimento;
+
+   
    
 
     public String getVariedadealimento() {
@@ -18,12 +20,12 @@ public class Alimento extends Produto {
         this.variedadealimento = variedadealimento;
     }
 
-   
+  public Alimento(){}
 
     public Alimento(String variedadealimento, int idproduto, String nomeproduto, double quantidadeproduto, double valorunitarioproduto, double valorvendaproduto, boolean situacaoproduto, String tipoproduto) {
         super(idproduto, nomeproduto, quantidadeproduto, valorunitarioproduto, valorvendaproduto, situacaoproduto, tipoproduto);
         this.variedadealimento = variedadealimento;
        
     }
-  
+ 
 }
