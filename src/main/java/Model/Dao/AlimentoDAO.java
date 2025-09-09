@@ -1,52 +1,103 @@
-
 package Model.Dao;
 
 import Model.Model.Alimento;
 import Util.PostgresConnection;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 
 public class AlimentoDAO {
-     public void addAlimento(Alimento alimento) throws SQLException {
-    	 PostgresConnection conn = new PostgresConnection();
-		 Connection conexao= conn.getConnection();
-		 System.out.println("nivel 2");
-        try {
-        	String sql = "INSERT INTO alimento ("
-        		    + "nomeproduto, tipoproduto, "
-        		    + "situacaoproduto ,variedadealimento)"
-        		    + "VALUES ( ?,?,?,?)";
 
-        	PreparedStatement stmt = conexao.prepareStatement(sql);
-           stmt.setString(1, alimento.getNomeproduto());
+    public List<Alimento> listAll() throws SQLException {
+        PostgresConnection conn = new PostgresConnection();
+        Connection conexao = conn.getConnection();
+
+        List<Alimento> alimentos = new ArrayList<>();
+        try {
+            String sql = "SELECT * FROM classificacao";
+            PreparedStatement stmt = conexao.prepareStatement(sql);
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                Alimento alimento = new Alimento();
+
+                alimento.setIdproduto(rs.getInt("idproduto"));
+                alimento.setNomeproduto(rs.getString("nomeproduto"));
+                alimento.setVariedadealimento(rs.getString("variedadealimento"));
+
+                alimentos.add(alimento);
+            }
+            conexao.close();
+        } catch (SQLException e) {
+            System.out.println("Erro na camada Dao: " + e.getMessage());
+
+        }
+
+        return alimentos;
+    }
+
+    public void addAlimento(Alimento alimento) throws SQLException {
+        PostgresConnection conn = new PostgresConnection();
+        Connection conexao = conn.getConnection();
+        System.out.println("nivel 2");
+        try {
+            String sql = "INSERT INTO alimento ("
+                    + "nomeproduto, tipoproduto, "
+                    + "situacaoproduto ,variedadealimento)"
+                    + "VALUES ( ?,?,?,?)";
+
+            PreparedStatement stmt = conexao.prepareStatement(sql);
+            stmt.setString(1, alimento.getNomeproduto());
             stmt.setString(2, alimento.getTipoproduto());
             stmt.setBoolean(3, alimento.isSituacaoproduto());
             stmt.setString(4, alimento.getVariedadealimento());
-          
-            stmt.executeUpdate(); 
+
+            stmt.executeUpdate();
         } catch (SQLException e) {
             throw new RuntimeException("Erro ao adicionar o parceiro: " + e.getMessage(), e);
         }
     }
-       public void updateAlimento(Alimento alimento) throws SQLException {
-    	 PostgresConnection conn = new PostgresConnection();
-		 Connection conexao= conn.getConnection();
-		 System.out.println("nivel 2");
-        try { 
-            String sql = "UPDATE classificacao SET nomeproduto = ?, tipoproduto = ?,"+
-                     "situacaoproduto = ?, variedadealimento= ? WHERE idproduto = ?";
-        	
 
-        	PreparedStatement stmt = conexao.prepareStatement(sql);
-           stmt.setString(1, alimento.getNomeproduto());
+    public void updateAlimento(Alimento alimento) throws SQLException {
+        PostgresConnection conn = new PostgresConnection();
+        Connection conexao = conn.getConnection();
+        System.out.println("nivel 2");
+        try {
+            String sql = "UPDATE classificacao SET nomeproduto = ?, tipoproduto = ?,"
+                    + "situacaoproduto = ?, variedadealimento= ? WHERE idproduto = ?";
+
+            PreparedStatement stmt = conexao.prepareStatement(sql);
+            stmt.setString(1, alimento.getNomeproduto());
             stmt.setString(2, alimento.getTipoproduto());
             stmt.setBoolean(3, alimento.isSituacaoproduto());
             stmt.setString(4, alimento.getVariedadealimento());
-           stmt.setInt(4, alimento.getIdproduto());
-            stmt.executeUpdate(); 
+            stmt.setInt(4, alimento.getIdproduto());
+            stmt.executeUpdate();
         } catch (SQLException e) {
             throw new RuntimeException("Erro ao adicionar o parceiro: " + e.getMessage(), e);
         }
     }
 }
+
+    
+
+    /* ============================================================
+       POST: create | update | delete com JSON padronizado
+       ============================================================ */
+   /* @Override
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        request.setCharacterEncoding(StandardCharsets.UTF_8.name());
+
+        String acao = request.getParameter("acao");
+        if ("create".equalsIgnoreCase(acao)) {
+            handleCreate(request, response);
+        } else if ("update".equalsIgnoreCase(acao)) {
+            handleUpdate(request, response);
+        } else if ("delete".equalsIgnoreCase(acao)) {
+            handleDelete(request, response);
+        } else {
+            writeJson(response, HttpServletResponse.SC_BAD_REQUEST, false, "Ação inválida.", "page");
+        }
+    }*/

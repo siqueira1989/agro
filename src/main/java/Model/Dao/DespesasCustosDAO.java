@@ -46,37 +46,6 @@ public class DespesasCustosDAO {
         System.out.println(existe);
         return existe;
     }
-    //Verificação de Atulização
-
-    public boolean VerificacaoUpdateDespesaCusto(DespesasCustos despesaCusto) throws SQLException {
-        PostgresConnection conn = new PostgresConnection();
-        Connection conexao = conn.getConnection();
-
-        boolean existe = false;
-
-        // Substitua pelo seu método de obter conexão com o banco de dados
-        try {
-            String sql = "SELECT COUNT(*) FROM despesascusto WHERE iddespesascusto = ? and despesascusto = ? and unidadedespesascustos = ? and valordespesascustos = ? and tipodespesascustos = ?";
-            PreparedStatement stmt = conexao.prepareStatement(sql);
-            // Definindo o valor do parâmetro da consulta
-            stmt.setInt(1, despesaCusto.getIddespesascusto());
-            stmt.setString(2, despesaCusto.getDespesascusto());
-            stmt.setString(3, despesaCusto.getUnidadedespesascustos());
-            stmt.setBigDecimal(4, BigDecimal.valueOf(despesaCusto.getValordespesascustos()));
-            stmt.setString(5, despesaCusto.getTipodespesascustos());
-
-            ResultSet rs = stmt.executeQuery();
-            if (rs.next()) {
-                // Verificando se a contagem é maior que zero
-                existe = rs.getInt(1) > 0;
-            }
-
-        } catch (SQLException e) {
-            System.out.println("Erro no nivel dao: " + e.getMessage()); // Tratar exceções de forma adequada na sua aplicação
-        }
-        System.out.println("dao ok");
-        return existe;
-    }
 
     // Método para criar uma nova despesa/custo no banco de dados
     public void create(DespesasCustos despesaCusto) throws SQLException {
@@ -199,4 +168,41 @@ public class DespesasCustosDAO {
         // Retorna o valor formatado
         return formatoBrasileiro.format(valor);
     }
+    public boolean VerificarDadosUpdate(DespesasCustos despesaCusto) throws SQLException {
+                 PostgresConnection conn = new PostgresConnection();
+		 Connection conexao= conn.getConnection();
+                 
+    try {
+
+         String sql = "SELECT COUNT(*) FROM classificacao WHERE iddespesascusto = ? AND despesascusto = ? AND unidadedespesascustos = ? AND valordespesascustos = ? AND tipodespesascustos = ? ";
+          
+         PreparedStatement stmt = conexao.prepareStatement(sql);
+            stmt.setInt(1, despesaCusto.getIddespesascusto());
+            stmt.setString(2, despesaCusto.getDespesascusto());
+            stmt.setString(3, despesaCusto.getUnidadedespesascustos());
+            stmt.setBigDecimal(4, BigDecimal.valueOf(despesaCusto.getValordespesascustos()));
+            stmt.setString(5, despesaCusto.getTipodespesascustos());
+           
+
+        ResultSet rs = stmt.executeQuery();
+        return rs.next() && rs.getInt(1) > 0;
+    } catch (Exception e) {
+          System.out.println("Erro sistema VerificarDadosUpdate " + e.getMessage());
+    }
+        return false;
+}
+    public boolean ExisteEmOutroRegistroDespesasCustos(DespesasCustos despesaCusto) throws SQLException {
+    try (Connection conexao = new PostgresConnection().getConnection();
+         PreparedStatement stmt = conexao.prepareStatement(
+            "SELECT COUNT(*) FROM classificacao WHERE iddespesascusto <> ? AND despesascusto = ? AND unidadedespesascustos = ? AND valordespesascustos = ? AND tipodespesascustos = ? ")) {
+        stmt.setInt(1, despesaCusto.getIddespesascusto());
+            stmt.setString(2, despesaCusto.getDespesascusto());
+            stmt.setString(3, despesaCusto.getUnidadedespesascustos());
+            stmt.setBigDecimal(4, BigDecimal.valueOf(despesaCusto.getValordespesascustos()));
+            stmt.setString(5, despesaCusto.getTipodespesascustos());
+        try (ResultSet rs = stmt.executeQuery()) {
+            return rs.next() && rs.getInt(1) > 0;
+        }
+    }
+}
 }

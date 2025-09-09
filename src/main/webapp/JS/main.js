@@ -265,6 +265,7 @@ function CarregarDadosDespesasCustos() {
         }
     });
 }
+
 function excluirDespesasCustos() {
     var id = $('#exclusaoId').val();
     $.ajax({
@@ -289,7 +290,6 @@ function excluirDespesasCustos() {
         }
     });
 }
-
 
 function atualizarDespesasCustos(id, despesa, unidade, valor, tipo) {
     $.ajax({

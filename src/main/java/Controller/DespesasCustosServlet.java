@@ -150,9 +150,14 @@ public class DespesasCustosServlet extends HttpServlet {
             bean.setUnidadedespesascustos(unidadedespesacustos);
             bean.setValordespesascustos(valor);
             bean.setTipodespesascustos(tipodespesacustos);
-             if (despesasCustosDAO.VerificacaoUpdateDespesaCusto(bean)) {
+             if (despesasCustosDAO.VerificarDadosUpdate(bean)) {
                  System.out.println("ok");
                 writeJson(response, HttpServletResponse.SC_BAD_REQUEST, false, "Despesa/Custo está igual ao cadastro anterior.", "modalAtualizacao");
+                return;
+            }
+              if (despesasCustosDAO.existeDespesaCusto(despesascustos)) {
+                 System.out.println("ok");
+                writeJson(response, HttpServletResponse.SC_BAD_REQUEST, false, "Despesa/Custo está igual ao cadastro  de outro registro.", "modalAtualizacao");
                 return;
             }
             despesasCustosDAO.update(bean);

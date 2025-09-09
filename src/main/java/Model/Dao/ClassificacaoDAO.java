@@ -134,13 +134,40 @@ public class ClassificacaoDAO {
 	                    // Verificando se a contagem é maior que zero
 	                    verificacaoclassificacao = rs.getInt(1)>0;
 	                }
-
-
 	        } catch (SQLException e) {
 	            System.out.println("Erro no nivel dao: "+e.getMessage()); // Tratar exceções de forma adequada na sua aplicação
 	        }
    
 	        return verificacaoclassificacao;
 	    }
+          // Verifica se o valor novo é igual ao que já está no registro
+public boolean DadoAtualClassificacao(int id, String classificacao) throws SQLException {
+             PostgresConnection conn = new PostgresConnection();
+		 Connection conexao= conn.getConnection();
+                 
+    try {
+         String sql = "SELECT COUNT(*) FROM classificacao WHERE idclassificacao = ? AND classificacao = ?";
+          PreparedStatement stmt = conexao.prepareStatement(sql);
+           stmt.setInt(1, id);
+        stmt.setString(2, classificacao);
+        ResultSet rs = stmt.executeQuery();
+        return rs.next() && rs.getInt(1) > 0;
+    } catch (Exception e) {
+    }
+        return false;
 }
 
+// Verifica se já existe em outro registro
+public boolean existeEmOutroRegistroClassificacao(int id, String classificacao) throws SQLException {
+    try (Connection conexao = new PostgresConnection().getConnection();
+         PreparedStatement stmt = conexao.prepareStatement(
+                 "SELECT COUNT(*) FROM classificacao WHERE classificacao = ? AND idclassificacao <> ?")) {
+        stmt.setString(1, classificacao);
+        stmt.setInt(2, id);
+        try (ResultSet rs = stmt.executeQuery()) {
+            return rs.next() && rs.getInt(1) > 0;
+        }
+    }
+}
+
+}

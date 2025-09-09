@@ -116,32 +116,47 @@ public class ClassificacaoServlet extends HttpServlet {
     }
 
     /* ----------------------------- UPDATE ----------------------------- */
-    private void handleUpdate(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        try {
-            String idParam = request.getParameter("id");
-            String classificacaoNome = request.getParameter("classificacao");
+private void handleUpdate(HttpServletRequest request, HttpServletResponse response) throws IOException {
+    try {
+        String idParam = request.getParameter("id");
+        String classificacaoNome = request.getParameter("classificacao");
 
-            if (isBlank(idParam) || isBlank(classificacaoNome)) {
-                writeJson(response, HttpServletResponse.SC_BAD_REQUEST, false,
-                        "ID e classificação são obrigatórios para atualizar.", "modalClassificacaoAtualizar");
-                return;
-            }
-
-            int id = Integer.parseInt(idParam);
-
-            Classificacao classificacao = new Classificacao();
-            classificacao.setIdclassificacao(id);
-            classificacao.setClassificacao(classificacaoNome);
-
-            classificacaoDAO.updateClassificacao(classificacao);
-
-            writeJson(response, HttpServletResponse.SC_OK, true,
-                    "Classificação atualizada com sucesso!", "page");
-        } catch (Exception e) {
-            writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
-                    "Erro ao atualizar: " + e.getMessage(), "modalClassificacaoAtualizar");
+        if (isBlank(idParam) || isBlank(classificacaoNome)) {
+            writeJson(response, HttpServletResponse.SC_BAD_REQUEST, false,
+                    "ID e classificação são obrigatórios para atualizar.", "modalClassificacaoAtualizar");
+            return;
         }
+
+        int id = Integer.parseInt(idParam);
+
+        // 1 - verificar se é o mesmo valor já salvo
+        if (classificacaoDAO.DadoAtualClassificacao(id, classificacaoNome)) {
+            writeJson(response, HttpServletResponse.SC_BAD_REQUEST, false,
+                    "O dado digitado já está gravado nesse registro. Não é permitido atualizar com o mesmo valor.", "modalClassificacaoAtualizar");
+            return;
+        }
+
+        // 2 - verificar se existe em outro registro
+        if (classificacaoDAO.existeEmOutroRegistroClassificacao(id, classificacaoNome)) {
+            writeJson(response, HttpServletResponse.SC_BAD_REQUEST, false,
+                    "Já existe outra classificação com esse valor. Insira um valor diferente.", "modalClassificacaoAtualizar");
+            return;
+        }
+
+        Classificacao classificacao = new Classificacao();
+        classificacao.setIdclassificacao(id);
+        classificacao.setClassificacao(classificacaoNome);
+
+        classificacaoDAO.updateClassificacao(classificacao);
+
+        writeJson(response, HttpServletResponse.SC_OK, true,
+                "Classificação atualizada com sucesso!", "page");
+
+    } catch (Exception e) {
+        writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
+                "Erro ao atualizar: " + e.getMessage(), "modalClassificacaoAtualizar");
     }
+}
 
     /* ----------------------------- DELETE ----------------------------- */
     private void handleDelete(HttpServletRequest request, HttpServletResponse response) throws IOException {
