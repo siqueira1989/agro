@@ -1,7 +1,4 @@
 /*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/JSP_Servlet/Servlet.java to edit this template
- */
 package Controller;
 
 import Model.Dao.EnderecoDAO;
@@ -82,9 +79,7 @@ public class ControllerParceiro extends HttpServlet {
 	}
 
 
-	/**
-	 * @see HttpServlet#doPost(HttpServletRequest request, HttpServletResponse response)
-	 */
+	
 	protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
 		// Declaração de json e acao
 		
@@ -120,7 +115,7 @@ public class ControllerParceiro extends HttpServlet {
 					  idendereco = enderecoDAO.obterIdEnderecoPorCep(endereco);
 				 }
 				 
-				/*Processo de verificacao*/
+				
 				 String cnpj= request.getParameter("cnpjPessoaCnpj");
 				 Boolean TesteCNPJ = parceiroDao.existeCNPJ(cnpj);
 				 	if(TesteCNPJ == true)
@@ -229,7 +224,7 @@ public class ControllerParceiro extends HttpServlet {
  				endereco2.setIdendereco(idendereco);
  				
  		
- 				/*Declaração de variaveis*/
+ 			
  				
  				int idpessoa =Integer.parseInt(request.getParameter("idpessoa"));
  				String nome = request.getParameter("nomepessoa"); 
@@ -246,7 +241,7 @@ public class ControllerParceiro extends HttpServlet {
 				String inscricaoEstadual = request.getParameter("inscricaoEstadualPessoaCnpj"); 
 				String site=	request.getParameter("siteparceiro");
 				
-				/*Declarando para classe*/ 
+				
 				
  				 Parceiro parceiro = new Parceiro(
  						 idpessoa, nome, usuario,
@@ -254,12 +249,10 @@ public class ControllerParceiro extends HttpServlet {
  						 email, telefone, endereco2,
  						 numero, complemento, cnpjpessoa, 
  						 razaoSocial, inscricaoEstadual, site);
- 				
- 				 /*Executando DAO*/
  				 
  				 parceiroDao.updateParceiro(parceiro);
  		
- 				 /*Enviando mensagem redirecionado para Parceiro.jsp*/
+ 				 Enviando mensagem redirecionado para Parceiro.jsp
  				 	
  				 	Mensagem = "Atualizado com Sucesso!";
  				 	Atributo= "success";
@@ -268,7 +261,7 @@ public class ControllerParceiro extends HttpServlet {
  				 	request.getRequestDispatcher(Caminho +"parceiro.jsp").forward(request, response);
 			} catch (Exception e) {
 				
-				/*Enviando mensagem redirecionado para Parceiro.jsp*-> Erro não foi atualizado*/
+			
 				
 				Mensagem = "Erro em atualizar";
 		 		Atributo= "danger";
@@ -308,4 +301,251 @@ public class ControllerParceiro extends HttpServlet {
 		
 	}
 
+}
+*/
+package Controller;
+
+import Model.Dao.EnderecoDAO;
+import Model.Dao.ParceiroDAO;
+import Model.Model.Endereco;
+import Model.Model.Parceiro;
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
+import java.sql.SQLException;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+public class ControllerParceiro extends HttpServlet {
+    private static final long serialVersionUID = 1L;
+
+    private EnderecoDAO enderecoDAO;
+    private ParceiroDAO parceiroDao;
+    private final Gson gson = new Gson();
+
+    @Override
+    public void init() {
+        enderecoDAO = new EnderecoDAO();
+        parceiroDao = new ParceiroDAO();
+    }
+
+    /* ============================================================
+       Helper: resposta JSON padronizada
+       ============================================================ */
+    private void writeJson(HttpServletResponse resp, int status, boolean ok, String msg, String target) throws IOException {
+        resp.setContentType("application/json");
+        resp.setCharacterEncoding(StandardCharsets.UTF_8.name());
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("ok", ok);
+        payload.put("msg", msg);
+        if (target != null) payload.put("target", target);
+
+        resp.setStatus(status);
+        try (PrintWriter out = resp.getWriter()) {
+            out.print(gson.toJson(payload));
+            out.flush();
+        }
+    }
+
+    /* ============================================================
+       GET: lista ou parceiro por ID
+       ============================================================ */
+    @Override
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+
+        response.setContentType("application/json");
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+
+        String idParam = request.getParameter("id");
+
+        try (PrintWriter out = response.getWriter()) {
+            if (idParam != null && !idParam.isEmpty()) {
+                int id = Integer.parseInt(idParam);
+                Parceiro parceiro = parceiroDao.getParceiroById(id);
+
+                if (parceiro != null) {
+                    out.print(gson.toJson(parceiro));
+                } else {
+                    writeJson(response, HttpServletResponse.SC_NOT_FOUND, false,
+                            "Parceiro não encontrado.", "page");
+                }
+            } else {
+                List<Parceiro> lista = parceiroDao.listAllParceiro();
+                out.print(gson.toJson(lista));
+            }
+            out.flush();
+        } catch (Exception e) {
+            writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
+                    "Erro ao carregar parceiros: " + e.getMessage(), "page");
+        }
+    }
+
+    /* ============================================================
+       POST: create | update | delete (JSON no corpo)
+       ============================================================ */
+    @Override
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        request.setCharacterEncoding(StandardCharsets.UTF_8.name());
+
+        StringBuilder json = new StringBuilder();
+        try (BufferedReader reader = request.getReader()) {
+            String linha;
+            while ((linha = reader.readLine()) != null) {
+                json.append(linha);
+            }
+        }
+
+        JsonObject jsonObject = gson.fromJson(json.toString(), JsonObject.class);
+        String acao = jsonObject.get("acao").getAsString();
+
+        switch (acao.toLowerCase()) {
+            case "create":
+                handleCreate(jsonObject, response);
+                break;
+            case "update":
+                handleUpdate(jsonObject, response);
+                break;
+            case "delete":
+                handleDelete(jsonObject, response);
+                break;
+            default:
+                writeJson(response, HttpServletResponse.SC_BAD_REQUEST, false,
+                        "Ação inválida.", "page");
+        }
+    }
+
+    /* ----------------------------- CREATE ----------------------------- */
+    private void handleCreate(JsonObject json, HttpServletResponse response) throws IOException {
+        try {
+            // Endereço
+            Endereco endereco = new Endereco();
+            endereco.setCep(json.get("cep").getAsString());
+
+            int idEndereco;
+            if (enderecoDAO.existeCep(endereco)) {
+                idEndereco = enderecoDAO.obterIdEnderecoPorCep(endereco);
+            } else {
+                endereco.setEndereco(json.get("endereco").getAsString());
+                endereco.setBairro(json.get("bairro").getAsString());
+                endereco.setCidade(json.get("cidade").getAsString());
+                endereco.setEstado(json.get("estado").getAsString());
+                endereco.setPais(json.get("pais").getAsString());
+                enderecoDAO.create(endereco);
+                idEndereco = enderecoDAO.obterIdEnderecoPorCep(endereco);
+            }
+
+            String cnpj = json.get("cnpjPessoaCnpj").getAsString();
+            if (parceiroDao.existeCNPJ(cnpj)) {
+                writeJson(response, HttpServletResponse.SC_BAD_REQUEST, false,
+                        "CNPJ já cadastrado.", "modalCadastroParceiro");
+                return;
+            }
+
+            Endereco endereco2 = new Endereco();
+            endereco2.setIdendereco(idEndereco);
+
+            Parceiro parceiro = new Parceiro(
+                    0,
+                    json.get("nomepessoa").getAsString(),
+                    json.get("usuariopessoa").getAsString(),
+                    json.get("senhapessoa").getAsString(),
+                    json.get("nivelpessoa").getAsString(),
+                    json.get("situacaopessoa").getAsBoolean(),
+                    json.get("emailpessoa").getAsString(),
+                    json.get("telefonepessoa").getAsString(),
+                    endereco2,
+                    json.get("numero").getAsInt(),
+                    json.get("complemento").getAsString(),
+                    cnpj,
+                    json.get("razaoSocialPessoaCnpj").getAsString(),
+                    json.get("inscricaoEstadualPessoaCnpj").getAsString(),
+                    json.get("siteparceiro").getAsString()
+            );
+
+            parceiroDao.addParceiro(parceiro);
+            writeJson(response, HttpServletResponse.SC_OK, true,
+                    "Parceiro cadastrado com sucesso!", "page");
+
+        } catch (Exception e) {
+            writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
+                    "Erro ao cadastrar: " + e.getMessage(), "modalCadastroParceiro");
+        }
+    }
+
+    /* ----------------------------- UPDATE ----------------------------- */
+    private void handleUpdate(JsonObject json, HttpServletResponse response) throws IOException {
+        try {
+            int idEndereco;
+            Endereco endereco = new Endereco();
+            endereco.setCep(json.get("cep").getAsString());
+
+            if (enderecoDAO.existeCep(endereco)) {
+                idEndereco = enderecoDAO.obterIdEnderecoPorCep(endereco);
+            } else {
+                endereco.setEndereco(json.get("endereco").getAsString());
+                endereco.setBairro(json.get("bairro").getAsString());
+                endereco.setCidade(json.get("cidade").getAsString());
+                endereco.setEstado(json.get("estado").getAsString());
+                endereco.setPais(json.get("pais").getAsString());
+                enderecoDAO.create(endereco);
+                idEndereco = enderecoDAO.obterIdEnderecoPorCep(endereco);
+            }
+
+            Endereco endereco2 = new Endereco();
+            endereco2.setIdendereco(idEndereco);
+
+            Parceiro parceiro = new Parceiro(
+                    json.get("idpessoa").getAsInt(),
+                    json.get("nomepessoa").getAsString(),
+                    json.get("usuariopessoa").getAsString(),
+                    json.get("senhapessoa").getAsString(),
+                    json.get("nivelpessoa").getAsString(),
+                    json.get("situacaopessoa").getAsBoolean(),
+                    json.get("emailpessoa").getAsString(),
+                    json.get("telefonepessoa").getAsString(),
+                    endereco2,
+                    json.get("numero").getAsInt(),
+                    json.get("complemento").getAsString(),
+                    json.get("cnpjPessoaCnpj").getAsString(),
+                    json.get("razaoSocialPessoaCnpj").getAsString(),
+                    json.get("inscricaoEstadualPessoaCnpj").getAsString(),
+                    json.get("siteparceiro").getAsString()
+            );
+
+            parceiroDao.updateParceiro(parceiro);
+            writeJson(response, HttpServletResponse.SC_OK, true,
+                    "Parceiro atualizado com sucesso!", "page");
+
+        } catch (Exception e) {
+            writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
+                    "Erro ao atualizar: " + e.getMessage(), "modalAtualizarParceiro");
+        }
+    }
+
+    /* ----------------------------- DELETE ----------------------------- */
+    private void handleDelete(JsonObject json, HttpServletResponse response) throws IOException {
+        try {
+            int id = json.get("idpessoa").getAsInt();
+            boolean situacao = json.get("situacaopessoa").getAsBoolean();
+
+            parceiroDao.deleteParceiro(id, !situacao);
+            writeJson(response, HttpServletResponse.SC_OK, true,
+                    "Parceiro desativado com sucesso!", "page");
+
+        } catch (Exception e) {
+            writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
+                    "Erro ao desativar: " + e.getMessage(), "modalExcluirParceiro");
+        }
+    }
 }

@@ -1,6 +1,5 @@
 package Controller;
 
-
 import Model.Dao.AlimentoClassificacaoDao;
 import Model.Dao.AlimentoDAO;
 import Model.Dao.ClassificacaoDAO;
@@ -10,67 +9,35 @@ import Model.Model.Classificacao;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
-
-
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.util.List;
-
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import static jakarta.ws.rs.client.Entity.json;
+
+import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class ControllerAlimento extends HttpServlet {
     private static final long serialVersionUID = 1L;
-    
+
     private AlimentoDAO alimentodao;
     private AlimentoClassificacaoDao alimentoclassificacaodao;
     private ClassificacaoDAO classificacaoDAO;
-     private final Gson gson = new Gson();
-
-   
+    private final Gson gson = new Gson();
 
     public void init() {
         alimentodao = new AlimentoDAO();
         alimentoclassificacaodao = new AlimentoClassificacaoDao();
         classificacaoDAO = new ClassificacaoDAO();
-        
     }
 
-    public ControllerAlimento() {
-        super();
-    }/*
-
-    @SuppressWarnings("unchecked")
-    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        // Lendo o corpo da requisição JSON
-       
-
-        if ("create".equals(acao)) {
-            try {
-              
-                // Resposta de sucesso
-                response.setContentType("application/json");
-                response.getWriter().write("{\"message\": \"Alimento cadastrado com sucesso!\"}");
-            } catch (Exception e) {
-                // Tratamento de erros
-                e.printStackTrace();
-                response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-                response.getWriter().write("{\"message\": \"Erro ao processar a solicitação\"}");
-            }
-        } else {
-            // Resposta para ações inválidas
-            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-            response.getWriter().write("{\"message\": \"Ação não suportada!\"}");
-        }
-    }*/
+    
     /* ============================================================
        Helper: resposta JSON padronizada
        ============================================================ */
@@ -91,33 +58,13 @@ public class ControllerAlimento extends HttpServlet {
     }
 
     /* ============================================================
-       GET: lista (DataTables consome array). Em erro, {ok:false,...}
-       ============================================================ */
-    @Override
-    protected void doGet(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException {
-        response.setContentType("application/json");
-        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-
-        try {
-            List<Alimento> alimentos = alimentodao.listAll();
-            try (PrintWriter out = response.getWriter()) {
-                out.print(gson.toJson(alimentos));
-                out.flush();
-            }
-        } catch (SQLException e) {
-            writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
-                    "Erro ao carregar classificações: " + e.getMessage(), "page");
-        }
-    }
-
-    /* ============================================================
        POST: create | update | delete com JSON padronizado
        ============================================================ */
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         request.setCharacterEncoding(StandardCharsets.UTF_8.name());
-         StringBuilder json = new StringBuilder();
+
+        StringBuilder json = new StringBuilder();
         try (BufferedReader reader = request.getReader()) {
             String linha;
             while ((linha = reader.readLine()) != null) {
@@ -125,108 +72,90 @@ public class ControllerAlimento extends HttpServlet {
             }
         }
 
-        // Convertendo o JSON em um objeto
-    
         JsonObject jsonObject = gson.fromJson(json.toString(), JsonObject.class);
-
-        // Extraindo a ação do JSON
         String acao = jsonObject.get("acao").getAsString();
-       
-        if ("create".equalsIgnoreCase(acao)) {
-            handleCreate(request, response);
-        } else if ("update".equalsIgnoreCase(acao)) {
-            handleUpdate(request, response);
-        } else if ("delete".equalsIgnoreCase(acao)) {
-            handleDelete(request, response);
-        } else {
-            writeJson(response, HttpServletResponse.SC_BAD_REQUEST, false, "Ação inválida.", "page");
+
+        switch (acao.toLowerCase()) {
+            case "create":
+                handleCreate(jsonObject, response);
+                break;
+            case "update":
+                handleUpdate(jsonObject, response);
+                break;
+            case "delete":
+                handleDelete(jsonObject, response);
+                break;
+            default:
+                writeJson(response, HttpServletResponse.SC_BAD_REQUEST, false, "Ação inválida.", "page");
         }
     }
 
     /* ----------------------------- CREATE ----------------------------- */
-    private void handleCreate(HttpServletRequest request, HttpServletResponse response) throws IOException {
+    private void handleCreate(JsonObject jsonObject, HttpServletResponse response) throws IOException {
         try {
-            StringBuilder json = new StringBuilder();
-        try (BufferedReader reader = request.getReader()) {
-            String linha;
-            while ((linha = reader.readLine()) != null) {
-                json.append(linha);
-            }
-        }
-             JsonObject jsonObject = gson.fromJson(json.toString(), JsonObject.class);
-             // Extraindo os demais parâmetros do JSON
-                String alimento = jsonObject.get("alimento").getAsString();
-                String variedade = jsonObject.get("variedade").getAsString();
-                String tipo = jsonObject.get("tipo").getAsString();
-                List<String> classificacoes = gson.fromJson(jsonObject.get("classificacoes"), List.class);
+            String alimento = jsonObject.get("alimento").getAsString();
+            String variedade = jsonObject.get("variedade").getAsString();
+            String tipo = jsonObject.get("tipo").getAsString();
+            List<String> classificacoes = gson.fromJson(jsonObject.get("classificacoes"), List.class);
 
-               if (isBlank(alimento) || isBlank(variedade)|| isBlank(tipo) || isBlank(classificacoes)) {
+            if (isBlank(alimento) || isBlank(variedade) || isBlank(tipo) || isBlank(classificacoes)) {
                 writeJson(response, HttpServletResponse.SC_BAD_REQUEST, false,
-                        "ID e classificação são obrigatórios para atualizar.", "modalClassificacaoAtualizar");
+                        "Todos os campos são obrigatórios para cadastrar.", "modalClassificacaoCadastro");
                 return;
             }
-                
-                // Obtém o número antes do loop
-                int numero = alimentoclassificacaodao.RetornoIdAlimento();
-               System.out.println("Número gerado: " + numero);
- Alimento alimentoObj= new Alimento();
-                alimentoObj.setNomeproduto(alimento);
-                alimentoObj.setTipoproduto(tipo);
-                alimentoObj.setVariedadealimento(variedade);
-                alimentoObj.setSituacaoproduto(true);
-                 alimentodao.addAlimento(alimentoObj);
-              
-                // Loop para cadastrar cada classificação no banco de dados
-               for (String classificacaoId : classificacoes) {
-                    AlimentoClassificacao alimentoClassificacao = new AlimentoClassificacao();
-                    // Instanciando  dentro da  setClassificacao
-                     alimentoClassificacao.setClassificacao(new Classificacao());
-                    alimentoClassificacao.getClassificacao().setIdclassificacao(Integer.parseInt(classificacaoId));
-                   alimentoClassificacao.setAlimento(new Alimento());
-                    alimentoClassificacao.getAlimento().setIdproduto(numero+1); // Associando ao alimento gerado
-                    // Inserindo no banco de dados
-                  alimentoclassificacaodao.addAlimentoClassificacao(alimentoClassificacao);
-                }
-                 writeJson(response, HttpServletResponse.SC_OK, true,
-                    "Alimento cadastrado com sucesso!", "page");
+
+            // Gera o próximo ID
+            int numero = alimentoclassificacaodao.RetornoIdAlimento();
+            System.out.println("Número gerado: " + numero);
+
+            // Cadastra o alimento
+            Alimento alimentoObj = new Alimento();
+            alimentoObj.setNomeproduto(alimento);
+            alimentoObj.setTipoproduto(tipo);
+            alimentoObj.setVariedadealimento(variedade);
+            alimentoObj.setSituacaoproduto(true);
+               if (alimentodao.VerificarDadosAlimento(alimentoObj)) {
+                writeJson(response, HttpServletResponse.SC_BAD_REQUEST, false, "Alimento ja cadastrado.", "ModalCadastroAlimento");
+                return;
+            }
+            
+            alimentodao.addAlimento(alimentoObj);
+
+            // Associa as classificações ao alimento
+            for (String classificacaoId : classificacoes) {
+                AlimentoClassificacao alimentoClassificacao = new AlimentoClassificacao();
+                alimentoClassificacao.setClassificacao(new Classificacao());
+                alimentoClassificacao.getClassificacao().setIdclassificacao(Integer.parseInt(classificacaoId));
+
+                alimentoClassificacao.setAlimento(new Alimento());
+                alimentoClassificacao.getAlimento().setIdproduto(numero + 1); // cuidado aqui
+
+                alimentoclassificacaodao.addAlimentoClassificacao(alimentoClassificacao);
+            }
+
+            writeJson(response, HttpServletResponse.SC_OK, true, "Alimento cadastrado com sucesso!", "page");
         } catch (Exception e) {
             writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
-                    "Erro ao cadastrar: " + e.getMessage(), "modalClassificacaoCadastro");
+                    "Erro ao cadastrar: " + e.getMessage(), "ModalCadastroAlimento");
         }
     }
 
     /* ----------------------------- UPDATE ----------------------------- */
-    private void handleUpdate(HttpServletRequest request, HttpServletResponse response) throws IOException {
+    private void handleUpdate(JsonObject jsonObject, HttpServletResponse response) throws IOException {
         try {
-              StringBuilder json = new StringBuilder();
-        try (BufferedReader reader = request.getReader()) {
-            String linha;
-            while ((linha = reader.readLine()) != null) {
-                json.append(linha);
-            }
-        }
-             JsonObject jsonObject = gson.fromJson(json.toString(), JsonObject.class);
-             // Extraindo os demais parâmetros do JSON
-              String id = jsonObject.get("idproduto").getAsString();
-                String alimento = jsonObject.get("alimento").getAsString();
-                String variedade = jsonObject.get("variedade").getAsString();
+            String id = jsonObject.get("idproduto").getAsString();
+            String alimento = jsonObject.get("alimento").getAsString();
+            String variedade = jsonObject.get("variedade").getAsString();
 
-            if (isBlank(alimento) || isBlank(variedade)|| isBlank(id)) {
+            if (isBlank(id) || isBlank(alimento) || isBlank(variedade)) {
                 writeJson(response, HttpServletResponse.SC_BAD_REQUEST, false,
-                        "ID e classificação são obrigatórios para atualizar.", "modalClassificacaoAtualizar");
+                        "ID e campos obrigatórios para atualizar.", "modalClassificacaoAtualizar");
                 return;
             }
 
-           // int id = Integer.parseInt(idParam);
-
-           /* Classificacao classificacao = new Classificacao();
-            classificacao.setIdclassificacao(id);
-            classificacao.setClassificacao(classificacaoNome);*/
-
-           // classificacaoDAO.updateClassificacao(classificacao);
-
+            // Atualização do alimento pode ser feita aqui se for implementada
             writeJson(response, HttpServletResponse.SC_OK, true,
-                    "Classificação atualizada com sucesso!", "page");
+                    "Atualizado com sucesso!", "page");
         } catch (Exception e) {
             writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
                     "Erro ao atualizar: " + e.getMessage(), "modalClassificacaoAtualizar");
@@ -234,9 +163,9 @@ public class ControllerAlimento extends HttpServlet {
     }
 
     /* ----------------------------- DELETE ----------------------------- */
-    private void handleDelete(HttpServletRequest request, HttpServletResponse response) throws IOException {
+    private void handleDelete(JsonObject jsonObject, HttpServletResponse response) throws IOException {
         try {
-            String idParam = request.getParameter("id");
+            String idParam = jsonObject.get("id").getAsString();
 
             if (isBlank(idParam)) {
                 writeJson(response, HttpServletResponse.SC_BAD_REQUEST, false,
@@ -245,14 +174,15 @@ public class ControllerAlimento extends HttpServlet {
             }
 
             int id = Integer.parseInt(idParam);
-            
-              if (classificacaoDAO.VerificacaoClassificacaoAlimento(id)) {
-                writeJson(response, HttpServletResponse.SC_BAD_REQUEST, false, "Informação não pode ser excluida.", "modalClassificacaoExcluir");
+
+            if (classificacaoDAO.VerificacaoClassificacaoAlimento(id)) {
+                writeJson(response, HttpServletResponse.SC_BAD_REQUEST, false,
+                        "Informação não pode ser excluída.", "modalClassificacaoExcluir");
                 return;
             }
+
             Classificacao classificacao = new Classificacao();
             classificacao.setIdclassificacao(id);
-
             classificacaoDAO.deleteClassificacao(classificacao);
 
             writeJson(response, HttpServletResponse.SC_OK, true,
@@ -263,16 +193,43 @@ public class ControllerAlimento extends HttpServlet {
         }
     }
 
-    /* ============================================================
-       Util
-       ============================================================ */
+    /* ----------------------------- GET: Lista ----------------------------- */
+    @Override
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        response.setContentType("application/json");
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+         PrintWriter out = response.getWriter();
+        try {
+            String id =request.getParameter("id");
+            if (id != null && !id.isEmpty()){
+                 int idalimento = Integer.parseInt(id);
+                Alimento alimento = alimentodao.AlimentoBuscaID(idalimento);
+                if (alimento != null) {
+                    System.out.println("alimento" + alimento);
+                    out.print(gson.toJson(alimento));
+                } else {
+                    writeJson(response, HttpServletResponse.SC_BAD_REQUEST, false,
+                        "Informação não encontrada.", "page");
+                }
+            }else{
+            List<Alimento> alimentos = alimentodao.listAll();
+             out.print(gson.toJson(alimentos));
+                out.flush();
+            }
+        } catch (SQLException e) {
+            writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
+                    "Erro ao carregar alimentos: " + e.getMessage(), "page");
+        }
+    }
+    
+
+
     private boolean isBlank(String s) {
         return s == null || s.trim().isEmpty();
     }
-  
-    private boolean isBlank(List<String> classificacoes) {
-       return classificacoes == null || classificacoes.isEmpty();
+
+    private boolean isBlank(List<String> list) {
+        return list == null || list.isEmpty();
     }
 }
- 
-

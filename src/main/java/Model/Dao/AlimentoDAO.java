@@ -17,7 +17,8 @@ public class AlimentoDAO {
 
         List<Alimento> alimentos = new ArrayList<>();
         try {
-            String sql = "SELECT * FROM classificacao";
+            String sql = "SELECT idproduto,nomeproduto, situacaoproduto, "
+                    + "tipoproduto, variedadealimento FROM alimento";
             PreparedStatement stmt = conexao.prepareStatement(sql);
             ResultSet rs = stmt.executeQuery();
             while (rs.next()) {
@@ -25,6 +26,8 @@ public class AlimentoDAO {
 
                 alimento.setIdproduto(rs.getInt("idproduto"));
                 alimento.setNomeproduto(rs.getString("nomeproduto"));
+                alimento.setSituacaoproduto(rs.getBoolean("situacaoproduto"));
+                alimento.setTipoproduto(rs.getString("tipoproduto"));
                 alimento.setVariedadealimento(rs.getString("variedadealimento"));
 
                 alimentos.add(alimento);
@@ -37,7 +40,34 @@ public class AlimentoDAO {
 
         return alimentos;
     }
+public Alimento  AlimentoBuscaID( int idalimento) throws SQLException {
+        PostgresConnection conn = new PostgresConnection();
+        Connection conexao = conn.getConnection();
+         Alimento alimento = null;
+       
+        try {
+            String sql = "SELECT idproduto,nomeproduto, situacaoproduto, "
+                    + "tipoproduto, variedadealimento FROM alimento where idproduto=? ";
+            PreparedStatement stmt = conexao.prepareStatement(sql);
+            stmt.setInt(1, idalimento);
+            ResultSet rs = stmt.executeQuery();
+            if(rs.next()) {
+                alimento = new Alimento();
 
+                alimento.setIdproduto(rs.getInt("idproduto"));
+                alimento.setNomeproduto(rs.getString("nomeproduto"));
+                alimento.setSituacaoproduto(rs.getBoolean("situacaoproduto"));
+                alimento.setTipoproduto(rs.getString("tipoproduto"));
+                alimento.setVariedadealimento(rs.getString("variedadealimento"));
+            }
+            conexao.close();
+        } catch (SQLException e) {
+            System.out.println("Erro na camada Dao: " + e.getMessage());
+
+        }
+
+        return alimento;
+    }
     public void addAlimento(Alimento alimento) throws SQLException {
         PostgresConnection conn = new PostgresConnection();
         Connection conexao = conn.getConnection();
@@ -79,6 +109,26 @@ public class AlimentoDAO {
             throw new RuntimeException("Erro ao adicionar o parceiro: " + e.getMessage(), e);
         }
     }
+    /*Metodo de veriticação*/
+         public boolean VerificarDadosAlimento(Alimento alimento) throws SQLException {
+                 PostgresConnection conn = new PostgresConnection();
+		 Connection conexao= conn.getConnection();
+                 
+    try {
+
+         String sql = "SELECT COUNT(*) FROM alimento WHERE nomeproduto = ? AND tipoproduto = ? AND variedadealimento = ?";
+          
+         PreparedStatement stmt = conexao.prepareStatement(sql);
+            stmt.setString(1, alimento.getNomeproduto());
+            stmt.setString(2, alimento.getTipoproduto());
+            stmt.setString(3, alimento.getVariedadealimento());
+        ResultSet rs = stmt.executeQuery();
+        return rs.next() && rs.getInt(1) > 0;
+    } catch (Exception e) {
+          System.out.println("Erro sistema VerificarDadosUpdate " + e.getMessage());
+    }
+        return false;
+}
 }
 
     

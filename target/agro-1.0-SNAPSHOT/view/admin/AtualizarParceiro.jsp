@@ -7,7 +7,7 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>AgroFazenda - Atualização de Parceiros</title>
+    <title>Agro - Atualização de Parceiros</title>
     <!-- jQuery Mask Plugin -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.mask/1.14.16/jquery.mask.min.js"></script>
     <!-- Bootstrap 4 CSS -->

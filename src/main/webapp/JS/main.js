@@ -1,24 +1,27 @@
 /******************************************************************************************************/
 /*Modulo Geral*/
 /******************************************************************************************************/
-
-function mostrarAlerta(mensagem, tipo = 'info', seletor = '#alerta', autoHideMs = 5000) {
+function mostrarAlerta(mensagem, tipo = 'info', seletor = '#alerta', autoHideMs = 4000) {
     const $box = $(seletor);
-    if ($box.length === 0)
+    if ($box.length === 0) {
+        console.warn('Elemento de alerta não encontrado:', seletor);
         return;
+    }
+console.log("Mostrando alerta:", mensagem, "->", seletor);
 
     $box
-            .removeClass('d-none alert-success alert-danger alert-info alert-warning')
-            .addClass(`alert alert-${tipo}`)
-            .html(mensagem)      // pode receber HTML simples (negrito, <br>, etc.)
-            .fadeIn();
+        .removeClass('d-none alert-success alert-danger alert-info alert-warning')
+        .addClass(`alert alert-${tipo}`)
+        .html(mensagem)
+        .fadeIn();
 
     if (autoHideMs > 0) {
         setTimeout(() => {
             $box.fadeOut(() => $box.addClass('d-none'));
         }, autoHideMs);
+    }
 }
-}
+
 
 function formatarMoeda(valor) {
     valor = valor.replace(/\D/g, ''); // Remove tudo que não for dígito
@@ -80,8 +83,8 @@ function CarregarClassificacao() {
                     return '<button class="btn btn-sm btn-warning btn-responsivo mr-3 ml-3" onclick="abrirModalAtualizacaoClassificacao('
                             + row.idclassificacao + ', \''
 
-                            + row.classificacao + '\')"><i class="fas fa-sync"></i><span class="texto-botao">Atualizar</span></button> ' +
-                            '<button class="btn btn-sm btn-danger btn-responsivo" onclick="abrirModalExclusaoClassificacao(' + row.idclassificacao + ', \'' + row.classificacao + '\')"><i class="fas fa-trash-alt"></i><span class="texto-botao">Excluir</span></button>';
+                            + row.classificacao + '\')"><i class="fas fa-sync mr-1"></i><span class="texto-botao">Atualizar</span></button> ' +
+                            '<button class="btn btn-sm btn-danger btn-responsivo" onclick="abrirModalExclusaoClassificacao(' + row.idclassificacao + ', \'' + row.classificacao + '\')"><i class="fas fa-trash-alt mr-1"></i><span class="texto-botao">Excluir</span></button>';
                 }
             }
         ],
@@ -105,7 +108,7 @@ function abrirModalExclusaoClassificacao(id, classificacao) {
 
 function salvarClassificacao() {
     const classificacao = $('#classificacao').val();
-    
+
     $.ajax({
         url: '/agro/ClassificacaoServlet',
         method: 'POST',
@@ -243,7 +246,7 @@ function CarregarDadosDespesasCustos() {
                 "data": "valordespesascustos",
                 "render": function (data, type, row) {
                     const valor = parseFloat(data);
-                   return isNaN(valor) ? '-' : 'R$ ' + valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    return isNaN(valor) ? '-' : 'R$ ' + valor.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
                 }
             },
             {"data": "tipodespesascustos"},
@@ -255,8 +258,8 @@ function CarregarDadosDespesasCustos() {
                             + row.despesascusto + '\', \''
                             + row.unidadedespesascustos + '\', \''
                             + row.valordespesascustos + '\', \''
-                            + row.tipodespesascustos + '\')"><i class="fas fa-sync"></i><span class="texto-botao">Atualizar</span></button> ' +
-                            '<button class="btn btn-sm btn-danger btn-responsivo" onclick="abrirModalExclusaoDespesasCustos(' + row.iddespesascusto + ', \'' + row.despesascusto + '\')"><i class="fas fa-trash-alt"></i><span class="texto-botao">Excluir</span></button>';
+                            + row.tipodespesascustos + '\')"><i class="fas fa-sync mr-1"></i><span class="texto-botao">Atualizar</span></button> ' +
+                            '<button class="btn btn-sm btn-danger btn-responsivo" onclick="abrirModalExclusaoDespesasCustos(' + row.iddespesascusto + ', \'' + row.despesascusto + '\')"><i class="fas fa-trash-alt mr-1"></i><span class="texto-botao">Excluir</span></button>';
                 }
             }
         ],
@@ -384,6 +387,154 @@ $('#modalCadastro').on('hidden.bs.modal', function () {
 /******************************************************************************************************/
 /* Alimento*/
 /******************************************************************************************************/
+//Limpeza do Formulario
 
-// Função para carregar classificações no select
+// Função AJAX para cadastrar alimento
+function salvarAlimento() {
+    const alimento = $('#alimento').val();
+    const variedade = $('#variedade').val();
+    const tipo = $('#tipo').val();
+    const classificacoesSelecionadas = $('#SelectClassificacao').val();
+
+    const data = {
+        acao: 'create',
+        alimento: alimento,
+        tipo: tipo,
+        variedade: variedade,
+        classificacoes: classificacoesSelecionadas
+    };
+
+    $.ajax({
+        url: '/agro/ControllerAlimento',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(data),
+success: function (resp) {
+    // Fecha o modal primeiro
+    $('#modalFormulario').modal('hide');
+
+    // Espera o modal ser escondido para mostrar o alerta
+    $('#modalFormulario').one('hidden.bs.modal', function () {
+        $('#formAlimento')[0].reset();
+        $('#formAlimento').removeClass('was-validated');
+        $('#tabelaalimentos').DataTable().ajax.reload();
+
+        // 🔥 Aqui o alerta será visível, pois o modal já está fechado
+        mostrarAlerta(resp.msg || 'Alimento cadastrado com sucesso!', 'success', '#alerta', 4000);
+    });
+},
+        error: function (xhr) {
+            let msg = 'Erro ao cadastrar alimento.';
+            let target = '#alerta';
+
+            try {
+                const json = JSON.parse(xhr.responseText);
+                msg = json.msg || msg;
+                if (json.target) {
+                    target = '#' + json.target;
+                }
+            } catch (e) {
+                console.error('Erro ao tratar JSON de erro:', e);
+            }
+
+            mostrarAlerta(msg, 'danger', target, 5000);
+        }
+    });
+}
+
+// Função para carregar classificações no select no cadastro modal Alimento
+
+function CarregarClassificacaoModal() {
+    $.ajax({
+        url: '/agro/ClassificacaoServlet',
+        method: 'GET',
+        dataType: 'json',
+        success: function (classificacoes) {
+            let select = $('#SelectClassificacao');
+            select.empty();
+            select.append('<option disabled value="">Selecione uma ou mais classificações...</option>');
+            classificacoes.forEach(function (item) {
+                select.append('<option value="' + item.idclassificacao + '">' + item.classificacao + '</option>');
+            });
+        },
+        error: function () {
+            mostrarAlerta('Erro ao carregar classificações.', 'danger');
+        }
+    });
+}
+/* Abertura de Modal de  Atualização*/
+function editarAlimento(id) {
+    $.ajax({
+        url: '/agro/ControllerAlimento',
+        method: 'GET',
+        data: { id: id },
+        dataType: 'json',
+        success: function (data) {
+            // Armazena os dados no sessionStorage para usar na próxima página
+            sessionStorage.setItem('alimentoParaAtualizar', JSON.stringify(data));
+            // Redireciona para página de atualização
+            window.location.href = 'AtualizacaoAlimento.jsp';
+             
+        },
+        error: function (xhr) {
+            if (xhr.status === 404) {
+                mostrarAlerta("Alimento não encontrado.", "danger");
+            } else {
+                mostrarAlerta("Erro ao buscar dados do alimento.", "danger");
+            }
+        }
+    });
+}
+
+
+/* Carregamento de  tabela Alimento*/
+function CarregarAlimento() {
+
+    // Inicializa o DataTable
+    if ($.fn.DataTable.isDataTable('#tabelaAlimento')) {
+        $('#tabelaAlimento').DataTable().destroy();
+    }
+    const tabela = $('#tabelaAlimento').DataTable({
+        "processing": true,
+        "serverSide": false,
+
+        "ajax": {
+            "url": "/agro/ControllerAlimento",
+            "method": "GET",
+            "dataSrc": ""
+        },
+        "columns": [
+            {"data": "idproduto"},
+            {"data": "nomeproduto"},
+            {
+                "data": "situacaoproduto",
+            
+                 "render": function(data) {
+                            // Badge para situação
+                            if (data) {
+                                return '<span class="badge badge-success">Ativo</span>';
+                            } else {
+                                return '<span class="badge badge-danger">Inativo</span>';
+                            }
+                        }
+            
+            },
+            {"data": "tipoproduto"},
+            {"data": "variedadealimento"},
+            {
+                "data": null,
+                "title": "Ações",
+
+                "render": function (data, type, row) {
+                    return '<button class="btn btn-sm btn-warning btn-responsivo mr-3 ml-3" onclick="editarAlimento(' + row.idproduto + ')">' +
+       '<i class="fas fa-sync mr-1"></i><span class="texto-botao">Atualizar</span></button>';
+
+                }
+            }
+        ],
+        "language": {
+            "url": 'https://cdn.datatables.net/plug-ins/2.1.6/i18n/pt-BR.json'
+        }
+    });
+}
            

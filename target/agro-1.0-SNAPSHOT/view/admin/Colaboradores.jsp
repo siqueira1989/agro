@@ -5,7 +5,7 @@
 %>
 <html>
 <head>
-    <title>Simulação - Painel Funcionários</title>
+    <title>Agro- Gestão de  Colaboradores</title>
 
     <!-- Bootstrap 4 CSS -->
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
