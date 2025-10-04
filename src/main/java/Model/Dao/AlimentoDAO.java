@@ -40,18 +40,19 @@ public class AlimentoDAO {
 
         return alimentos;
     }
-public Alimento  AlimentoBuscaID( int idalimento) throws SQLException {
+
+    public Alimento AlimentoBuscaID(int idalimento) throws SQLException {
         PostgresConnection conn = new PostgresConnection();
         Connection conexao = conn.getConnection();
-         Alimento alimento = null;
-       
+        Alimento alimento = null;
+
         try {
             String sql = "SELECT idproduto,nomeproduto, situacaoproduto, "
                     + "tipoproduto, variedadealimento FROM alimento where idproduto=? ";
             PreparedStatement stmt = conexao.prepareStatement(sql);
             stmt.setInt(1, idalimento);
             ResultSet rs = stmt.executeQuery();
-            if(rs.next()) {
+            if (rs.next()) {
                 alimento = new Alimento();
 
                 alimento.setIdproduto(rs.getInt("idproduto"));
@@ -68,6 +69,7 @@ public Alimento  AlimentoBuscaID( int idalimento) throws SQLException {
 
         return alimento;
     }
+
     public void addAlimento(Alimento alimento) throws SQLException {
         PostgresConnection conn = new PostgresConnection();
         Connection conexao = conn.getConnection();
@@ -109,45 +111,27 @@ public Alimento  AlimentoBuscaID( int idalimento) throws SQLException {
             throw new RuntimeException("Erro ao adicionar o parceiro: " + e.getMessage(), e);
         }
     }
-    /*Metodo de veriticação*/
-         public boolean VerificarDadosAlimento(Alimento alimento) throws SQLException {
-                 PostgresConnection conn = new PostgresConnection();
-		 Connection conexao= conn.getConnection();
-                 
-    try {
 
-         String sql = "SELECT COUNT(*) FROM alimento WHERE nomeproduto = ? AND tipoproduto = ? AND variedadealimento = ?";
-          
-         PreparedStatement stmt = conexao.prepareStatement(sql);
+    /*Metodo de veriticação*/
+    public boolean VerificarDadosAlimento(Alimento alimento) throws SQLException {
+        PostgresConnection conn = new PostgresConnection();
+        Connection conexao = conn.getConnection();
+
+        try {
+
+            String sql = "SELECT COUNT(*) FROM alimento WHERE nomeproduto = ?"
+                    + " AND tipoproduto = ? AND variedadealimento = ?";
+
+            PreparedStatement stmt = conexao.prepareStatement(sql);
             stmt.setString(1, alimento.getNomeproduto());
             stmt.setString(2, alimento.getTipoproduto());
             stmt.setString(3, alimento.getVariedadealimento());
-        ResultSet rs = stmt.executeQuery();
-        return rs.next() && rs.getInt(1) > 0;
-    } catch (Exception e) {
-          System.out.println("Erro sistema VerificarDadosUpdate " + e.getMessage());
-    }
-        return false;
-}
-}
-
-    
-
-    /* ============================================================
-       POST: create | update | delete com JSON padronizado
-       ============================================================ */
-   /* @Override
-    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        request.setCharacterEncoding(StandardCharsets.UTF_8.name());
-
-        String acao = request.getParameter("acao");
-        if ("create".equalsIgnoreCase(acao)) {
-            handleCreate(request, response);
-        } else if ("update".equalsIgnoreCase(acao)) {
-            handleUpdate(request, response);
-        } else if ("delete".equalsIgnoreCase(acao)) {
-            handleDelete(request, response);
-        } else {
-            writeJson(response, HttpServletResponse.SC_BAD_REQUEST, false, "Ação inválida.", "page");
+            ResultSet rs = stmt.executeQuery();
+            return rs.next() && rs.getInt(1) > 0;
+        } catch (Exception e) {
+            System.out.println("Erro sistema VerificarDadosUpdate " + e.getMessage());
         }
-    }*/
+        return false;
+    }
+    
+}

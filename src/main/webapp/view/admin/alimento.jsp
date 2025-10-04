@@ -63,7 +63,7 @@
                             <th>ID Alimento</th>
                             <th>Alimento</th>
                             <th>Situação</th>
-                            <th>Tipo Aliemento</th>
+                            <th>Tipo Alimento</th>
                             <th>Variedade</th>
                             <th>Ações</th>
                         </tr>

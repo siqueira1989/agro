@@ -64,7 +64,7 @@ function CarregarClassificacao() {
         $('#tabelaClassificacao').DataTable().destroy();
     }
     const tabela = $('#tabelaClassificacao').DataTable({
-        "processing": true,
+        "processing": false,
         "serverSide": false,
 
         "ajax": {
@@ -83,7 +83,7 @@ function CarregarClassificacao() {
                     return '<button class="btn btn-sm btn-warning btn-responsivo mr-3 ml-3" onclick="abrirModalAtualizacaoClassificacao('
                             + row.idclassificacao + ', \''
 
-                            + row.classificacao + '\')"><i class="fas fa-sync mr-1"></i><span class="texto-botao">Atualizar</span></button> ' +
+                            + row.classificacao + '\')"><i class="fas fa-sync mr-1"></i><span class="texto-botao"><texto-botao>Atualizar</texto-botao></span></button> ' +
                             '<button class="btn btn-sm btn-danger btn-responsivo" onclick="abrirModalExclusaoClassificacao(' + row.idclassificacao + ', \'' + row.classificacao + '\')"><i class="fas fa-trash-alt mr-1"></i><span class="texto-botao">Excluir</span></button>';
                 }
             }
@@ -125,7 +125,7 @@ function salvarClassificacao() {
         error: function (xhr) {
             let msg = 'Despesa não atualizada!';
             try {
-                msg = JSON.parse(xhr.responseText).msg || msg
+                msg = JSON.parse(xhr.responseText).msg || msg;
             } catch (e) {
             }
             mostrarAlerta(msg, 'danger', '#modalClassificacaoCadastro', 4000);
@@ -159,7 +159,7 @@ function atualizarClassificacao() {
         error: function (xhr) {
             let msg = 'Despesa não atualizada!';
             try {
-                msg = JSON.parse(xhr.responseText).msg || msg
+                msg = JSON.parse(xhr.responseText).msg || msg;
             } catch (e) {
             }
             mostrarAlerta(msg, 'danger', '#modalClassificacaoAtualizar', 4000);
@@ -184,7 +184,7 @@ function excluirClassificacao() {
         error: function (xhr) {
             let msg = 'Classificação  não excluída!';
             try {
-                msg = JSON.parse(xhr.responseText).msg || msg
+                msg = JSON.parse(xhr.responseText).msg || msg;
             } catch (e) {
 
             }
@@ -286,7 +286,7 @@ function excluirDespesasCustos() {
         error: function (xhr) {
             let msg = 'Despesa não excluída!';
             try {
-                msg = JSON.parse(xhr.responseText).msg || msg
+                msg = JSON.parse(xhr.responseText).msg || msg;
             } catch (e) {
             }
             mostrarAlerta(msg, 'danger', '#alerta');
@@ -315,7 +315,7 @@ function atualizarDespesasCustos(id, despesa, unidade, valor, tipo) {
         error: function (xhr) {
             let msg = 'Despesa não atualizada!';
             try {
-                msg = JSON.parse(xhr.responseText).msg || msg
+                msg = JSON.parse(xhr.responseText).msg || msg;
             } catch (e) {
             }
             mostrarAlerta(msg, 'danger', '#alertModalAtualizacao', 4000);
@@ -345,7 +345,7 @@ function salvarDespesasCustos(despesa, unidade, valor, tipo) {
             // espera { ok:false, msg:"...", target:"modalCadastro" }
             let msg = 'Erro ao cadastrar!';
             try {
-                msg = JSON.parse(xhr.responseText).msg || msg
+                msg = JSON.parse(xhr.responseText).msg || msg;
             } catch (e) {
             }
             // chama alerta no modal de cadastro e fecha em 4 segundos
@@ -387,7 +387,6 @@ $('#modalCadastro').on('hidden.bs.modal', function () {
 /******************************************************************************************************/
 /* Alimento*/
 /******************************************************************************************************/
-//Limpeza do Formulario
 
 // Função AJAX para cadastrar alimento
 function salvarAlimento() {
@@ -462,6 +461,34 @@ function CarregarClassificacaoModal() {
         }
     });
 }
+function CarregarClassificacaoModalAtualizar(idproduto) {
+        // Faz a requisição AJAX separada antes e injeta os dados manualmente
+    $.ajax({
+        url: '/agro/ControllerAlimento',
+        method: 'POST',
+        contentType: 'application/json; charset=utf-8',
+        dataType: 'json',
+        data: JSON.stringify({
+            acao: 'atualizacaoalimentoclassificacaomodal',
+            idproduto: idproduto
+        }),
+      success: function (classificacoes) {
+    console.log("📦 Dados recebidos:", classificacoes);
+    const select = $('#classificacaoSelect');
+    select.empty();
+    select.append('<option disabled value="">Selecione uma ou mais classificações...</option>');
+
+    classificacoes.forEach(function (item) {
+        const c = item.classificacao || item;
+        select.append('<option value="' + c.idclassificacao + '">' + c.classificacao + '</option>');
+    });
+},
+        error: function (xhr) {
+            console.error("❌ Erro no carregamento:", xhr.responseText);
+            mostrarAlerta('Erro ao carregar classificações vinculadas.', 'danger', '#alerta');
+        }
+    });
+}
 /* Abertura de Modal de  Atualização*/
 function editarAlimento(id) {
     $.ajax({
@@ -486,7 +513,6 @@ function editarAlimento(id) {
     });
 }
 
-
 /* Carregamento de  tabela Alimento*/
 function CarregarAlimento() {
 
@@ -495,7 +521,7 @@ function CarregarAlimento() {
         $('#tabelaAlimento').DataTable().destroy();
     }
     const tabela = $('#tabelaAlimento').DataTable({
-        "processing": true,
+        "processing": false,
         "serverSide": false,
 
         "ajax": {
@@ -537,4 +563,67 @@ function CarregarAlimento() {
         }
     });
 }
+
+/*Carregar os dados da classificação para tabela atulizar*/
+
+function CarregarClassificacaoAtualizarAlimento(idproduto) {
+    console.log("🔍 Carregando classificações para o alimento ID:", idproduto);
+
+    // Destroi o DataTable anterior, se existir
+    if ($.fn.DataTable.isDataTable('#AtualizarCarregamentoClassificacao')) {
+        $('#AtualizarCarregamentoClassificacao').DataTable().destroy();
+    }
+
+    // Faz a requisição AJAX separada antes e injeta os dados manualmente
+    $.ajax({
+        url: '/agro/ControllerAlimento',
+        method: 'POST',
+        contentType: 'application/json; charset=utf-8',
+        dataType: 'json',
+        data: JSON.stringify({
+            acao: 'atualizacaoalimentoclassificacao',
+            idproduto: idproduto
+        }),
+        success: function (json) {
+            console.log("✅ Dados recebidos:", json);
+
+            // Inicializa DataTable com os dados retornados
+            $('#AtualizarCarregamentoClassificacao').DataTable({
+                data: json.map(item => ({
+                    idclassificacao: item.classificacao.idclassificacao,
+                    classificacao: item.classificacao.classificacao,
+                    idproduto: item.alimento.idproduto
+                })),
+                columns: [
+                    { data: "idclassificacao" },
+                    { data: "classificacao" },
+                    { data: "idproduto", visible: false },
+                    {
+                        data: null,
+                        title: "Ações",
+                        render: function (data, type, row) {
+                            return `
+                                <button class="btn btn-sm btn-danger btn-responsivo"
+                                        onclick="abrirModalExclusaoClassificacao(${row.idclassificacao}, '${row.classificacao}')">
+                                    <i class="fas fa-trash-alt mr-1"></i>
+                                    <span class="texto-botao">Excluir</span>
+                                </button>`;
+                        }
+                    }
+                ],
+                language: {
+                    url: 'https://cdn.datatables.net/plug-ins/2.1.6/i18n/pt-BR.json'
+                }
+            });
+        },
+        error: function (xhr) {
+            console.error("❌ Erro no carregamento:", xhr.responseText);
+            mostrarAlerta('Erro ao carregar classificações vinculadas.', 'danger', '#alerta');
+        }
+    });
+}
+
+
+
+
            

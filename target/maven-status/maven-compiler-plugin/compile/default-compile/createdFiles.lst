@@ -15,7 +15,6 @@ Model\Model\Produto.class
 Model\Dao\AlimentoClassificacaoDao.class
 Model\Dao\DespesasCustosDAO.class
 com\agro\agro\JakartaRestConfiguration.class
-Model\Dao\EnderecoPessoaDAO.class
 Model\Dao\EnderecoDAO.class
 com\agro\agro\resources\JakartaEE10Resource.class
 Model\Dao\AlimentoDAO.class

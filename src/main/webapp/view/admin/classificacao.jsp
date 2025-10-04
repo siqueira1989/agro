@@ -8,7 +8,7 @@
         <script>
             $(document).ready(function () {
                 CarregarClassificacao();
-                setInterval(CarregarClassificacao, 10000);
+                setInterval(CarregarClassificacao, 20000);
             });
         </script>
     </head>

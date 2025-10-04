@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 
 public class ControllerAlimento extends HttpServlet {
+
     private static final long serialVersionUID = 1L;
 
     private AlimentoDAO alimentodao;
@@ -37,7 +38,6 @@ public class ControllerAlimento extends HttpServlet {
         classificacaoDAO = new ClassificacaoDAO();
     }
 
-    
     /* ============================================================
        Helper: resposta JSON padronizada
        ============================================================ */
@@ -48,7 +48,9 @@ public class ControllerAlimento extends HttpServlet {
         Map<String, Object> payload = new HashMap<>();
         payload.put("ok", ok);
         payload.put("msg", msg);
-        if (target != null) payload.put("target", target);
+        if (target != null) {
+            payload.put("target", target);
+        }
 
         resp.setStatus(status);
         try (PrintWriter out = resp.getWriter()) {
@@ -79,9 +81,16 @@ public class ControllerAlimento extends HttpServlet {
             case "create":
                 handleCreate(jsonObject, response);
                 break;
+            case "atualizacaoalimentoclassificacaomodal":
+                handleAtualizacaoAlimentoClassificacaoModal(jsonObject, response);
+                break;
             case "update":
                 handleUpdate(jsonObject, response);
                 break;
+            case "atualizacaoalimentoclassificacao":
+                handleAtualizacaoAlimentoClassificacao(jsonObject, response);
+                break;
+
             case "delete":
                 handleDelete(jsonObject, response);
                 break;
@@ -114,11 +123,11 @@ public class ControllerAlimento extends HttpServlet {
             alimentoObj.setTipoproduto(tipo);
             alimentoObj.setVariedadealimento(variedade);
             alimentoObj.setSituacaoproduto(true);
-               if (alimentodao.VerificarDadosAlimento(alimentoObj)) {
+            if (alimentodao.VerificarDadosAlimento(alimentoObj)) {
                 writeJson(response, HttpServletResponse.SC_BAD_REQUEST, false, "Alimento ja cadastrado.", "ModalCadastroAlimento");
                 return;
             }
-            
+
             alimentodao.addAlimento(alimentoObj);
 
             // Associa as classificações ao alimento
@@ -199,22 +208,22 @@ public class ControllerAlimento extends HttpServlet {
             throws ServletException, IOException {
         response.setContentType("application/json");
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-         PrintWriter out = response.getWriter();
+        PrintWriter out = response.getWriter();
         try {
-            String id =request.getParameter("id");
-            if (id != null && !id.isEmpty()){
-                 int idalimento = Integer.parseInt(id);
+            String id = request.getParameter("id");
+            if (id != null && !id.isEmpty()) {
+                int idalimento = Integer.parseInt(id);
                 Alimento alimento = alimentodao.AlimentoBuscaID(idalimento);
                 if (alimento != null) {
-                    System.out.println("alimento" + alimento);
+
                     out.print(gson.toJson(alimento));
                 } else {
                     writeJson(response, HttpServletResponse.SC_BAD_REQUEST, false,
-                        "Informação não encontrada.", "page");
+                            "Informação não encontrada.", "page");
                 }
-            }else{
-            List<Alimento> alimentos = alimentodao.listAll();
-             out.print(gson.toJson(alimentos));
+            } else {
+                List<Alimento> alimentos = alimentodao.listAll();
+                out.print(gson.toJson(alimentos));
                 out.flush();
             }
         } catch (SQLException e) {
@@ -222,8 +231,72 @@ public class ControllerAlimento extends HttpServlet {
                     "Erro ao carregar alimentos: " + e.getMessage(), "page");
         }
     }
-    
 
+    /* ----------------------------- DELETE ----------------------------- */
+    private void handleAtualizacaoAlimentoClassificacao(JsonObject jsonObject, HttpServletResponse response) throws IOException {
+        response.setContentType("application/json");
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+
+        try (PrintWriter out = response.getWriter()) {
+            String id = jsonObject.get("idproduto").getAsString();
+
+            if (id == null || id.isEmpty()) {
+                writeJson(response, HttpServletResponse.SC_BAD_REQUEST, false,
+                        "ID não informado.", "page");
+                return;
+            }
+
+            int idproduto = Integer.parseInt(id);
+            System.out.println("Buscando classificações para alimento ID: " + idproduto);
+
+            List<AlimentoClassificacao> lista = alimentoclassificacaodao.ClassificacaoAlimentoBuscaID(idproduto);
+
+            if (lista != null && !lista.isEmpty()) {
+                out.print(gson.toJson(lista));
+                out.flush();
+            } else {
+                writeJson(response, HttpServletResponse.SC_BAD_REQUEST, false,
+                        "Nenhuma classificação encontrada para o alimento.", "page");
+            }
+
+        } catch (SQLException e) {
+            writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
+                    "Erro ao carregar classificação do alimento: " + e.getMessage(), "page");
+        }
+    }
+//atualizacaoalimentoclassificacaomodal
+
+    private void handleAtualizacaoAlimentoClassificacaoModal(JsonObject jsonObject, HttpServletResponse response) throws IOException {
+        response.setContentType("application/json");
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+
+        try (PrintWriter out = response.getWriter()) {
+            String id = jsonObject.get("idproduto").getAsString();
+
+            if (id == null || id.isEmpty()) {
+                writeJson(response, HttpServletResponse.SC_BAD_REQUEST, false,
+                        "ID não informado.", "page");
+                return;
+            }
+
+            int idproduto = Integer.parseInt(id);
+            System.out.println("Buscando classificações para alimento ID: " + idproduto);
+
+            List<AlimentoClassificacao> lista = alimentoclassificacaodao.ClassificacaoAlimentoBuscaModalID(idproduto);
+            System.out.println("teste"+lista);
+            if (lista != null && !lista.isEmpty()) {
+                out.print(gson.toJson(lista));
+                out.flush();
+            } else {
+                writeJson(response, HttpServletResponse.SC_BAD_REQUEST, false,
+                        "Nenhuma classificação encontrada para o alimento.", "page");
+            }
+
+        } catch (SQLException e) {
+            writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
+                    "Erro ao carregar classificação do alimento: " + e.getMessage(), "page");
+        }
+    }
 
     private boolean isBlank(String s) {
         return s == null || s.trim().isEmpty();

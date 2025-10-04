@@ -10,6 +10,8 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 
 public class AlimentoClassificacaoDao {
     
@@ -79,4 +81,86 @@ public class AlimentoClassificacaoDao {
 		  
 		    return numero;
 		}
+         /*metodo de Buscar classificacao por produto*/
+    public List<AlimentoClassificacao> ClassificacaoAlimentoBuscaID(int idproduto) throws SQLException {
+    PostgresConnection conn = new PostgresConnection();
+    Connection conexao = conn.getConnection();
+
+    List<AlimentoClassificacao> alimentosclassificacaos = new ArrayList<>();
+
+    try {
+        String sql = "SELECT a.idproduto, c.idclassificacao, a.nomeproduto, c.classificacao " +
+                     "FROM public.alimentoclassificacao ac " +
+                     "JOIN public.alimento a ON ac.idproduto = a.idproduto " +
+                     "JOIN public.classificacao c ON ac.idclassificacao = c.idclassificacao " +
+                     "WHERE a.idproduto = ? " +
+                     "ORDER BY a.idproduto, c.idclassificacao";
+
+        PreparedStatement stmt = conexao.prepareStatement(sql);
+        stmt.setInt(1, idproduto);
+        ResultSet rs = stmt.executeQuery();
+
+        while (rs.next()) {
+            AlimentoClassificacao alimentoclassificacao = new AlimentoClassificacao();
+            alimentoclassificacao.setAlimento(new Alimento());
+            alimentoclassificacao.setClassificacao(new Classificacao());
+
+            // >>> use os nomes simples, sem alias do SQL
+            alimentoclassificacao.getAlimento().setIdproduto(rs.getInt("idproduto"));
+            alimentoclassificacao.getAlimento().setNomeproduto(rs.getString("nomeproduto"));
+            alimentoclassificacao.getClassificacao().setIdclassificacao(rs.getInt("idclassificacao"));
+            alimentoclassificacao.getClassificacao().setClassificacao(rs.getString("classificacao"));
+
+            alimentosclassificacaos.add(alimentoclassificacao);
+        }
+    } catch (SQLException e) {
+        System.out.println("Erro na camada Dao: " + e.getMessage());
+        throw e;
+    } finally {
+        conexao.close();
+    }
+
+    return alimentosclassificacaos;
 }
+// Metodo para carregar modal
+     public List<AlimentoClassificacao> ClassificacaoAlimentoBuscaModalID(int idproduto) throws SQLException {
+    PostgresConnection conn = new PostgresConnection();
+    Connection conexao = conn.getConnection();
+
+    List<AlimentoClassificacao> alimentosclassificacaos = new ArrayList<>();
+
+    try {
+        String sql = "SELECT  c.idclassificacao,c.classificacao " +
+                     "FROM public.alimentoclassificacao ac " +
+                     "JOIN public.alimento a ON ac.idproduto = a.idproduto " +
+                     "JOIN public.classificacao c ON ac.idclassificacao = c.idclassificacao " +
+                     "WHERE a.idproduto <> ? " +
+                     "ORDER BY a.idproduto, c.idclassificacao";
+
+        PreparedStatement stmt = conexao.prepareStatement(sql);
+        stmt.setInt(1, idproduto);
+        ResultSet rs = stmt.executeQuery();
+
+        while (rs.next()) {
+            AlimentoClassificacao alimentoclassificacao = new AlimentoClassificacao();
+            alimentoclassificacao.setAlimento(new Alimento());
+            alimentoclassificacao.setClassificacao(new Classificacao());
+
+            // >>> use os nomes simples, sem alias do SQL
+            alimentoclassificacao.getClassificacao().setIdclassificacao(rs.getInt("idclassificacao"));
+            alimentoclassificacao.getClassificacao().setClassificacao(rs.getString("classificacao"));
+
+            alimentosclassificacaos.add(alimentoclassificacao);
+        }
+    } catch (SQLException e) {
+        System.out.println("Erro na camada Dao: " + e.getMessage());
+        throw e;
+    } finally {
+        conexao.close();
+    }
+
+    return alimentosclassificacaos;
+}
+
+}
+
