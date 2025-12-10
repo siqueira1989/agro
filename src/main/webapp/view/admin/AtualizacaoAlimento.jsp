@@ -1,7 +1,7 @@
 <%@ page contentType="text/html;charset=UTF-8" language="java"%>
 <html>
 <head>
-    <title>Info4Cloud - Alimento</title>
+    <title>AgroFazenda Admin</title>
     <%@ include file="../../pagina/importacao.html"%>
 
     <script>
@@ -38,7 +38,7 @@
 
 <div class="container-fluid content mt-2">
     <div class="bg-success text-white p-3 rounded mb-4">
-        <h2 class="m-0"><i class="fas fa-sync mr-1"></i>Painel Administrativo</h2>
+        <h2 class="m-0"><i class="fas fa-sync mr-1"></i>Atualização de Alimento</h2>
     </div>
 
     <div id="alerta" class="alert d-none" role="alert"></div>
@@ -63,7 +63,7 @@
                     </div>
                 </div>
                 <div class="d-flex justify-content-end">
-                    <button type="submit" class="btn btn-warning mr-2">
+                    <button type="button" class="btn btn-warning mr-2" onclick="atualizarAlimento()">
                         <i class="fas fa-sync-alt"></i> Atualizar
                     </button>
                     <button type="reset" class="btn btn-secondary">Cancelar</button>
@@ -89,7 +89,6 @@
                             <th>Código</th>
                             <th>Classificação</th>
                             <th class="d-none">ID Produto</th>
-                            <th class="text-center">Ações</th>
                         </tr>
                     </thead>
                 </table>
@@ -109,6 +108,7 @@
                 </button>
             </div>
             <div class="modal-body pb-0">
+                  <div id="ModalAlimentoClassificacao" class="alert d-none" role="alert"></div>
                 <form>
                     <div class="form-group">
                         <p><strong>Alimento:</strong> <span id="valorAlimento"></span></p>
@@ -125,7 +125,7 @@
                 <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">
                     <i class="fas fa-times mr-1"></i>Cancelar
                 </button>
-                <button type="button" class="btn btn-success" onclick="salvarClassificacaoModal()">
+                <button type="button" class="btn btn-success" onclick="salvarClassificacaoModalAtualizacaoAlimento()">
                     <i class="fas fa-check mr-1"></i>Salvar
                 </button>
             </div>

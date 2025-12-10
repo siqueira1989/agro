@@ -5,7 +5,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
-import Model.Model.Endereco;
 import Model.Model.Parceiro;
 import Util.PostgresConnection;
 
@@ -20,8 +19,8 @@ public class ParceiroDAO {
         try {
         	 String sql = "INSERT INTO parceiro ("
             + "nomepessoa, usuariopessoa, senhapessoa, nivelpessoa, "
-            + "situacaopessoa, emailpessoa, numero, complemento, "
-            + "idendereco, telefonepessoa, cnpjPessoaCnpj, razaosocialpessoacnpj, "
+            + "situacaopessoa, emailpessoa,cep ,numero, complemento, "
+            + "telefonepessoa, cnpjPessoaCnpj, razaosocialpessoacnpj, "
             + "inscricaoestadualpessoacnpj, siteparceiro) "
             + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
@@ -32,9 +31,9 @@ public class ParceiroDAO {
             stmt.setString(4, parceiro.getNivelPessoa());
             stmt.setBoolean(5, parceiro.isSituacaoPessoa());
             stmt.setString(6, parceiro.getEmailPessoa());
-            stmt.setInt(7, parceiro.getNumero());
-            stmt.setString(8, parceiro.getComplemento());
-            stmt.setInt(9, parceiro.getEndereco().getIdendereco());
+            stmt.setString(7, parceiro.getCep());
+            stmt.setInt(8, parceiro.getNumero());
+            stmt.setString(9, parceiro.getComplemento());
             stmt.setString(10, parceiro.getTelefonePessoa());
             stmt.setString(11, parceiro.getCnpjPessoaCnpj());
             stmt.setString(12, parceiro.getRazaoSocialPessoaCnpj());
@@ -65,14 +64,7 @@ public class ParceiroDAO {
 
             if (rs.next()) {
                 // Criar o objeto Parceiro e Endereço a partir do ResultSet
-                Endereco endereco = new Endereco();
-                endereco.setIdendereco(rs.getInt("idendereco"));
-                endereco.setEndereco(rs.getString("endereco"));
-                endereco.setCep(rs.getString("cep"));
-                endereco.setBairro(rs.getString("bairro"));
-                endereco.setCidade(rs.getString("cidade"));
-                endereco.setEstado(rs.getString("estado"));
-                endereco.setPais(rs.getString("pais"));
+              
 
                 parceiro = new Parceiro(
                     rs.getInt("idPessoa"),
@@ -83,7 +75,7 @@ public class ParceiroDAO {
                     rs.getBoolean("situacaoPessoa"),
                     rs.getString("emailPessoa"),
                     rs.getString("telefonePessoa"),
-                    endereco,
+                    rs.getString("cep"),
                     rs.getInt("numero"),
                     rs.getString("complemento"),
                     rs.getString("cnpjPessoaCnpj"),
@@ -112,23 +104,13 @@ public class ParceiroDAO {
         
         try {  
             // Consulta SQL para buscar parceiros com seus respectivos endereços
-            String sql = "SELECT * FROM parceiro "
-                       + "INNER JOIN endereco ON parceiro.idendereco = endereco.idendereco";
+            String sql = "SELECT * FROM parceiro ";
                        
             PreparedStatement stmt = conexao.prepareStatement(sql);
             ResultSet rs = stmt.executeQuery();
             
             while (rs.next()) {
-                // Construindo o objeto Endereco
-                Endereco endereco = new Endereco(
-                    rs.getInt("idendereco"),        // ID do endereço
-                    rs.getString("endereco"),       // Endereço
-                    rs.getString("cep"),            // CEP
-                    rs.getString("bairro"),         // Bairro
-                    rs.getString("cidade"),         // Cidade
-                    rs.getString("estado"),         // Estado
-                    rs.getString("pais")            // País
-                );
+              
                 
                 // Construindo o objeto Parceiro
                 Parceiro parceiro = new Parceiro(
@@ -140,7 +122,7 @@ public class ParceiroDAO {
                     rs.getBoolean("situacaopessoa"),      // Situação da pessoa
                     rs.getString("emailpessoa"),          // Email da pessoa
                     rs.getString("telefonepessoa"),       // Telefone da pessoa
-                    endereco,                             // Objeto Endereço
+                    rs.getString("cep"),                             // Objeto Endereço
                     rs.getInt("numero"),            // Número do endereço
                     rs.getString("complemento"),    // Complemento do endereço
                     rs.getString("cnpjPessoaCnpj"),       // CNPJ do parceiro
@@ -190,6 +172,51 @@ public class ParceiroDAO {
  
 	        return existe;
 	    }
+    /*Contagenm do total ativos*/
+ public int contarPorSituacao(boolean ativo) throws SQLException {
+    int numero = 0;
+
+    String sql = "SELECT COUNT(*) FROM parceiro WHERE situacaopessoa = ?";
+
+    try (Connection conexao = new PostgresConnection().getConnection();
+         PreparedStatement stmt = conexao.prepareStatement(sql)) {
+
+        stmt.setBoolean(1, ativo);
+        ResultSet rs = stmt.executeQuery();
+
+        if (rs.next()) {
+            numero = rs.getInt(1); // <- retorna o número corretamente
+        }
+
+    } catch (SQLException e) {
+        System.err.println("Erro ao contar parceiros por situação: " + e.getMessage());
+        throw e; // ou trate conforme sua regra
+    }
+
+    return numero;
+}
+/*Contagem de todo*/
+ public int contarTodos() throws SQLException {
+    int numero = 0;
+
+    String sql = "SELECT COUNT(*) FROM parceiro";
+
+    try (Connection conexao = new PostgresConnection().getConnection();
+         PreparedStatement stmt = conexao.prepareStatement(sql);
+         ResultSet rs = stmt.executeQuery()) {
+
+        if (rs.next()) {
+            numero = rs.getInt(1);
+        }
+
+    } catch (SQLException e) {
+        System.err.println("Erro ao contar todos os parceiros: " + e.getMessage());
+        throw e;
+    }
+
+    return numero;
+}
+/*Verificação id para perceiro*/
     public Integer obterIdPArceiroPorCNPJ(String cnpj) throws SQLException {
 	    PostgresConnection conn = new PostgresConnection();
 	    Connection conexao = conn.getConnection();
@@ -230,7 +257,7 @@ public class ParceiroDAO {
                 String sql = "UPDATE parceiro SET "+
        "nomepessoa = ?, usuariopessoa = ?, senhapessoa = ?, "+
        "nivelpessoa = ?, situacaopessoa = ?, emailpessoa = ?,"+
-       "numero = ?, complemento = ?, idendereco = ?, "+
+       "numero = ?, complemento = ?, cep = ?, "+
        "telefonepessoa = ?, cnpjPessoaCnpj = ?, razaosocialpessoacnpj = ?,"+ 
        "inscricaoestadualpessoacnpj = ?, siteparceiro = ? WHERE idpessoa = ?";
                 PreparedStatement stmt = conexao.prepareStatement(sql);
@@ -244,7 +271,7 @@ public class ParceiroDAO {
             
             stmt.setInt(7, parceiro.getNumero());
             stmt.setString(8, parceiro.getComplemento());
-            stmt.setInt(9, parceiro.getEndereco().getIdendereco());
+            stmt.setString(9, parceiro.getCep());
             
             stmt.setString(10, parceiro.getTelefonePessoa());
             stmt.setString(11, parceiro.getCnpjPessoaCnpj());
@@ -346,4 +373,5 @@ public class ParceiroDAO {
 
         return parceiros;
     }*/
+
 }

@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>Dashboard - Insumos Agrícolas</title>
+
+    <!-- Bootstrap 4.6.2 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+    <!-- DataTables -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap4.min.css">
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        /* GRÁFICOS MENORES */
+        canvas {
+            max-height: 220px !important;
+        }
+    </style>
+</head>
+
+<body class="bg-light">
+
+<!-- NAVBAR -->
+<nav class="navbar navbar-expand-lg navbar-dark bg-success shadow-sm">
+    <a class="navbar-brand font-weight-bold" href="#">
+        <i class="fas fa-seedling"></i> AgroInsumos
+    </a>
+</nav>
+
+<div class="container-fluid mt-4">
+
+    <!-- TÍTULO E BOTÕES -->
+    <div class="row mb-4">
+        <div class="col">
+            <h3 class="text-success font-weight-bold">
+                <i class="fas fa-chart-line"></i> Dashboard de Insumos Agrícolas
+            </h3>
+        </div>
+
+        <div class="col text-right">
+            <button class="btn btn-success mr-2" data-toggle="modal" data-target="#modalNovoInsumo">
+                <i class="fas fa-plus"></i> Novo Insumo
+            </button>
+
+            <button class="btn btn-primary" data-toggle="modal" data-target="#modalEstoque">
+                <i class="fas fa-box"></i> Entrada de Estoque
+            </button>
+        </div>
+    </div>
+
+    <!-- CARDS INTELIGENTES -->
+    <div class="row">
+
+        <div class="col-lg-3 mb-3">
+            <div class="card border-left-primary shadow-sm">
+                <div class="card-body">
+                    <h6 class="text-muted">Valor em Estoque</h6>
+                    <h3 class="font-weight-bold">R$ 92.540</h3>
+                    <i class="fas fa-dollar-sign fa-2x text-primary float-right"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-3 mb-3">
+            <div class="card border-left-danger shadow-sm">
+                <div class="card-body">
+                    <h6 class="text-muted">Itens Vencendo</h6>
+                    <h3 class="font-weight-bold">6</h3>
+                    <i class="fas fa-skull-crossbones fa-2x text-danger float-right"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-3 mb-3">
+            <div class="card border-left-warning shadow-sm">
+                <div class="card-body">
+                    <h6 class="text-muted">Previsão de Compra</h6>
+                    <h3 class="font-weight-bold">18 itens</h3>
+                    <i class="fas fa-shopping-cart fa-2x text-warning float-right"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-3 mb-3">
+            <div class="card border-left-info shadow-sm">
+                <div class="card-body">
+                    <h6 class="text-muted">Consumo Mensal</h6>
+                    <h3 class="font-weight-bold">742 kg</h3>
+                    <i class="fas fa-chart-area fa-2x text-info float-right"></i>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- GRÁFICOS REDUZIDOS -->
+    <div class="row mt-4">
+
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0"><i class="fas fa-chart-bar"></i> Estoque por Categoria</h6>
+                </div>
+                <div class="card-body">
+                    <canvas id="graficoCategorias"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0"><i class="fas fa-chart-line"></i> Gastos Mensais</h6>
+                </div>
+                <div class="card-body">
+                    <canvas id="graficoGastos"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0"><i class="fas fa-chart-pie"></i> Situação dos Insumos</h6>
+                </div>
+                <div class="card-body">
+                    <canvas id="graficoSituacao"></canvas>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- DATATABLE -->
+    <div class="card shadow-sm mb-5">
+        <div class="card-header bg-white">
+            <h5 class="mb-0"><i class="fas fa-list"></i> Lista de Insumos</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table id="tabelaInsumos" class="table table-striped table-bordered">
+                    <thead class="thead-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>Nome</th>
+                            <th>Categoria</th>
+                            <th>Estoque</th>
+                            <th>Preço</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        <tr>
+                            <td>1</td>
+                            <td>Fertilizante NPK</td>
+                            <td>Fertilizante</td>
+                            <td>120</td>
+                            <td>R$ 89,00</td>
+                            <td><span class="badge badge-success">Ativo</span></td>
+                        </tr>
+                        <tr>
+                            <td>2</td>
+                            <td>Herbicida HF-22</td>
+                            <td>Herbicida</td>
+                            <td>14</td>
+                            <td>R$ 122,00</td>
+                            <td><span class="badge badge-warning">Baixo Estoque</span></td>
+                        </tr>
+                        <tr>
+                            <td>3</td>
+                            <td>Semente Soja Premium</td>
+                            <td>Sementes</td>
+                            <td>300</td>
+                            <td>R$ 450,00</td>
+                            <td><span class="badge badge-success">Ativo</span></td>
+                        </tr>
+                    </tbody>
+
+                </table>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- MODAL: NOVO INSUMO -->
+<div class="modal fade" id="modalNovoInsumo" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="fas fa-plus"></i> Cadastrar Novo Insumo</h5>
+                <button type="button" class="close text-white" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+
+            <div class="modal-body">
+
+                <div class="form-group">
+                    <label>Nome do Insumo</label>
+                    <input type="text" class="form-control" placeholder="Ex: Fertilizante NPK 10-10-10">
+                </div>
+
+                <div class="form-group">
+                    <label>Categoria</label>
+                    <select class="form-control">
+                        <option>Fertilizante</option>
+                        <option>Herbicida</option>
+                        <option>Inseticida</option>
+                        <option>Semente</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Unidade</label>
+                    <select class="form-control">
+                        <option>Kg</option>
+                        <option>L</option>
+                        <option>Unidade</option>
+                        <option>Saco</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Preço (R$)</label>
+                    <input type="number" class="form-control" placeholder="0,00">
+                </div>
+
+                <div class="form-group">
+                    <label>Status</label>
+                    <select class="form-control">
+                        <option value="1">Ativo</option>
+                        <option value="0">Inativo</option>
+                    </select>
+                </div>
+
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                <button class="btn btn-success">Salvar Insumo</button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: ENTRADA DE ESTOQUE -->
+<div class="modal fade" id="modalEstoque" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="fas fa-box"></i> Registrar Entrada de Estoque</h5>
+                <button type="button" class="close text-white" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+
+            <div class="modal-body">
+
+                <div class="form-group">
+                    <label>Selecionar Insumo</label>
+                    <select class="form-control">
+                        <option>Fertilizante NPK</option>
+                        <option>Herbicida HF-22</option>
+                        <option>Semente Soja Premium</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Quantidade Adicionada</label>
+                    <input type="number" class="form-control" placeholder="Ex: 150">
+                </div>
+
+                <div class="form-group">
+                    <label>Data da Entrada</label>
+                    <input type="date" class="form-control">
+                </div>
+
+                <div class="form-group">
+                    <label>Observações</label>
+                    <textarea class="form-control" rows="3" placeholder="Opcional"></textarea>
+                </div>
+
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                <button class="btn btn-primary">Salvar Entrada</button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- SCRIPTS -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.min.js"></script>
+
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap4.min.js"></script>
+
+<script>
+/* DATATABLE */
+$(document).ready(function () {
+    $('#tabelaInsumos').DataTable({
+        language: {
+            url: "https://cdn.datatables.net/plug-ins/1.13.6/i18n/Portuguese-Brasil.json"
+        }
+    });
+});
+
+/* GRÁFICOS */
+new Chart(document.getElementById('graficoCategorias'), {
+    type: 'bar',
+    data: {
+        labels: ["Fertilizantes", "Herbicidas", "Inseticidas", "Sementes"],
+        datasets: [{
+            data: [1200, 450, 380, 920],
+            backgroundColor: [
+                "rgba(40,167,69,0.7)",
+                "rgba(255,193,7,0.7)",
+                "rgba(220,53,69,0.7)",
+                "rgba(23,162,184,0.7)"
+            ]
+        }]
+    },
+    options: { responsive: true }
+});
+
+new Chart(document.getElementById('graficoGastos'), {
+    type: 'line',
+    data: {
+        labels: ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun"],
+        datasets: [{
+            data: [3200, 4100, 3800, 4500, 4700, 4900],
+            borderColor: "rgba(40,167,69,1)",
+            fill: false
+        }]
+    },
+    options: { responsive: true }
+});
+
+new Chart(document.getElementById('graficoSituacao'), {
+    type: 'doughnut',
+    data: {
+        labels: ["Ativos", "Baixo Estoque", "Vencendo"],
+        datasets: [{
+            data: [82, 12, 6],
+            backgroundColor: [
+                "rgba(40,167,69,0.8)",
+                "rgba(255,193,7,0.8)",
+                "rgba(220,53,69,0.8)"
+            ]
+        }]
+    },
+    options: { responsive: true }
+});
+</script>
+
+</body>
+</html>

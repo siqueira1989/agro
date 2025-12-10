@@ -31,11 +31,11 @@ public class PessoaFisica extends Pessoa{
 
     public PessoaFisica(
     		int idPessoa, String nomePessoa, String usuarioPessoa, String senhaPessoa, String nivelPessoa,
-			boolean situacaoPessoa, String emailPessoa, String telefonePessoa, Endereco endereco, int numero,
+			boolean situacaoPessoa, String emailPessoa, String telefonePessoa, String cep, int numero,
 			String complemento, String cpfPf,LocalDate dataNascimentoPf 
     		) {
         super(idPessoa, nomePessoa, usuarioPessoa,  senhaPessoa,  nivelPessoa, situacaoPessoa, 
-        		emailPessoa, telefonePessoa,  endereco,numero, complemento);
+        		emailPessoa, telefonePessoa,  cep ,numero, complemento);
         this.cpfPf = cpfPf;
         this.dataNascimentoPf = dataNascimentoPf;
         

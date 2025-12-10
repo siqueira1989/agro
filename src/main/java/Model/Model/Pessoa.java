@@ -14,7 +14,7 @@ public class Pessoa {
     protected boolean situacaoPessoa; // Removido static
     protected String emailPessoa;
     protected String telefonePessoa;
-    private Endereco endereco;  // id endereco
+    private String Cep;
     private int numero;
     private String complemento;
 	public int getIdPessoa() {
@@ -65,12 +65,14 @@ public class Pessoa {
 	public void setTelefonePessoa(String telefonePessoa) {
 		this.telefonePessoa = telefonePessoa;
 	}
-	public Endereco getEndereco() {
-		return endereco;
-	}
-	public void setEndereco(Endereco endereco) {
-		this.endereco = endereco;
-	}
+          public String getCep() {
+        return Cep;
+    }
+
+    public void setCep(String Cep) {
+        this.Cep = Cep;
+    }
+	
 	public int getNumero() {
 		return numero;
 	}
@@ -84,7 +86,7 @@ public class Pessoa {
 		this.complemento = complemento;
 	}
 	public Pessoa(int idPessoa, String nomePessoa, String usuarioPessoa, String senhaPessoa, String nivelPessoa,
-			boolean situacaoPessoa, String emailPessoa, String telefonePessoa, Endereco endereco, int numero,
+			boolean situacaoPessoa, String emailPessoa, String telefonePessoa, String cep, int numero,
 			String complemento) {
 		super();
 		this.idPessoa = idPessoa;
@@ -95,10 +97,12 @@ public class Pessoa {
 		this.situacaoPessoa = situacaoPessoa;
 		this.emailPessoa = emailPessoa;
 		this.telefonePessoa = telefonePessoa;
-		this.endereco = endereco;
+		this.Cep = cep;
 		this.numero = numero;
 		this.complemento = complemento;
 	}
 	public Pessoa() {}
+
+  
   }
 

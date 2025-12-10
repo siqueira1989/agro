@@ -7,10 +7,10 @@ public class PessoaCnpj extends Pessoa {
     protected String inscricaoEstadualPessoaCnpj;
 
     public PessoaCnpj(int idPessoa, String nomePessoa, String usuarioPessoa, String senhaPessoa, String nivelPessoa,
-			boolean situacaoPessoa, String emailPessoa, String telefonePessoa, Endereco endereco, int numero,
+			boolean situacaoPessoa, String emailPessoa, String telefonePessoa, String cep, int numero,
 			String complemento, String cnpjPessoaCnpj, String razaoSocialPessoaCnpj, String inscricaoEstadualPessoaCnpj) {
         super(idPessoa, nomePessoa, usuarioPessoa,  senhaPessoa,  nivelPessoa, situacaoPessoa, 
-        		emailPessoa, telefonePessoa,  endereco,numero, complemento);
+        		emailPessoa , telefonePessoa ,cep ,numero, complemento);
         this.cnpjPessoaCnpj = cnpjPessoaCnpj;
         this.razaoSocialPessoaCnpj = razaoSocialPessoaCnpj;
         this.inscricaoEstadualPessoaCnpj = inscricaoEstadualPessoaCnpj;

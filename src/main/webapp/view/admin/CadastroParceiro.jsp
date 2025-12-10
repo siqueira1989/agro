@@ -1,261 +1,381 @@
 <!DOCTYPE html>
 <%@ page contentType="text/html;charset=UTF-8" language="java" %>
 <html lang="pt-br">
-<head>
-    <meta charset="UTF-8">
-    <title>Agro- Cadastro de Parceiros</title>
-    <!-- Bootstrap 4 CSS -->
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <!-- CSS customizado -->
-    <link href="../../CSS/estilo.css" rel="stylesheet">
-    
-    <script>
-        // Funções para busca do CEP
-        function limpa_formulário_cep() {
-            document.getElementById('endereco').value = "";
-            document.getElementById('bairro').value = "";
-            document.getElementById('cidade').value = "";
-            document.getElementById('estado').value = "";
-        }
-        function meu_callback(conteudo) {
-            if (!("erro" in conteudo)) {
-                document.getElementById('endereco').value = conteudo.logradouro;
-                document.getElementById('bairro').value = conteudo.bairro;
-                document.getElementById('cidade').value = conteudo.localidade;
-                document.getElementById('estado').value = conteudo.uf;
-            } else {
-                limpa_formulário_cep();
-                alert("CEP não encontrado.");
+    <head>
+        <meta charset="UTF-8">
+        <title>Agro- Cadastro de Parceiros</title>
+        <!-- Bootstrap 4 CSS -->
+        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+        <!-- Font Awesome -->
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+        <!-- CSS customizado -->
+        <link href="../../CSS/estilo.css" rel="stylesheet">
+
+
+        <style>
+            .disabled-field {
+                background-color: #e9ecef !important; /* cinza claro */
+                transition: background-color 0.3s ease; /* animação suave */
             }
-        }
-        function pesquisacep(valor) {
-            var cep = valor.replace(/\D/g, '');
-            if (cep !== "") {
-                var validacep = /^[0-9]{8}$/;
-                if(validacep.test(cep)) {
-                    document.getElementById('endereco').value = "...";
-                    document.getElementById('bairro').value = "...";
-                    document.getElementById('cidade').value = "...";
-                    document.getElementById('estado').value = "...";
-                    var script = document.createElement('script');
-                    script.src = 'https://viacep.com.br/ws/' + cep + '/json/?callback=meu_callback';
-                    document.body.appendChild(script);
-                } else {
-                    limpa_formulário_cep();
-                    alert("Formato de CEP inválido.");
-                }
-            } else {
-                limpa_formulário_cep();
-            }
-        }
-    </script>
-</head>
-<body>
-    <header class="header">
-        <%@ include file="../../pagina/menu.jsp" %>
-    </header>
-    
-    <div class="container my-4">
-        <div class="card shadow">
-            <div class="card-header bg-success text-white">
-                <h2 class="mb-0"><i class="fas fa-user-plus"></i> Cadastro de Parceiros</h2>
-            </div>
-            <div class="card-body">
-                <!-- Exibição de mensagens -->
-                <% 
-                    String Mensagem = (String) request.getAttribute("Mensagem");
-                    String Atributo = (String) request.getAttribute("Atributo");
-                    if (Mensagem != null && !Mensagem.trim().isEmpty() && Atributo != null && !Atributo.trim().isEmpty()) {
-                %>
-                <div class="alert alert-<%= Atributo %> alert-dismissible fade show" role="alert">
-                    <strong><i class="fas fa-exclamation-triangle"></i> Atenção!</strong> <%= Mensagem %>
-                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
+        </style>
+    </head>
+    <body>
+        <header class="header">
+            <%@ include file="../../pagina/menu.jsp" %>
+        </header>
+
+        <div class="container-fluid content mt-2">
+
+            <!-- Título -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-body bg-success text-white rounded">
+                    <h4 class="titulo-pagina"><i class="fas fa-user-plus"></i> Cadastrar Parceiro</h4>
                 </div>
-                <% } %>
-                
-                <form method="post" action="/agro/ControllerParceiro" id="cadastroForm" class="needs-validation" novalidate>
-                    <!-- Dados Pessoais -->
-                    <div class="mb-4">
-                        <h4 class="text-success mb-3"><i class="fas fa-user"></i> Dados Pessoais</h4>
-                        <div class="form-row">
-                            <div class="form-group col-md-12">
-                                <label for="nomepessoa"><i class="fas fa-user"></i> Nome Completo</label>
-                                <input type="text" class="form-control" id="nomepessoa" name="nomepessoa" required>
-                                <div class="invalid-feedback">O nome não pode ser vazio.</div>
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group col-md-4">
-                                <label for="usuariopessoa"><i class="fas fa-user-tag"></i> Usuário</label>
-                                <input type="text" class="form-control" id="usuariopessoa" name="usuariopessoa" required>
-                                <div class="invalid-feedback">O nome de usuário não pode ser vazio.</div>
-                            </div>
-                            <div class="form-group col-md-4">
-                                <label for="senhapessoa"><i class="fas fa-lock"></i> Senha</label>
-                                <input type="password" class="form-control" id="senhapessoa" name="senhapessoa" required>
-                                <div class="invalid-feedback">A senha deve ter pelo menos 6 caracteres.</div>
-                            </div>
-                            <div class="form-group col-md-4">
-                                <label for="nivelpessoa"><i class="fas fa-user-cog"></i> Nível</label>
-                                <input type="text" class="form-control" id="nivelpessoa" name="nivelpessoa" value="Parceiro" readonly>
-                                <div class="invalid-feedback">O nível não pode ser vazio.</div>
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group col-md-12">
-                                <label for="emailpessoa"><i class="fas fa-envelope"></i> Email</label>
-                                <input type="email" class="form-control" id="emailpessoa" name="emailpessoa" required>
-                                <div class="invalid-feedback">Informe um email válido.</div>
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group col-md-6">
-                                <label for="situacaopessoa"><i class="fas fa-hourglass-half"></i> Situação</label>
-                                <select class="form-control" id="situacaopessoa" name="situacaopessoa" required>
-                                    <option value="true">Ativo</option>
-                                    <option value="false">Desativo</option>
-                                </select>
-                                <div class="invalid-feedback">A situação não pode ser vazia.</div>
-                            </div>
-                            <div class="form-group col-md-6">
-                                <label for="telefonepessoa"><i class="fas fa-phone"></i> Telefone</label>
-                                <input type="text" class="form-control" id="telefonepessoa" name="telefonepessoa" required>
-                                <div class="invalid-feedback">O telefone não pode ser vazio.</div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Dados da Empresa Parceira -->
-                    <div class="mb-4">
-                        <h4 class="text-success mb-3"><i class="fas fa-building"></i> Dados da Empresa Parceira</h4>
-                        <div class="form-row">
-                            <div class="form-group col-md-12">
-                                <label for="razaoSocialPessoaCnpj"><i class="fas fa-briefcase"></i> Razão Social</label>
-                                <input type="text" class="form-control" id="razaoSocialPessoaCnpj" name="razaoSocialPessoaCnpj" required>
-                                <div class="invalid-feedback">A razão social não pode ser vazia.</div>
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group col-md-6">
-                                <label for="cnpjPessoaCnpj"><i class="fas fa-id-card"></i> CNPJ</label>
-                                <input type="text" class="form-control" id="cnpjPessoaCnpj" name="cnpjPessoaCnpj" required>
-                                <div class="invalid-feedback">O CNPJ não pode ser vazio.</div>
-                            </div>
-                            <div class="form-group col-md-6">
-                                <label for="inscricaoEstadualPessoaCnpj"><i class="fas fa-file-alt"></i> Inscrição Estadual</label>
-                                <input type="text" class="form-control" id="inscricaoEstadualPessoaCnpj" name="inscricaoEstadualPessoaCnpj" required>
-                                <div class="invalid-feedback">A inscrição estadual não pode ser vazia.</div>
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group col-md-8">
-                                <label for="siteparceiro"><i class="fas fa-globe"></i> Site do Parceiro</label>
-                                <input type="text" class="form-control" id="siteparceiro" name="siteparceiro" required>
-                                <div class="invalid-feedback">O site não pode ser vazio.</div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Endereço -->
-                    <div class="mb-4">
-                        <h4 class="text-success mb-3"><i class="fas fa-map-marker-alt"></i> Endereço</h4>
-                        <div class="form-row">
-                            <div class="form-group col-md-4">
-                                <label for="cep"><i class="fas fa-map-pin"></i> CEP</label>
-                                <input type="text" class="form-control" id="cep" name="cep" maxlength="9" onblur="pesquisacep(this.value);" required>
-                                <div class="invalid-feedback">O CEP não pode ser vazio.</div>
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group col-md-12">
-                                <label for="endereco"><i class="fas fa-road"></i> Endereço</label>
-                                <input type="text" class="form-control" id="endereco" name="endereco" required>
-                                <div class="invalid-feedback">O endereço não pode ser vazio.</div>
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group col-md-4">
-                                <label for="numero"><i class="fas fa-thumbtack"></i> Número</label>
-                                <input type="text" class="form-control" id="numero" name="numero" required>
-                                <div class="invalid-feedback">O número não pode ser vazio.</div>
-                            </div>
-                            <div class="form-group col-md-8">
-                                <label for="complemento"><i class="fas fa-info-circle"></i> Complemento</label>
-                                <input type="text" class="form-control" id="complemento" name="complemento">
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group col-md-6">
-                                <label for="bairro"><i class="fas fa-map-marker-alt"></i> Bairro</label>
-                                <input type="text" class="form-control" id="bairro" name="bairro" required>
-                                <div class="invalid-feedback">O bairro não pode ser vazio.</div>
-                            </div>
-                            <div class="form-group col-md-6">
-                                <label for="cidade"><i class="fas fa-city"></i> Cidade</label>
-                                <input type="text" class="form-control" id="cidade" name="cidade" required>
-                                <div class="invalid-feedback">A cidade não pode ser vazia.</div>
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group col-md-6">
-                                <label for="estado"><i class="fas fa-flag"></i> Estado</label>
-                                <input type="text" class="form-control" id="estado" name="estado" required>
-                                <div class="invalid-feedback">O estado não pode ser vazio.</div>
-                            </div>
-                            <div class="form-group col-md-6">
-                                <label for="pais"><i class="fas fa-globe-americas"></i> País</label>
-                                <input type="text" class="form-control" id="pais" name="pais" required>
-                                <div class="invalid-feedback">O país não pode ser vazio.</div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Hidden input para ação -->
-                    <input type="hidden" name="acao" value="create">
-                    <div class="text-center">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-plus"></i> Cadastrar
-                        </button>
-                    </div>
-                </form>
             </div>
+            <div id="alerta" class="alert d-none" role="alert"></div>
+            <!-- FORMULÁRIO COMPLETO -->
+            <form id="formCadastro">
+
+                <!-- DADOS EMPRESA -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-white">
+                        <h5 class="text-success font-weight-bold">
+                            <i class="fas fa-building"></i> Dados da Empresa
+                        </h5>
+                    </div>
+
+                    <div class="card-body">
+                        <div class="form-row">
+                            <div class="form-group col-md-12">
+                                <label>CNPJ *</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control required" id="cnpj" name="cnpj" placeholder="00.000.000/0001-00">
+                                    <div class="input-group-append">
+                                        <span class="input-group-text" id="icone-cnpj">
+                                            <i class="fas fa-spinner fa-spin d-none text-secondary" id="spinner-cnpj"></i>
+                                            <i class="fas fa-check text-success d-none" id="icone-ok"></i>
+                                            <i class="fas fa-times text-danger d-none" id="icone-erro"></i>
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="invalid-feedback">Informe o CNPJ.</div>
+                            </div>
+
+
+                            <div class="form-group col-md-12">
+                                <label>Razão Social *</label>
+                                <input type="text" class="form-control required" id="razao" name="razaosocial">
+                                <div class="invalid-feedback">Informe o razao social.</div>
+                            </div>
+
+                        </div>
+                        <div class="form-row">
+
+
+                            <div class="form-group  col-md-7">
+                                <label>Site</label>
+                                <input type="text" class="form-control" id="site" name="site" placeholder="https://www.exemplo.com.br">
+                            </div>
+                            <div class="form-group col-md-5">
+                                <label>Inscrição Estadual</label>
+                                <input type="text" class="form-control required" id="inscricaoestadual" name="inscricaoestadual">
+                                <div class="invalid-feedback">Informe o Inscricao Estadual.</div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- DADOS COMERCIAIS -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-white">
+                        <h5 class="text-success font-weight-bold">
+                            <i class="fa-regular fa-address-book"></i> Dados Comerciais
+                        </h5>
+                    </div>
+
+                    <div class="card-body">
+
+                        <div class="form-group">
+                            <label>Nome Completo *</label>
+                            <input type="text" class="form-control required" id="nome" name="nome" required>
+                            <div class="invalid-feedback">Informe o nome.</div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group col-md-6">
+                                <label>Usuário *</label>
+                                <input type="text" class="form-control required" id="usuario" name="usuario">
+
+                            </div>
+
+                            <div class="form-group col-md-6">
+                                <label>Senha *</label>
+                                <input type="password" class="form-control required" id="senha" name="senha">
+                            </div>
+
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group col-md-6">
+                                <label>E-mail *</label>
+                                <input type="email" class="form-control required" id="email" name="email">
+                                <div class="invalid-feedback">Informe o email.</div>
+                            </div>
+                            <div class="form-group col-md-6">
+                                <label>Telefone</label>
+                                <input type="telefone" class="form-control required" id="telefone" name="telefone">
+                                <div class="invalid-feedback">Informe  telefone.</div>
+                            </div>
+
+                        </div>
+
+                        <div class="form-row">
+
+                            <div class="form-group col-md-6">
+                                <label>Nível *</label>
+                                <select class="form-control required" id="nivel" name="nivel">
+                                    <option value="">Selecione</option>
+                                    <option value="parceiro">Parceiro</option>
+                                    <option value="insumo">Insumo</option>
+                                    <option value="fornecedor">Fornecedor</option>
+                                </select>
+                                <div class="invalid-feedback">Informe o Nivel.</div>
+                            </div>
+
+
+                            <div class="form-group col-md-6">
+                                <label>Situação</label>
+                                <input type="text" class="form-control" value="Ativo" readonly>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ENDEREÇO -->
+                <div class="card shadow-sm mb-5">
+                    <div class="card-header bg-white">
+                        <h5 class="text-success font-weight-bold">
+                            <i class="fas fa-map-marker-alt"></i> Endereço
+                        </h5>
+                    </div>
+
+                    <div class="card-body">
+
+                        <div class="form-row">
+                            <div class="form-group col-md-4">
+                                <label>CEP *</label>
+                                <input type="text" class="form-control required" id="cep" name="cep">
+                                <div class="invalid-feedback">Informe o CEP.</div>
+                            </div>
+
+                            <div class="form-group col-md-12">
+                                <label>Endereço</label>
+                                <input type="text" class="form-control" id="logradouro" readonly>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+
+                            <div class="form-group col-md-2">
+                                <label>Número *</label>
+                                <input type="text" class="form-control required" id="numero" name="numero">
+                                <div class="invalid-feedback">Informe o numero.</div>
+                            </div>
+
+                            <div class="form-group col-md-4">
+                                <label>Bairro</label>
+                                <input type="text" class="form-control" id="bairro" readonly>
+                            </div>
+
+                            <div class="form-group col-md-4">
+                                <label>Cidade</label>
+                                <input type="text" class="form-control" id="cidade" readonly>
+                            </div>
+
+                            <div class="form-group col-md-2">
+                                <label>UF</label>
+                                <input type="text" class="form-control" id="uf" readonly>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Complemento</label>
+                            <input type="text" class="form-control" id="complemento">
+
+                        </div>
+                    </div>
+                </div>
+
+                <!-- BOTÕES -->
+                <div class="text-right mb-5">
+                    <a href="http://localhost:8080/agro/view/admin/parceiro.jsp" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Voltar
+                    </a>
+
+                   <button type="submit" class="btn btn-success" id="btnSalvar" onclick="salvarParceiro()">
+    <i class="fas fa-save"></i> Salvar Cadastro
+</button>
+                </div>
+
+            </form>
+
         </div>
-    </div>
-    
-    <!-- Scripts -->
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
-    <script>
-        $(document).ready(function() {
-            $('#telefonepessoa').mask('(00) 00000-0000');
-            $('#cnpjPessoaCnpj').mask('00.000.000/0000-00');
-            $('#inscricaoEstadualPessoaCnpj').mask('000.000.000.000');
-            $('#cep').mask('00000-000');
+
+        <!-- Scripts -->
+
+        <!-- jQuery -->
+        <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+        <!-- jQuery Mask -->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.mask/1.14.16/jquery.mask.min.js"></script>
+
+        <!-- Bootstrap -->
+        <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
+
+<script>
+$(document).ready(function () {
+$("#formCadastro").on("submit", function (event) {
+    event.preventDefault(); // Impede o envio padrão do formulário
+    salvarParceiro();       // Chama sua função AJAX
+});
+    // ========= MÁSCARAS =========
+    $('#cep').mask('00000-000');
+    $('#cnpj').mask('00.000.000/0001-00');
+
+    $('#telefone')
+        .mask('(00) 00000-0000')
+        .on('blur', function () {
+            if ($(this).val().length === 14) {
+                $(this).mask('(00) 0000-0000');
+            } else {
+                $(this).mask('(00) 00000-0000');
+            }
         });
-        
-        (function() {
-            'use strict';
-            window.addEventListener('load', function() {
-                var forms = document.getElementsByClassName('needs-validation');
-                Array.prototype.filter.call(forms, function(form) {
-                    form.addEventListener('submit', function(event) {
-                        if (form.checkValidity() === false) {
-                            event.preventDefault();
-                            event.stopPropagation();
-                        }
-                        form.classList.add('was-validated');
-                    }, false);
-                });
-            }, false);
-        })();
-    </script>
-    
-    <footer>
+
+    // ========= FUNÇÃO VALIDAR CNPJ =========
+    function validarCNPJ(cnpj) {
+        cnpj = cnpj.replace(/[^\d]+/g, '');
+        if (cnpj.length !== 14) return false;
+        if (/^(\d)\1{13}$/.test(cnpj)) return false;
+
+        let tamanho = cnpj.length - 2;
+        let numeros = cnpj.substring(0, tamanho);
+        let digitos = cnpj.substring(tamanho);
+        let soma = 0;
+        let pos = tamanho - 7;
+
+        for (let i = tamanho; i >= 1; i--) {
+            soma += numeros.charAt(tamanho - i) * pos--;
+            if (pos < 2) pos = 9;
+        }
+
+        let resultado = soma % 11 < 2 ? 0 : 11 - (soma % 11);
+        if (resultado != digitos.charAt(0)) return false;
+
+        tamanho += 1;
+        numeros = cnpj.substring(0, tamanho);
+        soma = 0;
+        pos = tamanho - 7;
+
+        for (let i = tamanho; i >= 1; i--) {
+            soma += numeros.charAt(tamanho - i) * pos--;
+            if (pos < 2) pos = 9;
+        }
+
+        resultado = soma % 11 < 2 ? 0 : 11 - (soma % 11);
+        return resultado == digitos.charAt(1);
+    }
+
+    // ========= DESABILITAR USUÁRIO / SENHA SE NÃO FOR PARCEIRO =========
+    $("#nivel").on("change", function () {
+        let valor = $(this).val();
+        if (valor !== "parceiro") {
+            $("#usuario, #senha")
+                .prop("disabled", true)
+                .addClass("disabled-field")
+                .fadeTo(200, 0.6)
+                .removeClass("is-invalid is-valid")
+                .val("");
+        } else {
+            $("#usuario, #senha")
+                .prop("disabled", false)
+                .removeClass("disabled-field")
+                .fadeTo(200, 1);
+        }
+    });
+
+    // ========= VIA CEP =========
+    $("#cep").blur(function () {
+        let cep = $(this).val().replace(/\D/g, '');
+        if (cep.length !== 8) return;
+
+        $.getJSON("https://viacep.com.br/ws/" + cep + "/json/", function (data) {
+            if (data.erro) {
+                alert("❌ CEP não encontrado.");
+                return;
+            }
+            $("#logradouro").val(data.logradouro);
+            $("#bairro").val(data.bairro);
+            $("#cidade").val(data.localidade);
+            $("#uf").val(data.uf);
+        });
+    });
+    // ========= Limpar DE CNPJ =========//    // 🟡 Sempre que o usuário DIGITAR no campo CNPJ
+    $("#cnpj").on("input", function () {
+        // Resetar ícones e classes
+        $("#icone-ok, #icone-erro").addClass("d-none");
+        $("#spinner-cnpj").addClass("d-none");
+        $("#cnpj").removeClass("is-valid is-invalid");
+        $("#btnSalvar").prop("disabled", false); // libera botão enquanto digita
+    });
+
+    // 🔵 Quando o usuário sair do campo (blur), fazemos a verificação com o servidor
+    $("#cnpj").on("blur", function () {
+        const cnpj = $(this).val().replace(/\D/g, '');
+
+        // Resetar ícones e botão
+        $("#icone-ok, #icone-erro").addClass("d-none");
+        $("#spinner-cnpj").removeClass("d-none");
+
+        if (cnpj.length !== 14 || !validarCNPJ(cnpj)) {
+            $("#spinner-cnpj").addClass("d-none");
+            $("#icone-erro").removeClass("d-none");
+            $("#cnpj").addClass("is-invalid");
+            $("#btnSalvar").prop("disabled", true);
+            return;
+        }
+
+        // Verificação com backend
+        $.ajax({
+            url: "/agro/ControllerParceiro?cnpj=" + cnpj,
+            method: "GET",
+            dataType: "json",
+            success: function (res) {
+                $("#spinner-cnpj").addClass("d-none");
+                const existe = res.existe === true || res.existe === "true";
+
+                if (existe) {
+                    $("#icone-erro").removeClass("d-none");
+                    $("#cnpj").addClass("is-invalid");
+                    $("#btnSalvar").prop("disabled", true);
+                } else {
+                    $("#icone-ok").removeClass("d-none");
+                    $("#cnpj").removeClass("is-invalid").addClass("is-valid");
+                    $("#btnSalvar").prop("disabled", false);
+                }
+            },
+            error: function () {
+                $("#spinner-cnpj").addClass("d-none");
+                $("#icone-erro").removeClass("d-none");
+                $("#btnSalvar").prop("disabled", true);
+                alert("❌ Erro ao verificar CNPJ.");
+            }
+        });
+    });
+}); // FIM DO DOCUMENT READY — AGORA FECHADO CORRETAMENTE ✔️
+
+</script>
+
         <%@ include file="../../pagina/footer.jsp" %>
     </footer>
 </body>

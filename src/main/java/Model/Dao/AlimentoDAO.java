@@ -97,18 +97,15 @@ public class AlimentoDAO {
         Connection conexao = conn.getConnection();
         System.out.println("nivel 2");
         try {
-            String sql = "UPDATE classificacao SET nomeproduto = ?, tipoproduto = ?,"
-                    + "situacaoproduto = ?, variedadealimento= ? WHERE idproduto = ?";
+            String sql = "UPDATE alimento SET nomeproduto = ?, variedadealimento= ? WHERE idproduto = ?";
 
             PreparedStatement stmt = conexao.prepareStatement(sql);
             stmt.setString(1, alimento.getNomeproduto());
-            stmt.setString(2, alimento.getTipoproduto());
-            stmt.setBoolean(3, alimento.isSituacaoproduto());
-            stmt.setString(4, alimento.getVariedadealimento());
-            stmt.setInt(4, alimento.getIdproduto());
+            stmt.setString(2, alimento.getVariedadealimento());
+            stmt.setInt(3, alimento.getIdproduto());
             stmt.executeUpdate();
         } catch (SQLException e) {
-            throw new RuntimeException("Erro ao adicionar o parceiro: " + e.getMessage(), e);
+            throw new RuntimeException("error em atualizar alimento: " + e.getMessage(), e);
         }
     }
 

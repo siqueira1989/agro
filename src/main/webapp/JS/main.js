@@ -7,19 +7,19 @@ function mostrarAlerta(mensagem, tipo = 'info', seletor = '#alerta', autoHideMs 
         console.warn('Elemento de alerta não encontrado:', seletor);
         return;
     }
-console.log("Mostrando alerta:", mensagem, "->", seletor);
+    console.log("Mostrando alerta:", mensagem, "->", seletor);
 
     $box
-        .removeClass('d-none alert-success alert-danger alert-info alert-warning')
-        .addClass(`alert alert-${tipo}`)
-        .html(mensagem)
-        .fadeIn();
+            .removeClass('d-none alert-success alert-danger alert-info alert-warning')
+            .addClass(`alert alert-${tipo}`)
+            .html(mensagem)
+            .fadeIn();
 
     if (autoHideMs > 0) {
         setTimeout(() => {
             $box.fadeOut(() => $box.addClass('d-none'));
         }, autoHideMs);
-    }
+}
 }
 
 
@@ -408,20 +408,20 @@ function salvarAlimento() {
         method: 'POST',
         contentType: 'application/json',
         data: JSON.stringify(data),
-success: function (resp) {
-    // Fecha o modal primeiro
-    $('#modalFormulario').modal('hide');
+        success: function (resp) {
+            // Fecha o modal primeiro
+            $('#modalFormulario').modal('hide');
 
-    // Espera o modal ser escondido para mostrar o alerta
-    $('#modalFormulario').one('hidden.bs.modal', function () {
-        $('#formAlimento')[0].reset();
-        $('#formAlimento').removeClass('was-validated');
-        $('#tabelaalimentos').DataTable().ajax.reload();
+            // Espera o modal ser escondido para mostrar o alerta
+            $('#modalFormulario').one('hidden.bs.modal', function () {
+                $('#formAlimento')[0].reset();
+                $('#formAlimento').removeClass('was-validated');
+                $('#tabelaalimentos').DataTable().ajax.reload();
 
-        // 🔥 Aqui o alerta será visível, pois o modal já está fechado
-        mostrarAlerta(resp.msg || 'Alimento cadastrado com sucesso!', 'success', '#alerta', 4000);
-    });
-},
+                // 🔥 Aqui o alerta será visível, pois o modal já está fechado
+                mostrarAlerta(resp.msg || 'Alimento cadastrado com sucesso!', 'success', '#alerta', 4000);
+            });
+        },
         error: function (xhr) {
             let msg = 'Erro ao cadastrar alimento.';
             let target = '#alerta';
@@ -440,8 +440,44 @@ success: function (resp) {
         }
     });
 }
+/* Atualizar alimento*/
+function atualizarAlimento() {
+    const alimento = $('#alimento').val();
+    const variedade = $('#variedade').val();
+    const id = $('#idproduto').val();
 
-// Função para carregar classificações no select no cadastro modal Alimento
+    const data = {
+        acao: 'update',
+        idproduto: id,
+        alimento: alimento,
+        variedade: variedade
+
+    };
+    $.ajax({
+        url: '/agro/ControllerAlimento',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(data),
+
+        success: function (resp) {
+            mostrarAlerta(resp.msg || 'Atualizada atualizada com sucesso!', 'success', '#alerta');
+            sessionStorage.setItem("mensagemAlerta", resp.msg || 'Alimento atualizado com sucesso!');
+            sessionStorage.setItem("tipoAlerta", "success");
+            window.location.href = "http://localhost:8080/agro/view/admin/alimento.jsp";
+            //$('#tabelaalimentos').DataTable().ajax.reload();
+        },
+        error: function (xhr) {
+            let msg = 'Despesa não atualizada!';
+            try {
+                msg = JSON.parse(xhr.responseText).msg || msg;
+                console.log("erro");
+            } catch (e) {
+            }
+            mostrarAlerta(msg, 'danger', '#alerta', 4000);
+        }
+    });
+}
+/* Função para carregar classificações no select no cadastro modal Alimento da Pagina Gerenciamento de Alimento*/
 
 function CarregarClassificacaoModal() {
     $.ajax({
@@ -461,8 +497,11 @@ function CarregarClassificacaoModal() {
         }
     });
 }
+
+/* Modulo para carregar  classificaçoes na pagina Atualização*/
+
 function CarregarClassificacaoModalAtualizar(idproduto) {
-        // Faz a requisição AJAX separada antes e injeta os dados manualmente
+    // Faz a requisição AJAX separada antes e injeta os dados manualmente
     $.ajax({
         url: '/agro/ControllerAlimento',
         method: 'POST',
@@ -472,17 +511,17 @@ function CarregarClassificacaoModalAtualizar(idproduto) {
             acao: 'atualizacaoalimentoclassificacaomodal',
             idproduto: idproduto
         }),
-      success: function (classificacoes) {
-    console.log("📦 Dados recebidos:", classificacoes);
-    const select = $('#classificacaoSelect');
-    select.empty();
-    select.append('<option disabled value="">Selecione uma ou mais classificações...</option>');
+        success: function (classificacoes) {
+            console.log("📦 Dados recebidos:", classificacoes);
+            const select = $('#classificacaoSelect');
+            select.empty();
+            select.append('<option disabled value="">Selecione uma ou mais classificações...</option>');
 
-    classificacoes.forEach(function (item) {
-        const c = item.classificacao || item;
-        select.append('<option value="' + c.idclassificacao + '">' + c.classificacao + '</option>');
-    });
-},
+            classificacoes.forEach(function (item) {
+                const c = item.classificacao || item;
+                select.append('<option value="' + c.idclassificacao + '">' + c.classificacao + '</option>');
+            });
+        },
         error: function (xhr) {
             console.error("❌ Erro no carregamento:", xhr.responseText);
             mostrarAlerta('Erro ao carregar classificações vinculadas.', 'danger', '#alerta');
@@ -494,14 +533,14 @@ function editarAlimento(id) {
     $.ajax({
         url: '/agro/ControllerAlimento',
         method: 'GET',
-        data: { id: id },
+        data: {id: id},
         dataType: 'json',
         success: function (data) {
             // Armazena os dados no sessionStorage para usar na próxima página
             sessionStorage.setItem('alimentoParaAtualizar', JSON.stringify(data));
             // Redireciona para página de atualização
             window.location.href = 'AtualizacaoAlimento.jsp';
-             
+
         },
         error: function (xhr) {
             if (xhr.status === 404) {
@@ -534,16 +573,16 @@ function CarregarAlimento() {
             {"data": "nomeproduto"},
             {
                 "data": "situacaoproduto",
-            
-                 "render": function(data) {
-                            // Badge para situação
-                            if (data) {
-                                return '<span class="badge badge-success">Ativo</span>';
-                            } else {
-                                return '<span class="badge badge-danger">Inativo</span>';
-                            }
-                        }
-            
+
+                "render": function (data) {
+                    // Badge para situação
+                    if (data) {
+                        return '<span class="badge badge-success">Ativo</span>';
+                    } else {
+                        return '<span class="badge badge-danger">Inativo</span>';
+                    }
+                }
+
             },
             {"data": "tipoproduto"},
             {"data": "variedadealimento"},
@@ -553,8 +592,7 @@ function CarregarAlimento() {
 
                 "render": function (data, type, row) {
                     return '<button class="btn btn-sm btn-warning btn-responsivo mr-3 ml-3" onclick="editarAlimento(' + row.idproduto + ')">' +
-       '<i class="fas fa-sync mr-1"></i><span class="texto-botao">Atualizar</span></button>';
-
+                            '<i class="fas fa-sync mr-1"></i><span class="texto-botao">Atualizar</span></button>';
                 }
             }
         ],
@@ -590,26 +628,14 @@ function CarregarClassificacaoAtualizarAlimento(idproduto) {
             // Inicializa DataTable com os dados retornados
             $('#AtualizarCarregamentoClassificacao').DataTable({
                 data: json.map(item => ({
-                    idclassificacao: item.classificacao.idclassificacao,
-                    classificacao: item.classificacao.classificacao,
-                    idproduto: item.alimento.idproduto
-                })),
+                        idclassificacao: item.classificacao.idclassificacao,
+                        classificacao: item.classificacao.classificacao,
+                        idproduto: item.alimento.idproduto
+                    })),
                 columns: [
-                    { data: "idclassificacao" },
-                    { data: "classificacao" },
-                    { data: "idproduto", visible: false },
-                    {
-                        data: null,
-                        title: "Ações",
-                        render: function (data, type, row) {
-                            return `
-                                <button class="btn btn-sm btn-danger btn-responsivo"
-                                        onclick="abrirModalExclusaoClassificacao(${row.idclassificacao}, '${row.classificacao}')">
-                                    <i class="fas fa-trash-alt mr-1"></i>
-                                    <span class="texto-botao">Excluir</span>
-                                </button>`;
-                        }
-                    }
+                    {data: "idclassificacao"},
+                    {data: "classificacao"},
+                    {data: "idproduto", visible: false}
                 ],
                 language: {
                     url: 'https://cdn.datatables.net/plug-ins/2.1.6/i18n/pt-BR.json'
@@ -622,6 +648,295 @@ function CarregarClassificacaoAtualizarAlimento(idproduto) {
         }
     });
 }
+
+/* Salvar cadastro novo  classificação*/
+function salvarClassificacaoModalAtualizacaoAlimento() {
+    const idproduto = $('#idproduto').val();
+    const classificacoesSelecionadas = $('#classificacaoSelect').val(); // array dos IDs selecionados
+
+    if (!idproduto) {
+        mostrarAlerta('ID do alimento não encontrado.', 'danger', '#alerta');
+        return;
+    }
+
+    if (!classificacoesSelecionadas || classificacoesSelecionadas.length === 0) {
+        mostrarAlerta('Selecione ao menos uma classificação.', 'warning', '#ModalAlimentoClassificacao');
+        return;
+    }
+
+    // Monta o objeto para envio
+    const data = {
+        acao: 'salvarclassificacoesalimentomodal',
+        idproduto: idproduto,
+        classificacoes: classificacoesSelecionadas
+    };
+
+    console.log("📦 Enviando dados do modal:", data);
+
+    $.ajax({
+        url: '/agro/ControllerAlimento',
+        method: 'POST',
+        contentType: 'application/json; charset=utf-8',
+        dataType: 'json',
+        data: JSON.stringify(data),
+        success: function (resp) {
+            console.log("✅ Resposta:", resp);
+            $('#modalClassificacao').modal('hide');
+            mostrarAlerta(resp.msg || 'Classificações adicionadas com sucesso!', 'success', '#alerta');
+            // Recarrega a tabela de classificações do alimento
+            CarregarClassificacaoAtualizarAlimento(idproduto);
+            CarregarClassificacaoModalAtualizar(idproduto);
+        },
+        error: function (xhr) {
+            let msg = 'Classificação ja cadastrado';
+            console.error("❌ Erro ao salvar:", xhr.responseText);
+            mostrarAlerta(msg, 'danger', '#ModalAlimentoClassificacao');
+        }
+    });
+}
+
+/*>>>>>>>>>>>>>>>>>>>>>>Parceiro<<<<<<<<<<<<<<<<<<<<<<<<<< */
+/*Carregamento de parceiro*/
+function CarregarParceiros() {
+
+    // Inicializa o DataTable
+    if ($.fn.DataTable.isDataTable('#tabelaParceiros')) {
+        $('#tabelaParceiros').DataTable().destroy();
+    }
+    const tabela = $('#tabelaParceiros').DataTable({
+        "processing": false,
+        "serverSide": false,
+
+        "ajax": {
+            "url": "/agro/ControllerParceiro",
+            "method": "GET",
+            "dataSrc": ""
+        },
+        "columns": [
+            {"data": "idPessoa"},
+            {"data": "nomePessoa"},
+            {"data": "nivelPessoa"},
+            {
+                "data": "situacaoPessoa",
+
+                "render": function (data) {
+                    // Badge para situação
+                    if (data) {
+                        return '<span class="badge badge-success">Ativo</span>';
+                    } else {
+                        return '<span class="badge badge-danger">Inativo</span>';
+                    }
+                }
+
+            },
+            {"data": "telefonePessoa"},
+            {"data": "razaoSocialPessoaCnpj"},
+            {"data": "cnpjPessoaCnpj"},
+            {
+                "data": null,
+                "title": "Ações",
+"render": function (data, type, row) {
+    const estaAtivo = row.situacaoPessoa === true || row.situacaoPessoa === "true";
+    const textoBotao = estaAtivo ? "Desativar" : "Ativar";
+    const classeBotao = estaAtivo ? "btn-danger" : "btn-success";
+    const icone = estaAtivo ? "fa-user-slash" : "fa-user-check";
+
+    return `
+        <button class="btn btn-sm btn-warning btn-responsivo mr-2" onclick="editarAlimento(${row.idPessoa})">
+            <i class="fas fa-sync mr-1"></i><span class="texto-botao">Atualizar</span>
+        </button>
+        <button class="btn btn-sm ${classeBotao} btn-responsivo" onclick="abrirModalDesativar(${row.idPessoa}, '${row.nomePessoa}', ${row.situacaoPessoa})">
+            <i class="fas ${icone} mr-1"></i><span class="texto-botao">${textoBotao}</span>
+        </button>
+    `;
+}
+
+
+
+            }
+        ],
+        "language": {
+            "url": 'https://cdn.datatables.net/plug-ins/2.1.6/i18n/pt-BR.json'
+        }
+    });
+}
+/* Salvamento de Parceiro*/
+
+function salvarParceiro() {
+    const nivel = $('#nivel').val();
+    const data = {
+        acao: "create", // ou "update"
+        cnpj: $('#cnpj').val(),
+        razaosocial: $('#razao').val(),
+        site: $('#site').val(),
+        inscricaoestadual: $('#inscricaoestadual').val(),
+        nome: $('#nome').val(),
+        email: $('#email').val(),
+        telefone: $('#telefone').val(),
+        nivel: nivel,
+        cep: $('#cep').val(),
+        numero: $('#numero').val(),
+        complemento: $('#complemento').val(),
+        situacao: "Ativo"
+    };
+
+    // Só adiciona usuário e senha se for "parceiro"
+    if (nivel === 'parceiro') {
+        data.usuario = $('#usuario').val();
+        data.senha = $('#senha').val();
+    }
+
+    $.ajax({
+        url: '/agro/ControllerParceiro', // ajuste conforme necessário
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(data),
+        success: function (resp) {
+            mostrarAlerta(resp.msg || 'Parceiro cadastrado com sucesso!', 'success', '#alerta');
+            sessionStorage.setItem("mensagemAlerta", resp.msg || 'Parceiro cadastrado com sucesso!');
+            sessionStorage.setItem("tipoAlerta", "success");
+            window.location.href = "http://localhost:8080/agro/view/admin/parceiro.jsp";
+        },
+        error: function (xhr) {
+            let msg = 'Erro ao cadastrar parceiro!';
+            try {
+                msg = JSON.parse(xhr.responseText).msg || msg;
+            } catch (e) {
+            }
+            mostrarAlerta(msg, 'danger', '#alerta', 4000);
+        }
+    });
+}
+// Atualizar de parceiro
+function updateParceiro() {
+    const nivel = $('#nivel').val();
+
+    const data = {
+        acao: "update", // ou "update"
+        idpessoa: $('#idpessoa').val(),
+        cnpj: $('#cnpj').val(),
+        razaosocial: $('#razao').val(),
+        site: $('#site').val(),
+        inscricaoestadual: $('#inscricaoestadual').val(),
+        nome: $('#nome').val(),
+        email: $('#email').val(),
+        telefone: $('#telefone').val(),
+        nivel: nivel,
+        cep: $('#cep').val(),
+        numero: $('#numero').val(),
+        complemento: $('#complemento').val(),
+        situacao: "Ativo"
+    };
+
+    // Só adiciona usuário e senha se for "parceiro"
+    if (nivel === 'parceiro') {
+        data.usuario = $('#usuario').val();
+        data.senha = $('#senha').val();
+    }
+
+    $.ajax({
+        url: '/agro/ControllerParceiro', // ajuste conforme necessário
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(data),
+        success: function (resp) {
+            mostrarAlerta(resp.msg || 'Parceiro cadastrado com sucesso!', 'success', '#alerta');
+            sessionStorage.setItem("mensagemAlerta", resp.msg || 'Parceiro cadastrado com sucesso!');
+            sessionStorage.setItem("tipoAlerta", "success");
+            carregarResumoParceiros();
+            window.location.href = "http://localhost:8080/agro/view/admin/parceiro.jsp";
+        },
+        error: function (xhr) {
+            let msg = 'Erro ao cadastrar parceiro!';
+            try {
+                msg = JSON.parse(xhr.responseText).msg || msg;
+            } catch (e) {
+            }
+            mostrarAlerta(msg, 'danger', '#alerta', 4000);
+        }
+    });
+}
+
+/** Modulo de Desativação do  parceiro*/
+if (typeof parceiroParaDesativar === "undefined") {
+    var parceiroParaDesativar = null;
+}
+if (typeof situacaopessoa === "undefined") {
+    var situacaopessoa = null;
+}
+
+function abrirModalDesativar(id, nome, situacaoAtual) {
+    parceiroParaDesativar = id;
+    situacaopessoa = situacaoAtual;
+
+    // Define se a ação será ativar ou desativar
+    const vaiDesativar = situacaoAtual === true || situacaoAtual === "true";
+
+    const titulo = vaiDesativar ? "Confirmar Desativação" : "Confirmar Ativação";
+    const mensagem = vaiDesativar
+        ? `Você deseja desativar o parceiro "${nome}"?`
+        : `Você deseja ativar o parceiro "${nome}"?`;
+
+    const classeBotao = vaiDesativar ? "btn-danger" : "btn-success";
+    const textoBotao = vaiDesativar ? "Desativar" : "Ativar";
+    const iconeBotao = vaiDesativar ? "fa-user-slash" : "fa-user-check";
+
+    $("#modalDesativarLabel").text(titulo);
+    $("#mensagemDesativar").text(mensagem);
+
+    const $btn = $("#btnConfirmarDesativar");
+    $btn.removeClass("btn-danger btn-success").addClass(classeBotao);
+    $btn.html(`<i class="fas ${iconeBotao} mr-1"></i>${textoBotao}`);
+
+    $("#modalDesativar").modal("show");
+}
+// Ao clicar no botão "Desativar" dentro do modal
+$("#btnConfirmarDesativar").on("click", function () {
+    if (!parceiroParaDesativar)
+        return;
+
+    $.ajax({
+        url: `/agro/ControllerParceiro`,
+        method: "POST",
+        contentType: "application/json",
+        data: JSON.stringify({
+            acao: "delete",
+            situacao: situacaopessoa,
+            idPessoa: parceiroParaDesativar
+        }),
+        success: function (resp) {
+            sessionStorage.setItem("mensagemAlerta", resp.msg || 'Parceiro alterado com sucesso!');
+            sessionStorage.setItem("tipoAlerta", "info");
+            CarregarParceiros();
+            carregarResumoParceiros();
+            $("#modalDesativar").modal("hide");
+        },
+        error: function () {
+            $("#modalDesativar").modal("hide");
+            mostrarAlerta("Erro ao alterar parceiro!", "danger", "#alerta");
+        }
+    });
+});
+
+
+/** Carregaremento do dados*/
+function carregarResumoParceiros() {
+    $.ajax({
+        url: "/agro/ControllerParceiro?acao=dados", // importante!
+        method: "get",
+        dataType: "json",
+        success: function (dados) {
+            $("#total").text(dados.total);
+            $("#ativosParceiros").text(dados.ativos);
+            $("#inativosParceiros").text(dados.inativos);
+            console.log('total:' + dados.total);
+        },
+        error: function () {
+            console.warn("❌ Não foi possível carregar o resumo de parceiros.");
+        }
+    });
+}
+
 
 
 

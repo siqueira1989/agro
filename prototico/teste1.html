@@ -1,0 +1,50 @@
+function CarregarParceiros() {
+
+    // Inicializa o DataTable
+    if ($.fn.DataTable.isDataTable('#tabelaParceiros')) {
+        $('#tabelaParceiros').DataTable().destroy();
+    }
+    const tabela = $('#tabelaParceiros').DataTable({
+        "processing": false,
+        "serverSide": false,
+
+        "ajax": {
+            "url": "/agro/ControllerParceiro",
+            "method": "GET",
+            "dataSrc": ""
+        },
+        "columns": [
+            {"data": "idpessoa"},
+            {"data": "nomepessoa"},
+             {"data": "nivelpessoa"},
+            {
+                "data": "situacaopessoa",
+            
+                 "render": function(data) {
+                            // Badge para situação
+                            if (data) {
+                                return '<span class="badge badge-success">Ativo</span>';
+                            } else {
+                                return '<span class="badge badge-danger">Inativo</span>';
+                            }
+                        }
+            
+            },
+            {"data": "telefonepessoa"},
+            {"data": "razaosocialpessoacnpj"},
+            {"data": "cnpjpessoacnpj"},
+            {
+                "data": null,
+                "title": "Ações",
+
+                "render": function (data, type, row) {
+                    return '<button class="btn btn-sm btn-warning btn-responsivo mr-3 ml-3" onclick="editarAlimento(' + row.idproduto + ')">' +
+                   '<i class="fas fa-sync mr-1"></i><span class="texto-botao">Atualizar</span></button>';
+                }
+            }
+        ],
+        "language": {
+            "url": 'https://cdn.datatables.net/plug-ins/2.1.6/i18n/pt-BR.json'
+        }
+    });
+}

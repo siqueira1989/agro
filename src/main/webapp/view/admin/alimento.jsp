@@ -10,6 +10,14 @@
 
         <script>
             $(document).ready(function () {
+     const msg = sessionStorage.getItem("mensagemAlerta");
+    const tipo = sessionStorage.getItem("tipoAlerta");
+
+    if (msg && window.location.pathname.includes("alimento.jsp")) {
+        mostrarAlerta(msg, tipo || 'info', '#alerta', 4000);
+        sessionStorage.removeItem("mensagemAlerta");
+        sessionStorage.removeItem("tipoAlerta");
+    }
            //Carregando os dados da tabela
                             
                             CarregarAlimento();

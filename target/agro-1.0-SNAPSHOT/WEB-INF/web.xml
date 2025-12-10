@@ -17,12 +17,12 @@
         <servlet-class>Controller.DespesasCustosServlet</servlet-class>
     </servlet>
     <servlet>
-        <servlet-name>ControllerParceiro</servlet-name>
-        <servlet-class>Controller.ControllerParceiro</servlet-class>
-    </servlet>
-    <servlet>
         <servlet-name>ControllerAlimento</servlet-name>
         <servlet-class>Controller.ControllerAlimento</servlet-class>
+    </servlet>
+    <servlet>
+        <servlet-name>ControllerParceiro</servlet-name>
+        <servlet-class>Controller.ControllerParceiro</servlet-class>
     </servlet>
     <servlet-mapping>
         <servlet-name>ClassificacaoServlet</servlet-name>
@@ -33,12 +33,12 @@
         <url-pattern>/DespesasCustosServlet</url-pattern>
     </servlet-mapping>
     <servlet-mapping>
-        <servlet-name>ControllerParceiro</servlet-name>
-        <url-pattern>/ControllerParceiro</url-pattern>
-    </servlet-mapping>
-    <servlet-mapping>
         <servlet-name>ControllerAlimento</servlet-name>
         <url-pattern>/ControllerAlimento</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>ControllerParceiro</servlet-name>
+        <url-pattern>/ControllerParceiro</url-pattern>
     </servlet-mapping>
     <session-config>
         <session-timeout>

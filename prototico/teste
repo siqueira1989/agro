@@ -1,0 +1,6 @@
+
+                "render": function (data, type, row) {
+                    return '<button class="btn btn-sm btn-warning btn-responsivo mr-3 ml-3" onclick="editarAlimento(' + row.idproduto + ')">' +
+                   '<i class="fas fa-sync mr-1"></i><span class="texto-botao">Atualizar</span></button>';
+           
+                }
