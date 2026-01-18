@@ -59,29 +59,30 @@ protected void doGet(HttpServletRequest request, HttpServletResponse response)
 
     response.setContentType("application/json");
     response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-  String acao = request.getParameter("acao");
-    if ("dados".equalsIgnoreCase(acao)) {
-        handleDados(null, response);
-        return;
-    }
+
+    String acao = request.getParameter("acao");
     String idParam = request.getParameter("id");
+    System.out.println("estando variavel"+ idParam);
     String verificarCnpj = request.getParameter("cnpj");
 
     try (PrintWriter out = response.getWriter()) {
 
-        // === 1. VERIFICAÇÃO DE CNPJ ===
-        if (verificarCnpj != null && !verificarCnpj.isEmpty()) {
-            boolean existe = parceiroDao.existeCNPJ(verificarCnpj);
-            System.out.println( "PASSOU AQUI");
-            Map<String, Object> resultado = new HashMap<>();
-            resultado.put("existe", existe);
-
-            out.print(gson.toJson(resultado));
-            out.flush();
+        // 1️⃣ RESUMO (dashboard)
+        if ("dados".equalsIgnoreCase(acao)) {
+            handleDados(null, response);
             return;
         }
 
-        // === 2. BUSCA POR ID ===
+        // 2️⃣ VERIFICAÇÃO DE CNPJ
+        if (verificarCnpj != null && !verificarCnpj.isEmpty()) {
+            boolean existe = parceiroDao.existeCNPJ(verificarCnpj);
+            Map<String, Object> resultado = new HashMap<>();
+            resultado.put("existe", existe);
+            out.print(gson.toJson(resultado));
+            return;
+        }
+
+        // 3️⃣ BUSCA POR ID (EDIÇÃO)
         if (idParam != null && !idParam.isEmpty()) {
             int id = Integer.parseInt(idParam);
             Parceiro parceiro = parceiroDao.getParceiroById(id);
@@ -89,26 +90,26 @@ protected void doGet(HttpServletRequest request, HttpServletResponse response)
             if (parceiro != null) {
                 out.print(gson.toJson(parceiro));
             } else {
-                writeJson(response, HttpServletResponse.SC_NOT_FOUND, false,
-                        "Parceiro não encontrado.", "page");
+                writeJson(response, HttpServletResponse.SC_NOT_FOUND,
+                        false, "Parceiro não encontrado.", null);
             }
-        } else {
-            // === 3. LISTA COMPLETA ===
-            List<Parceiro> lista = parceiroDao.listAllParceiro();
-            out.print(gson.toJson(lista));
+            return;
         }
 
-        out.flush();
+        // 4️⃣ LISTAGEM
+        List<Parceiro> lista = parceiroDao.listAllParceiro();
+        out.print(gson.toJson(lista));
 
-    }
-    catch (Exception e) {
+    } catch (Exception e) {
         e.printStackTrace();
-        writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
-                "Erro ao carregar parceiros: " + e.getMessage(), "page");
+        writeJson(response,
+                HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                false,
+                "Erro ao carregar parceiros",
+                null);
     }
 }
 
-    
       /* ============================================================
        POST: create | update | delete com JSON padronizado
        ============================================================ */
@@ -126,7 +127,7 @@ protected void doGet(HttpServletRequest request, HttpServletResponse response)
 
         JsonObject jsonObject = gson.fromJson(json.toString(), JsonObject.class);
         String acao = jsonObject.get("acao").getAsString();
-
+System.out.println("acao:"+ acao);
         switch (acao.toLowerCase()) {
             case "create":
                 handleCreate(jsonObject, response);
@@ -135,7 +136,7 @@ protected void doGet(HttpServletRequest request, HttpServletResponse response)
                 handleDados(null, response);
                 break;*/
             case "update":
-              //  handleUpdate(jsonObject, response);
+               handleUpdate(jsonObject, response);
                 break;
             case "delete":
                handleDelete(jsonObject, response);
@@ -183,6 +184,39 @@ protected void doGet(HttpServletRequest request, HttpServletResponse response)
         writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false, "Erro no cadastro",null);
     }
 }
+   /********************************** Update**************************************/
+   private void handleUpdate(JsonObject jsonObject, HttpServletResponse response) throws IOException {
+    try {
+         String cnpj=  jsonObject.get("cnpj").getAsString();
+        
+         
+        Parceiro parceiro = new Parceiro(
+            jsonObject.get("idPessoa").getAsInt(),
+            jsonObject.get("nome").getAsString(),
+            jsonObject.has("usuario") ? jsonObject.get("usuario").getAsString() : null,
+            jsonObject.has("senha") ? jsonObject.get("senha").getAsString() : null,
+            jsonObject.get("nivel").getAsString(),
+            jsonObject.get("situacao").getAsBoolean(), // ou use jsonObject.get("situacao").getAsBoolean() se enviar no JSON
+            jsonObject.get("email").getAsString(),
+            jsonObject.get("telefone").getAsString(), // telefonePessoa (adicione se enviar no JSON)
+            jsonObject.get("cep").getAsString(),
+            jsonObject.get("numero").getAsInt(),
+            jsonObject.get("complemento").getAsString(),
+            cnpj,
+            jsonObject.get("razaosocial").getAsString(),
+            jsonObject.get("inscricaoestadual").getAsString(),
+            jsonObject.get("site").getAsString()
+        );
+
+        parceiroDao.updateParceiro(parceiro);
+
+        writeJson(response, HttpServletResponse.SC_OK, true, "Parceiro atualizado com sucesso!", null);
+    } catch (Exception e) {
+        e.printStackTrace();
+        System.out.println(" Erro gerencial do sistema" + e.getMessage());
+        writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false, "Erro no cadastro",null);
+    }
+}
    /* -----------------------------  Desativar ----------------------------- */
    private void handleDelete(JsonObject jsonObject, HttpServletResponse response) throws IOException {
     try {
@@ -202,7 +236,7 @@ protected void doGet(HttpServletRequest request, HttpServletResponse response)
         writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false, "Erro no cadastro",null);
     }
 }
-      /* -----------------------------  Desativar ----------------------------- */
+      /* ----------------------------- Dados ----------------------------- */
   private void handleDados(JsonObject jsonObject, HttpServletResponse response) throws IOException {
     response.setContentType("application/json");
     PrintWriter out = response.getWriter();

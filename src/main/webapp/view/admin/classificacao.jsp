@@ -74,7 +74,7 @@
                             <div id="modalClassificacaoCadastro" class="mt-2"></div>
                         </div>
                         <div class="modal-footer">
-                            <button type="button" class="btn btn-primary mr-2" onclick="salvarParceiro()">
+                            <button type="button" class="btn btn-primary mr-2" onclick="salvarClassificacao()">
                                 <i class="fas fa-save"></i> Salvar
                             </button>
                             <button type="button" class="btn btn-secondary" data-dismiss="modal">

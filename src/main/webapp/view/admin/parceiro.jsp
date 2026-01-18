@@ -7,6 +7,8 @@
     
         <script>
             $(document).ready(function () {
+                
+                
                 // Carregando mensagens
                    const msg = sessionStorage.getItem("mensagemAlerta");
     const tipo = sessionStorage.getItem("tipoAlerta");
@@ -138,13 +140,8 @@
         </div>
     </div>
 </div>
-
-
-
         <footer>
             <%@ include file="../../pagina/footer.jsp"%>
         </footer>
     </body>
-
-
 </html>

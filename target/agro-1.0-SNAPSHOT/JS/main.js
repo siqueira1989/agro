@@ -48,7 +48,30 @@ function formatarValorParaBR(valor) {
     return `${inteiro},${decimal}`;
 }
 
+/* Função   preender cep*/
+    function preencherEnderecoViaCep(cep) {
+    if (!cep) return;
 
+    const cepLimpo = String(cep).replace(/\D/g, '');
+    if (cepLimpo.length !== 8) return;
+
+    $.getJSON(`https://viacep.com.br/ws/${cepLimpo}/json/`)
+        .done(function (data) {
+            if (data.erro) {
+                console.warn("CEP não encontrado no ViaCEP.");
+                return;
+            }
+            $("#logradouro").val(data.logradouro || "");
+            $("#bairro").val(data.bairro || "");
+            $("#cidade").val(data.localidade || "");
+            $("#uf").val(data.uf || "");
+        })
+        .fail(function () {
+            console.warn("Erro ao consultar o ViaCEP.");
+        });
+}
+
+/*********************************************/
 function ExibirAlerta(titulo, mensagem) {
     alert(titulo + ": " + mensagem);
 }
@@ -742,9 +765,10 @@ function CarregarParceiros() {
     const icone = estaAtivo ? "fa-user-slash" : "fa-user-check";
 
     return `
-        <button class="btn btn-sm btn-warning btn-responsivo mr-2" onclick="editarAlimento(${row.idPessoa})">
-            <i class="fas fa-sync mr-1"></i><span class="texto-botao">Atualizar</span>
-        </button>
+          <button class="btn btn-sm btn-warning btn-responsivo mr-2"
+          onclick="window.location.href='/agro/view/admin/CadastroParceiro.jsp?id=${row.idPessoa}'">
+      <i class="fas fa-sync mr-1"></i><span class="texto-botao">Atualizar</span>
+  </button>
         <button class="btn btn-sm ${classeBotao} btn-responsivo" onclick="abrirModalDesativar(${row.idPessoa}, '${row.nomePessoa}', ${row.situacaoPessoa})">
             <i class="fas ${icone} mr-1"></i><span class="texto-botao">${textoBotao}</span>
         </button>
@@ -760,102 +784,11 @@ function CarregarParceiros() {
         }
     });
 }
-/* Salvamento de Parceiro*/
 
-function salvarParceiro() {
-    const nivel = $('#nivel').val();
-    const data = {
-        acao: "create", // ou "update"
-        cnpj: $('#cnpj').val(),
-        razaosocial: $('#razao').val(),
-        site: $('#site').val(),
-        inscricaoestadual: $('#inscricaoestadual').val(),
-        nome: $('#nome').val(),
-        email: $('#email').val(),
-        telefone: $('#telefone').val(),
-        nivel: nivel,
-        cep: $('#cep').val(),
-        numero: $('#numero').val(),
-        complemento: $('#complemento').val(),
-        situacao: "Ativo"
-    };
 
-    // Só adiciona usuário e senha se for "parceiro"
-    if (nivel === 'parceiro') {
-        data.usuario = $('#usuario').val();
-        data.senha = $('#senha').val();
-    }
 
-    $.ajax({
-        url: '/agro/ControllerParceiro', // ajuste conforme necessário
-        method: 'POST',
-        contentType: 'application/json',
-        data: JSON.stringify(data),
-        success: function (resp) {
-            mostrarAlerta(resp.msg || 'Parceiro cadastrado com sucesso!', 'success', '#alerta');
-            sessionStorage.setItem("mensagemAlerta", resp.msg || 'Parceiro cadastrado com sucesso!');
-            sessionStorage.setItem("tipoAlerta", "success");
-            window.location.href = "http://localhost:8080/agro/view/admin/parceiro.jsp";
-        },
-        error: function (xhr) {
-            let msg = 'Erro ao cadastrar parceiro!';
-            try {
-                msg = JSON.parse(xhr.responseText).msg || msg;
-            } catch (e) {
-            }
-            mostrarAlerta(msg, 'danger', '#alerta', 4000);
-        }
-    });
-}
-// Atualizar de parceiro
-function updateParceiro() {
-    const nivel = $('#nivel').val();
+//** Atualizar de parceiro*/
 
-    const data = {
-        acao: "update", // ou "update"
-        idpessoa: $('#idpessoa').val(),
-        cnpj: $('#cnpj').val(),
-        razaosocial: $('#razao').val(),
-        site: $('#site').val(),
-        inscricaoestadual: $('#inscricaoestadual').val(),
-        nome: $('#nome').val(),
-        email: $('#email').val(),
-        telefone: $('#telefone').val(),
-        nivel: nivel,
-        cep: $('#cep').val(),
-        numero: $('#numero').val(),
-        complemento: $('#complemento').val(),
-        situacao: "Ativo"
-    };
-
-    // Só adiciona usuário e senha se for "parceiro"
-    if (nivel === 'parceiro') {
-        data.usuario = $('#usuario').val();
-        data.senha = $('#senha').val();
-    }
-
-    $.ajax({
-        url: '/agro/ControllerParceiro', // ajuste conforme necessário
-        method: 'POST',
-        contentType: 'application/json',
-        data: JSON.stringify(data),
-        success: function (resp) {
-            mostrarAlerta(resp.msg || 'Parceiro cadastrado com sucesso!', 'success', '#alerta');
-            sessionStorage.setItem("mensagemAlerta", resp.msg || 'Parceiro cadastrado com sucesso!');
-            sessionStorage.setItem("tipoAlerta", "success");
-            carregarResumoParceiros();
-            window.location.href = "http://localhost:8080/agro/view/admin/parceiro.jsp";
-        },
-        error: function (xhr) {
-            let msg = 'Erro ao cadastrar parceiro!';
-            try {
-                msg = JSON.parse(xhr.responseText).msg || msg;
-            } catch (e) {
-            }
-            mostrarAlerta(msg, 'danger', '#alerta', 4000);
-        }
-    });
-}
 
 /** Modulo de Desativação do  parceiro*/
 if (typeof parceiroParaDesativar === "undefined") {
@@ -864,6 +797,8 @@ if (typeof parceiroParaDesativar === "undefined") {
 if (typeof situacaopessoa === "undefined") {
     var situacaopessoa = null;
 }
+
+/** Abertura do modal*/
 
 function abrirModalDesativar(id, nome, situacaoAtual) {
     parceiroParaDesativar = id;
@@ -890,7 +825,8 @@ function abrirModalDesativar(id, nome, situacaoAtual) {
 
     $("#modalDesativar").modal("show");
 }
-// Ao clicar no botão "Desativar" dentro do modal
+//** Ao clicar no botão "Desativar" dentro do modal*/
+
 $("#btnConfirmarDesativar").on("click", function () {
     if (!parceiroParaDesativar)
         return;
@@ -920,6 +856,7 @@ $("#btnConfirmarDesativar").on("click", function () {
 
 
 /** Carregaremento do dados*/
+
 function carregarResumoParceiros() {
     $.ajax({
         url: "/agro/ControllerParceiro?acao=dados", // importante!
@@ -937,8 +874,116 @@ function carregarResumoParceiros() {
     });
 }
 
+/********0*************** Salva create ou update*************************/
+function carregarDadosParceiro(id) {
+  $.ajax({
+    url: `/agro/ControllerParceiro?id=${id}`,
+    method: "GET",
+    dataType: "json",
+    success: function (parceiro) {
+      $("#idPessoa").val(parceiro.idPessoa);
+      $("#nome").val(parceiro.nomePessoa);
+      $("#usuario").val(parceiro.usuarioPessoa);
+      $("#senha").val(parceiro.senhaPessoa);
+      $("#nivel").val(parceiro.nivelPessoa).trigger("change");
+      $("#email").val(parceiro.emailPessoa);
+      $("#telefone").val(parceiro.telefonePessoa);
 
+      // Endereço
+      $("#cep").val(parceiro.Cep || "");
+      $("#numero").val(parceiro.numero|| "");
+      $("#complemento").val(parceiro.complemento|| "");
+       preencherEnderecoViaCep(parceiro.Cep || "" );
+      $("#razao").val(parceiro.razaoSocialPessoaCnpj);
+      $("#cnpj").val(parceiro.cnpjPessoaCnpj);
+      $("#inscricaoestadual").val(parceiro.inscricaoEstadualPessoaCnpj);
+      $("#site").val(parceiro.sitePessoaCnpj || "");
 
+      // Situação
+      const sit = (parceiro.situacaoPessoa === true || parceiro.situacaoPessoa === "true") ? "true" : "false";
+      $("#situacao").val(sit);
 
+      // Preenche logradouro, bairro, cidade, uf via cep
+      if (parceiro.cepPessoa) preencherEnderecoViaCep(parceiro.cepPessoa);
+    },
+    error: function (xhr) {
+      console.error("Erro GET parceiro:", xhr.responseText);
+      mostrarAlerta("Erro ao carregar dados do parceiro!", "danger", "#alerta");
+    }
+  });
+}
+function salvarParceiroCreateOuUpdate() {
+  const idPessoa = $("#idPessoa").val();
+  const nivel = $("#nivel").val();
+
+  // detecta se é create ou update
+ const acao = idPessoa  !== "" ? "update" : "create";
+
+ 
+  const data = {
+    acao: acao,
+    idPessoa: idPessoa,
+    nome: $("#nome").val(),
+    nivel: nivel,
+    email: $("#email").val(),
+    telefone: $("#telefone").val(),
+    cep: $("#cep").val(),
+    numero: $("#numero").val(),
+    complemento: $("#complemento").val(),
+    situacao: $("#situacao").val(),
+    cnpj: $("#cnpj").val(),
+    razaosocial: $("#razao").val(),
+    inscricaoestadual: $("#inscricaoestadual").val(),
+    site: $("#site").val()
+  };
+
+  if (nivel === "parceiro") {
+    data.usuario = $("#usuario").val();
+    data.senha = $("#senha").val();
+  }
+
+  $.ajax({
+      url: "/agro/ControllerParceiro",
+  method: "POST",
+  contentType: "application/json; charset=utf-8",
+  dataType: "json",
+  data: JSON.stringify(data),
+   
+    success: function (resp) {
+      // diferencia mensagens de sucesso
+     
+      if(  acao === "create"){
+          let msgSucesso =resp.msg || "Parceiro cadastrado com sucesso!";
+           sessionStorage.setItem("mensagemAlerta", msgSucesso);
+      sessionStorage.setItem("tipoAlerta", "success");
+      window.location.href = "/agro/view/admin/parceiro.jsp";
+      }else{
+          let msgSucesso =resp.msg || "Parceiro atualizado com sucesso!";
+           sessionStorage.setItem("mensagemAlerta", msgSucesso);
+      sessionStorage.setItem("tipoAlerta", "success");
+      window.location.href = "/agro/view/admin/parceiro.jsp";
+      }
+    
+     
+    },
+    error: function (xhr) {
+      console.error("Erro POST parceiro:", xhr.responseText);
+      // diferencia mensagens de erro
+             if(  acao === "create"){
+           let msgErro = "Erro ao cadastrar parceiro!";
+      }else{
+         let msgErro ="Erro ao atualizar parceiro!";
+      }
+      try {
+        const json = JSON.parse(xhr.responseText);
+        if (json.msg) msgErro = json.msg;
+      } catch (e) {
+        // ignora parse
+      }
+
+      mostrarAlerta(msgErro, "danger", "#alerta", 4000);
+    }
+  });
+}
 
            

@@ -56,8 +56,7 @@ public class ParceiroDAO {
     
 
         try  {
-        	 String sql = "SELECT * FROM parceiro INNER JOIN endereco "
-        	 		+ "ON parceiro.idendereco = endereco.idendereco WHERE parceiro.idPessoa = ?";
+        	 String sql = "SELECT * FROM parceiro where idPessoa = ?";
         	  PreparedStatement stmt = conexao.prepareStatement(sql);
         	 stmt.setInt(1, id);
             ResultSet rs = stmt.executeQuery();
