@@ -9,9 +9,6 @@ public class Alimento extends Produto {
 
     private String variedadealimento;
 
-   
-   
-
     public String getVariedadealimento() {
         return variedadealimento;
     }

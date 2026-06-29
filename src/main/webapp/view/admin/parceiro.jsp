@@ -1,32 +1,10 @@
-<%@ page contentType="text/html;charset=UTF-8" language="java"%>
+﻿<%@ page contentType="text/html;charset=UTF-8" language="java"%>
 <html>
     <head>
         <title>Agro - Parceiros</title>
 
         <%@ include file="../../pagina/importacao.html"%>
     
-        <script>
-            $(document).ready(function () {
-                
-                
-                // Carregando mensagens
-                   const msg = sessionStorage.getItem("mensagemAlerta");
-    const tipo = sessionStorage.getItem("tipoAlerta");
-
-    if (msg && window.location.pathname.includes("parceiro.jsp")) {
-        mostrarAlerta(msg, tipo || 'info', '#alerta', 4000);
-                               sessionStorage.removeItem("mensagemAlerta");
-                               sessionStorage.removeItem("tipoAlerta");
-                           }
-                                     
-                        /** Carregamento de  Dados na tabela do sistemaa*/            
-                CarregarParceiros();
-                carregarResumoParceiros()
-              
-                setInterval(CarregarParceiros, 20000);
-                  
-            });
-        </script>
     </head>
     <body>
         <header>
@@ -45,8 +23,8 @@
                     <div class="card shadow-sm border-left-green">
                         <div class="card-body">
                             <h6 class="text-muted">Total de Parceiros</h6>
-                           <h3 id="total" class="font-weight-bold">0</h3>
-                            <i class="fas fa-users fa-2x text-success float-right"></i>
+                           <h3 id="total" class="fw-bold">0</h3>
+                            <i class="fas fa-users fa-2x text-success float-end"></i>
                         </div>
                     </div>
                 </div>
@@ -55,8 +33,8 @@
                     <div class="card shadow-sm border-left-green">
                         <div class="card-body">
                             <h6 class="text-muted">Ativos</h6>
-                          <h3 id="ativosParceiros" class="font-weight-bold">0</h3>
-                            <i class="fas fa-check-circle fa-2x text-success float-right"></i>
+                          <h3 id="ativosParceiros" class="fw-bold">0</h3>
+                            <i class="fas fa-check-circle fa-2x text-success float-end"></i>
                         </div>
                     </div>
                 </div>
@@ -65,8 +43,8 @@
                     <div class="card shadow-sm border-left-green">
                         <div class="card-body">
                             <h6 class="text-muted">Inativos</h6>
-                         <h3 id="inativosParceiros" class="font-weight-bold">0</h3>
-                            <i class="fas fa-user-slash fa-2x text-danger float-right"></i>
+                         <h3 id="inativosParceiros" class="fw-bold">0</h3>
+                            <i class="fas fa-user-slash fa-2x text-danger float-end"></i>
                         </div>
                     </div>
                 </div>
@@ -74,7 +52,7 @@
             </div>
             <!-- HEADER + BOTÃO -->
             <div class="row mb-4">
-                <div class="col text-right">
+                <div class="col text-end">
                      <a href="http://localhost:8080/agro/view/admin/CadastroParceiro.jsp" class="btn btn-success">
                           <i class="fas fa-user-plus"></i> Cadastrar Parceiro
                     </a>
@@ -88,9 +66,9 @@
           
             <hr>
                 <div class="card-body">
-                    <div class="table-responsive">
-                        <table id="tabelaParceiros" class="table table-striped table-bordered">
-                            <thead class="thead-light">
+                    <div class="table-responsive rounded shadow-custom p-2">
+                        <table id="tabelaParceiros" class="table table-bordered table-striped">
+                            <thead class="thead-green">
                                 <tr>
                                     <th>ID</th>
                                     <th>Parceiro</th>
@@ -120,9 +98,7 @@
             <!-- Título do modal (dinâmico) -->
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title" id="modalDesativarLabel">Confirmar Ação</h5>
-                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Fechar">
-                    <span aria-hidden="true">&times;</span>
-                </button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
             </div>
 
             <!-- Corpo do modal com a mensagem -->
@@ -132,9 +108,9 @@
 
             <!-- Rodapé com botões -->
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                 <button type="button" class="btn btn-danger" id="btnConfirmarDesativar">
-                    <i class="fas fa-user-slash mr-1"></i> Desativar
+                    <i class="fas fa-user-slash me-1"></i> Desativar
                 </button>
             </div>
         </div>

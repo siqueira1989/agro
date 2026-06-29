@@ -39,9 +39,7 @@ public class ParceiroDAO {
             stmt.setString(12, parceiro.getRazaoSocialPessoaCnpj());
             stmt.setString(13, parceiro.getInscricaoEstadualPessoaCnpj());
             stmt.setString(14, parceiro.getSiteparceiro());
-            stmt.executeUpdate();
-        
-            
+            stmt.executeUpdate();    
         } catch (SQLException e) {
              e.printStackTrace();
            System.out.println("Erro ao listar os parceiros: " + e.getMessage());
