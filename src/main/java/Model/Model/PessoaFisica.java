@@ -6,7 +6,7 @@ import java.time.LocalDate;
 
 public class PessoaFisica extends Pessoa{
     private String cpfPf;
-    private LocalDate dataNascimentoPf;
+    LocalDate dataNascimentoPf;
 
 
     public String getCpfPf() {
@@ -28,6 +28,8 @@ public class PessoaFisica extends Pessoa{
 
   
    
+
+    public PessoaFisica() {}
 
     public PessoaFisica(
     		int idPessoa, String nomePessoa, String usuarioPessoa, String senhaPessoa, String nivelPessoa,
