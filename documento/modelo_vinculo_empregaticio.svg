@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 660" font-family="Calibri, Arial, sans-serif">
+  <defs>
+    <marker id="arr" markerWidth="10" markerHeight="10" refX="6" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#1f5c1f"/>
+    </marker>
+  </defs>
+
+  <text x="420" y="24" text-anchor="middle" font-size="16" font-weight="bold" fill="#1f5c1f">Modelagem: Pessoa &#215; Vínculos de Trabalho (1 pessoa &#8594; N vínculos)</text>
+
+  <!-- PESSOA -->
+  <rect x="270" y="40" width="300" height="104" rx="8" fill="#1f5c1f"/>
+  <text x="420" y="62" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">PESSOA  (identidade — não muda)</text>
+  <text x="288" y="84" fill="#fff" font-size="11.5">idpessoa • nome • CPF • data de nascimento</text>
+  <text x="288" y="104" fill="#fff" font-size="11.5">endereço • usuário / senha</text>
+  <text x="288" y="128" fill="#cfe6cf" font-size="11">Os dados de quem a pessoa É permanecem os mesmos.</text>
+
+  <!-- 1:N -->
+  <line x1="420" y1="144" x2="420" y2="166" stroke="#1f5c1f" stroke-width="2"/>
+  <text x="432" y="162" fill="#1f5c1f" font-size="12" font-weight="bold">1 : N</text>
+  <line x1="200" y1="166" x2="640" y2="166" stroke="#1f5c1f" stroke-width="2"/>
+  <line x1="200" y1="166" x2="200" y2="196" stroke="#1f5c1f" stroke-width="2" marker-end="url(#arr)"/>
+  <line x1="640" y1="166" x2="640" y2="196" stroke="#1f5c1f" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- VINCULO 1 -->
+  <rect x="40" y="198" width="320" height="150" rx="8" fill="#eaf4ea" stroke="#1f5c1f" stroke-width="1.5"/>
+  <text x="200" y="220" text-anchor="middle" font-size="13" font-weight="bold" fill="#1a1a1a">VÍNCULO 1 — 2019 a 2020</text>
+  <text x="56" y="242" font-size="11.5" fill="#333">matrícula 1001 • cargo: trabalhador rural</text>
+  <text x="56" y="262" font-size="11.5" fill="#333">salário R$ X • jornada 8h • hora extra própria</text>
+  <text x="56" y="282" font-size="11.5" fill="#333">admissão 01/2019 • desligamento 12/2020</text>
+  <text x="56" y="302" font-size="11.5" fill="#333">tipo atividade • status: DESLIGADO</text>
+  <text x="56" y="328" font-size="11" fill="#1f5c1f" font-weight="bold">id_vinculo = 1</text>
+
+  <!-- VINCULO 2 -->
+  <rect x="480" y="198" width="320" height="150" rx="8" fill="#eaf4ea" stroke="#1f5c1f" stroke-width="1.5"/>
+  <text x="640" y="220" text-anchor="middle" font-size="13" font-weight="bold" fill="#1a1a1a">VÍNCULO 2 — 2022 a 2026</text>
+  <text x="496" y="242" font-size="11.5" fill="#333">matrícula 2042 • cargo: operador de campo</text>
+  <text x="496" y="262" font-size="11.5" fill="#333">salário R$ Y • jornada 8h • hora extra própria</text>
+  <text x="496" y="282" font-size="11.5" fill="#333">admissão 03/2022 • desligamento: —</text>
+  <text x="496" y="302" font-size="11.5" fill="#333">tipo atividade • status: ATIVO</text>
+  <text x="496" y="328" font-size="11" fill="#1f5c1f" font-weight="bold">id_vinculo = 2</text>
+
+  <!-- arrows to operational -->
+  <line x1="200" y1="348" x2="200" y2="380" stroke="#1f5c1f" stroke-width="2" marker-end="url(#arr)"/>
+  <line x1="640" y1="348" x2="640" y2="380" stroke="#1f5c1f" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- OP 1 -->
+  <rect x="40" y="382" width="320" height="132" rx="8" fill="#fff6e0" stroke="#e0a800" stroke-width="1.5"/>
+  <text x="200" y="404" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#1a1a1a">Dados do período (id_vinculo = 1)</text>
+  <text x="56" y="426" font-size="11.5" fill="#333">• Pontos • Vales • Faltas</text>
+  <text x="56" y="446" font-size="11.5" fill="#333">• Fechamentos mensais (salário/horas “fotografados”)</text>
+  <text x="56" y="466" font-size="11.5" fill="#333">• Horas em talão</text>
+  <text x="56" y="490" font-size="11.5" fill="#a06a00" font-weight="bold">ex.: 5h no talão SS em 2020 → vínculo 1</text>
+
+  <!-- OP 2 -->
+  <rect x="480" y="382" width="320" height="132" rx="8" fill="#fff6e0" stroke="#e0a800" stroke-width="1.5"/>
+  <text x="640" y="404" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#1a1a1a">Dados do período (id_vinculo = 2)</text>
+  <text x="496" y="426" font-size="11.5" fill="#333">• Pontos • Vales • Faltas</text>
+  <text x="496" y="446" font-size="11.5" fill="#333">• Fechamentos mensais</text>
+  <text x="496" y="466" font-size="11.5" fill="#333">• Horas em talão</text>
+  <text x="496" y="490" font-size="11.5" fill="#a06a00" font-weight="bold">valorizado pelo salário do vínculo 2</text>
+
+  <!-- footer note -->
+  <rect x="40" y="540" width="760" height="96" rx="8" fill="#f2f2f2" stroke="#b0b0b0" stroke-width="1"/>
+  <text x="56" y="562" font-size="12" font-weight="bold" fill="#1a1a1a">Como o sistema escolhe o vínculo certo</text>
+  <text x="56" y="584" font-size="11.5" fill="#333">1) Explícito: cada lançamento grava o id_vinculo (robusto e rápido).</text>
+  <text x="56" y="604" font-size="11.5" fill="#333">2) Por data (fallback): o vínculo onde admissao &#8804; data &#8804; coalesce(desligamento, hoje).</text>
+  <text x="56" y="624" font-size="11.5" fill="#333">Como os períodos não se sobrepõem, a data sempre resolve um único vínculo.</text>
+</svg>

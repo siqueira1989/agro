@@ -1,0 +1,504 @@
+<%@ page contentType="text/html;charset=UTF-8" language="java"%>
+<html>
+<head>
+    <title>Info4Cloud - Cadastro Funcionário</title>
+
+    <!-- Se você já importa Bootstrap/jQuery no importacao.html, pode reativar:
+    <%@ include file="../../pagina/importacao.html"%>
+    -->
+
+    <!-- Caso NÃO esteja importando, descomente abaixo (ajuste caminhos locais/CDN conforme seu projeto):
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.6.2/css/bootstrap.min.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.6.2/js/bootstrap.bundle.min.js"></script>
+    -->
+
+</head>
+<body>
+<header>
+    <%@ include file="../../pagina/menu.jsp"%>
+</header>
+
+<div class="container-fluid content mt-2">
+
+    <!-- ALERTA GLOBAL -->
+    <div id="alerta" class="d-none"></div>
+
+    <div class="card shadow-sm">
+        <div class="card-header d-flex align-items-center justify-content-between">
+            <div class="d-flex align-items-center">
+                <!-- ícone inline SVG -->
+                <svg width="22" height="22" viewBox="0 0 24 24" class="mr-2" aria-hidden="true">
+                    <path fill="currentColor" d="M12 12a4 4 0 1 0-4-4a4 4 0 0 0 4 4Zm0 2c-4 0-8 2-8 6v2h16v-2c0-4-4-6-8-6Z"/>
+                </svg>
+                <strong>Cadastro de Funcionário</strong>
+            </div>
+
+            <div>
+                <a href="/agro/view/admin/funcionario.jsp" class="btn btn-outline-secondary btn-sm">
+                    <!-- ícone voltar -->
+                    <svg width="18" height="18" viewBox="0 0 24 24" class="mr-1" aria-hidden="true">
+                        <path fill="currentColor" d="M19 11H7.83l5.58-5.59L12 4l-8 8l8 8l1.41-1.41L7.83 13H19z"/>
+                    </svg>
+                    Voltar
+                </a>
+            </div>
+        </div>
+
+        <div class="card-body">
+            <form id="formFuncionario" novalidate>
+                <!-- hidden -->
+                <input type="hidden" id="idPessoa" name="idPessoa" value="">
+
+                <div class="row">
+                    <!-- Nome -->
+                    <div class="form-group col-md-6">
+                        <label for="nomePessoa">Nome</label>
+                        <input type="text" class="form-control" id="nomePessoa" name="nomePessoa"
+                               minlength="3" maxlength="120" required>
+                        <div class="invalid-feedback">Informe o nome (mín. 3 caracteres).</div>
+                    </div>
+
+                    <!-- Email -->
+                    <div class="form-group col-md-3">
+                        <label for="emailPessoa">E-mail</label>
+                        <input type="email" class="form-control" id="emailPessoa" name="emailPessoa"
+                               maxlength="120" required>
+                        <div class="invalid-feedback">Informe um e-mail válido.</div>
+                    </div>
+
+                    <!-- Telefone -->
+                    <div class="form-group col-md-3">
+                        <label for="telefonePessoa">Telefone</label>
+                        <input type="text" class="form-control" id="telefonePessoa" name="telefonePessoa"
+                               placeholder="(00) 00000-0000" required>
+                        <div class="invalid-feedback">Informe um telefone válido.</div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <!-- Usuário -->
+                    <div class="form-group col-md-3">
+                        <label for="usuarioPessoa">Usuário</label>
+                        <input type="text" class="form-control" id="usuarioPessoa" name="usuarioPessoa"
+                               minlength="3" maxlength="40" required>
+                        <div class="invalid-feedback">Informe o usuário (3 a 40).</div>
+                    </div>
+
+                    <!-- Senha -->
+                    <div class="form-group col-md-3">
+                        <label for="senhaPessoa">Senha</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="senhaPessoa" name="senhaPessoa"
+                                   minlength="4" maxlength="60" required>
+                            <div class="input-group-append">
+                                <button class="btn btn-outline-secondary" type="button" id="btnToggleSenha" title="Mostrar/ocultar senha">
+                                    <!-- ícone olho -->
+                                    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path fill="currentColor" d="M12 5c-7.633 0-10 7-10 7s2.367 7 10 7 10-7 10-7-2.367-7-10-7zm0 12a5 5 0 1 1 5-5 5 5 0 0 1-5 5zm0-8a3 3 0 1 0 3 3 3 3 0 0 0-3-3z"/>
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="invalid-feedback">Informe uma senha (mín. 4).</div>
+                        </div>
+                    </div>
+
+                    <!-- Nível -->
+                    <div class="form-group col-md-3">
+                        <label for="nivelPessoa">Nível</label>
+                        <select class="form-control" id="nivelPessoa" name="nivelPessoa" required>
+                            <option value="" selected disabled>Selecione...</option>
+                            <option value="admin">Admin</option>
+                            <option value="gerente">Gerente</option>
+                            <option value="operador">Operador</option>
+                        </select>
+                        <div class="invalid-feedback">Selecione o nível.</div>
+                    </div>
+
+                    <!-- Situação -->
+                    <div class="form-group col-md-3">
+                        <label for="situacaoPessoa">Situação</label>
+                        <select class="form-control" id="situacaoPessoa" name="situacaoPessoa" required>
+                            <option value="true" selected>Ativo</option>
+                            <option value="false">Inativo</option>
+                        </select>
+                        <div class="invalid-feedback">Selecione a situação.</div>
+                    </div>
+                </div>
+
+                <hr>
+
+                <div class="row">
+                    <!-- CPF -->
+                    <div class="form-group col-md-3">
+                        <label for="cpfPf">CPF</label>
+                        <input type="text" class="form-control" id="cpfPf" name="cpfPf"
+                               placeholder="000.000.000-00" required>
+                        <div class="invalid-feedback">Informe um CPF válido.</div>
+                    </div>
+
+                    <!-- Data Nascimento -->
+                    <div class="form-group col-md-3">
+                        <label for="dataNascimentoPf">Data Nascimento</label>
+                        <input type="text" class="form-control" id="dataNascimentoPf" name="dataNascimentoPf"
+                               placeholder="dd/mm/aaaa" required>
+                        <div class="invalid-feedback">Informe uma data válida (dd/mm/aaaa).</div>
+                    </div>
+
+                    <!-- Matrícula -->
+                    <div class="form-group col-md-3">
+                        <label for="matricula">Matrícula</label>
+                        <input type="text" class="form-control" id="matricula" name="matricula"
+                               minlength="1" maxlength="30" required>
+                        <div class="invalid-feedback">Informe a matrícula.</div>
+                    </div>
+
+                    <!-- Tipo Funcionário -->
+                    <div class="form-group col-md-3">
+                        <label for="tipoFuncionario">Tipo Funcionário</label>
+                        <select class="form-control" id="tipoFuncionario" name="tipoFuncionario" required>
+                            <option value="" selected disabled>Selecione...</option>
+                            <option value="CLT">CLT</option>
+                            <option value="DIARIA">Diária</option>
+                            <option value="EMPREITA">Empreita</option>
+                            <option value="PRODUCAO">Produção</option>
+                        </select>
+                        <div class="invalid-feedback">Selecione o tipo.</div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <!-- Cargo -->
+                    <div class="form-group col-md-6">
+                        <label for="cargo">Cargo</label>
+                        <input type="text" class="form-control" id="cargo" name="cargo"
+                               minlength="2" maxlength="80" required>
+                        <div class="invalid-feedback">Informe o cargo (mín. 2).</div>
+                    </div>
+
+                    <!-- Área dinâmica (exemplo) -->
+                    <div class="form-group col-md-6">
+                        <label>Configuração do tipo</label>
+                        <div id="boxTipoInfo" class="alert alert-info mb-0">
+                            Selecione o <strong>Tipo Funcionário</strong> para ver dicas de cadastro.
+                        </div>
+                    </div>
+                </div>
+
+                <hr>
+
+                <!-- Endereço -->
+                <h6 class="mb-3">Endereço</h6>
+
+                <div class="row">
+                    <div class="form-group col-md-3">
+                        <label for="cep">CEP</label>
+                        <input type="text" class="form-control" id="cep" name="cep"
+                               placeholder="00000-000" required>
+                        <div class="invalid-feedback">Informe um CEP válido.</div>
+                    </div>
+
+                    <div class="form-group col-md-2">
+                        <label for="numero">Número</label>
+                        <input type="text" class="form-control" id="numero" name="numero"
+                               inputmode="numeric" required>
+                        <div class="invalid-feedback">Informe o número.</div>
+                    </div>
+
+                    <div class="form-group col-md-7">
+                        <label for="complemento">Complemento</label>
+                        <input type="text" class="form-control" id="complemento" name="complemento"
+                               maxlength="80">
+                    </div>
+                </div>
+
+                <!-- Campos extras que o ViaCEP do seu main.js preenche -->
+                <div class="row">
+                    <div class="form-group col-md-5">
+                        <label for="logradouro">Logradouro</label>
+                        <input type="text" class="form-control" id="logradouro" name="logradouro" readonly>
+                    </div>
+                    <div class="form-group col-md-3">
+                        <label for="bairro">Bairro</label>
+                        <input type="text" class="form-control" id="bairro" name="bairro" readonly>
+                    </div>
+                    <div class="form-group col-md-3">
+                        <label for="cidade">Cidade</label>
+                        <input type="text" class="form-control" id="cidade" name="cidade" readonly>
+                    </div>
+                    <div class="form-group col-md-1">
+                        <label for="uf">UF</label>
+                        <input type="text" class="form-control" id="uf" name="uf" readonly>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end mt-3">
+                    <button type="button" class="btn btn-outline-secondary mr-2" id="btnLimpar">
+                        <!-- ícone limpar -->
+                        <svg width="18" height="18" viewBox="0 0 24 24" class="mr-1" aria-hidden="true">
+                            <path fill="currentColor" d="M7 21a2 2 0 0 1-2-2V7h14v12a2 2 0 0 1-2 2zm3-10v8h2v-8zm4 0v8h2v-8zM15.5 4l1 1H20v2H4V5h3.5l1-1h7z"/>
+                        </svg>
+                        Limpar
+                    </button>
+
+                    <button type="submit" class="btn btn-success" id="btnSalvar">
+                        <!-- ícone salvar -->
+                        <svg width="18" height="18" viewBox="0 0 24 24" class="mr-1" aria-hidden="true">
+                            <path fill="currentColor" d="M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7zm-5 16a3 3 0 1 1 3-3a3 3 0 0 1-3 3zM6 8V5h9v3z"/>
+                        </svg>
+                        Salvar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div>
+
+<footer>
+    <%@ include file="../../pagina/footer.jsp"%>
+</footer>
+
+<!-- IMPORTS: main.js do seu projeto (ajuste o path real conforme sua estrutura) -->
+<script src="/agro/assets/js/main.js"></script>
+
+<!-- Script específico desta tela -->
+<script>
+/* ===========================
+   Máscaras (JS puro)
+=========================== */
+function onlyDigits(v) { return (v || '').replace(/\D/g, ''); }
+
+function maskCPF(v) {
+  v = onlyDigits(v).slice(0, 11);
+  v = v.replace(/(\d{3})(\d)/, "$1.$2");
+  v = v.replace(/(\d{3})(\d)/, "$1.$2");
+  v = v.replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+  return v;
+}
+
+function maskCEP(v) {
+  v = onlyDigits(v).slice(0, 8);
+  v = v.replace(/(\d{5})(\d)/, "$1-$2");
+  return v;
+}
+
+function maskTelefone(v) {
+  v = onlyDigits(v).slice(0, 11);
+  if (v.length <= 10) {
+    v = v.replace(/(\d{2})(\d)/, "($1) $2");
+    v = v.replace(/(\d{4})(\d)/, "$1-$2");
+  } else {
+    v = v.replace(/(\d{2})(\d)/, "($1) $2");
+    v = v.replace(/(\d{5})(\d)/, "$1-$2");
+  }
+  return v;
+}
+
+function maskData(v) {
+  v = onlyDigits(v).slice(0, 8);
+  v = v.replace(/(\d{2})(\d)/, "$1/$2");
+  v = v.replace(/(\d{2})(\d)/, "$1/$2");
+  return v;
+}
+
+function setValid(el, ok, msg) {
+  if (!el) return;
+  el.classList.remove('is-valid', 'is-invalid');
+  el.classList.add(ok ? 'is-valid' : 'is-invalid');
+  if (!ok && msg) {
+    const fb = el.closest('.form-group')?.querySelector('.invalid-feedback');
+    if (fb) fb.textContent = msg;
+  }
+}
+
+function validarCPF(cpf) {
+  cpf = onlyDigits(cpf);
+  if (cpf.length !== 11) return false;
+  if (/^(\d)\1+$/.test(cpf)) return false;
+
+  let soma = 0;
+  for (let i = 0; i < 9; i++) soma += parseInt(cpf.charAt(i)) * (10 - i);
+  let d1 = 11 - (soma % 11);
+  if (d1 >= 10) d1 = 0;
+  if (d1 !== parseInt(cpf.charAt(9))) return false;
+
+  soma = 0;
+  for (let i = 0; i < 10; i++) soma += parseInt(cpf.charAt(i)) * (11 - i);
+  let d2 = 11 - (soma % 11);
+  if (d2 >= 10) d2 = 0;
+  return d2 === parseInt(cpf.charAt(10));
+}
+
+function validarDataBR(v) {
+  const d = onlyDigits(v);
+  if (d.length !== 8) return false;
+  const dd = parseInt(d.slice(0,2),10);
+  const mm = parseInt(d.slice(2,4),10);
+  const yyyy = parseInt(d.slice(4,8),10);
+  if (yyyy < 1900 || yyyy > 2100) return false;
+  const dt = new Date(yyyy, mm-1, dd);
+  return dt.getFullYear() === yyyy && dt.getMonth() === (mm-1) && dt.getDate() === dd;
+}
+
+/* ===========================
+   Dinâmica: dicas por tipo
+=========================== */
+function atualizarBoxTipoInfo() {
+  const tipo = document.getElementById('tipoFuncionario').value;
+  const box = document.getElementById('boxTipoInfo');
+
+  if (!tipo) {
+    box.className = 'alert alert-info mb-0';
+    box.innerHTML = 'Selecione o <strong>Tipo Funcionário</strong> para ver dicas de cadastro.';
+    return;
+  }
+
+  const map = {
+    CLT: { cls: 'alert alert-primary mb-0', html: 'CLT: use a matrícula e cargo corretamente. Horas/faltas/extra serão calculadas no módulo CLT.' },
+    DIARIA: { cls: 'alert alert-success mb-0', html: 'Diária: o pagamento é por dias trabalhados. Matrícula pode ser usada como controle interno.' },
+    EMPREITA: { cls: 'alert alert-warning mb-0', html: 'Empreita: pagamento por valor fixo do serviço. Cargo ajuda a identificar o tipo de atividade.' },
+    PRODUCAO: { cls: 'alert alert-secondary mb-0', html: 'Produção: pagamento por produção (ex.: caixas). Matrícula + cargo ajudam na rastreabilidade.' }
+  };
+
+  box.className = map[tipo].cls;
+  box.textContent = ''; // limpa texto
+  box.innerHTML = map[tipo].html;
+}
+
+/* ===========================
+   Eventos / validação / submit
+=========================== */
+document.addEventListener('DOMContentLoaded', function() {
+  const form = document.getElementById('formFuncionario');
+
+  // máscaras ao digitar
+  const cpf = document.getElementById('cpfPf');
+  const tel = document.getElementById('telefonePessoa');
+  const cep = document.getElementById('cep');
+  const dataNasc = document.getElementById('dataNascimentoPf');
+  const numero = document.getElementById('numero');
+
+  cpf.addEventListener('input', () => cpf.value = maskCPF(cpf.value));
+  tel.addEventListener('input', () => tel.value = maskTelefone(tel.value));
+  cep.addEventListener('input', () => cep.value = maskCEP(cep.value));
+  dataNasc.addEventListener('input', () => dataNasc.value = maskData(dataNasc.value));
+
+  numero.addEventListener('input', () => {
+    numero.value = onlyDigits(numero.value).slice(0, 6);
+  });
+
+  // validações mais fortes no blur
+  cpf.addEventListener('blur', () => setValid(cpf, validarCPF(cpf.value), 'CPF inválido.'));
+  dataNasc.addEventListener('blur', () => setValid(dataNasc, validarDataBR(dataNasc.value), 'Data inválida (dd/mm/aaaa).'));
+
+  // CEP -> chama seu main.js (ViaCEP)
+  cep.addEventListener('blur', () => {
+    const v = cep.value;
+    // usa função já existente no seu main.js
+    if (typeof preencherEnderecoViaCep === 'function') {
+      preencherEnderecoViaCep(v);
+    }
+    // valida cep
+    setValid(cep, onlyDigits(v).length === 8, 'CEP inválido.');
+  });
+
+  // tipo funcionário -> dicas
+  document.getElementById('tipoFuncionario').addEventListener('change', atualizarBoxTipoInfo);
+
+  // toggle senha
+  document.getElementById('btnToggleSenha').addEventListener('click', function() {
+    const input = document.getElementById('senhaPessoa');
+    input.type = (input.type === 'password') ? 'text' : 'password';
+  });
+
+  // limpar
+  document.getElementById('btnLimpar').addEventListener('click', function() {
+    form.reset();
+    form.classList.remove('was-validated');
+    // remove estados
+    Array.from(form.querySelectorAll('.is-valid, .is-invalid')).forEach(el => {
+      el.classList.remove('is-valid','is-invalid');
+    });
+    atualizarBoxTipoInfo();
+    if (typeof mostrarAlerta === 'function') {
+      mostrarAlerta('Formulário limpo.', 'info', '#alerta', 2500);
+    }
+  });
+
+  // submit AJAX
+  form.addEventListener('submit', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // validações extras
+    const okCpf = validarCPF(cpf.value);
+    const okData = validarDataBR(dataNasc.value);
+    const okCep = onlyDigits(cep.value).length === 8;
+
+    setValid(cpf, okCpf, 'CPF inválido.');
+    setValid(dataNasc, okData, 'Data inválida (dd/mm/aaaa).');
+    setValid(cep, okCep, 'CEP inválido.');
+
+    // validação bootstrap
+    if (!form.checkValidity() || !okCpf || !okData || !okCep) {
+      form.classList.add('was-validated');
+      if (typeof mostrarAlerta === 'function') {
+        mostrarAlerta('Revise os campos em vermelho.', 'warning', '#alerta', 4000);
+      }
+      return;
+    }
+
+    const payload = {
+      acao: (document.getElementById('idPessoa').value ? 'update' : 'create'),
+      idPessoa: document.getElementById('idPessoa').value || null,
+      nomePessoa: document.getElementById('nomePessoa').value.trim(),
+      usuarioPessoa: document.getElementById('usuarioPessoa').value.trim(),
+      senhaPessoa: document.getElementById('senhaPessoa').value,
+      nivelPessoa: document.getElementById('nivelPessoa').value,
+      situacaoPessoa: document.getElementById('situacaoPessoa').value,
+      emailPessoa: document.getElementById('emailPessoa').value.trim(),
+      telefonePessoa: document.getElementById('telefonePessoa').value.trim(),
+      cep: document.getElementById('cep').value.trim(),
+      numero: parseInt(document.getElementById('numero').value, 10),
+      complemento: document.getElementById('complemento').value.trim(),
+      cpfPf: document.getElementById('cpfPf').value.trim(),
+      dataNascimentoPf: document.getElementById('dataNascimentoPf').value.trim(), // dd/mm/aaaa
+      matricula: document.getElementById('matricula').value.trim(),
+      tipoFuncionario: document.getElementById('tipoFuncionario').value,
+      cargo: document.getElementById('cargo').value.trim()
+    };
+
+    // jQuery AJAX (compatível com seu main.js)
+    $.ajax({
+      url: '/agro/FuncionarioServlet',
+      method: 'POST',
+      contentType: 'application/json; charset=utf-8',
+      dataType: 'json',
+      data: JSON.stringify(payload),
+      success: function(resp) {
+        if (typeof mostrarAlerta === 'function') {
+          mostrarAlerta(resp.msg || 'Funcionário salvo com sucesso!', 'success', '#alerta', 4000);
+        }
+        // se quiser redirecionar:
+        // window.location.href = '/agro/view/admin/funcionario.jsp';
+      },
+      error: function(xhr) {
+        let msg = 'Erro ao salvar funcionário!';
+        try {
+          const json = JSON.parse(xhr.responseText);
+          msg = json.msg || msg;
+        } catch(e) {}
+        if (typeof mostrarAlerta === 'function') {
+          mostrarAlerta(msg, 'danger', '#alerta', 5000);
+        }
+      }
+    });
+  });
+
+  atualizarBoxTipoInfo();
+});
+</script>
+
+</body>
+</html>
