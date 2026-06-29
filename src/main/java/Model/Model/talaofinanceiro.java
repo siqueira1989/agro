@@ -1,96 +1,94 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
+
 package Model.Model;
 
 import java.util.Date;
 
-/**
- *
- * @author lucia
- */
-public class talaofinanceiro {
-    private int idtalaofinanceiro;
-    private  Talao talao;
-    private String safratalaofinanceiro;
-    private Date  iniciosafratalaofinanceiro;
-    private Date  terminosafratalaofinanceiro;
-    private Double custosafratalaofinanceiro;
-    private Double despesassafratalaofinanceiro;
-    private Double vendabrutasafratalaofinanceiro;
-    private Double vendaliquidasafratalaofinanceiro;
+public class TalaoFinanceiro {
 
-    public int getIdtalaofinanceiro() {
-        return idtalaofinanceiro;
+    private int idTalaoFinanceiro;
+    private int idTalao;
+    private Talao talaoTalaoFinanceiro;
+    private String safraTalaoFinanceiro;
+    private Date iniciosafraTalaoFinanceiro;
+    private Date terminosafraTalaoFinanceiro;
+    private Double custosafraTalaoFinanceiro;
+    private Double despesassafraTalaoFinanceiro;
+    private Double vendabrutassafraTalaoFinanceiro;
+    private Double vendasliquidassafraTalaoFinanceiro;
+
+    public int getIdTalaoFinanceiro() {
+        return idTalaoFinanceiro;
     }
 
-    public void setIdtalaofinanceiro(int idtalaofinanceiro) {
-        this.idtalaofinanceiro = idtalaofinanceiro;
+    public void setIdTalaoFinanceiro(int idTalaoFinanceiro) {
+        this.idTalaoFinanceiro = idTalaoFinanceiro;
     }
 
-    public Talao getTalao() {
-        return talao;
+    public int getIdTalao() { return idTalao; }
+    public void setIdTalao(int idTalao) { this.idTalao = idTalao; }
+
+    public Talao getTalaoTalaoFinanceiro() {
+        return talaoTalaoFinanceiro;
     }
 
-    public void setTalao(Talao talao) {
-        this.talao = talao;
+    public void setTalaoTalaoFinanceiro(Talao talaoTalaoFinanceiro) {
+        this.talaoTalaoFinanceiro = talaoTalaoFinanceiro;
     }
 
-    public String getSafratalaofinanceiro() {
-        return safratalaofinanceiro;
+    public String getSafraTalaoFinanceiro() {
+        return safraTalaoFinanceiro;
     }
 
-    public void setSafratalaofinanceiro(String safratalaofinanceiro) {
-        this.safratalaofinanceiro = safratalaofinanceiro;
+    public void setSafraTalaoFinanceiro(String safraTalaoFinanceiro) {
+        this.safraTalaoFinanceiro = safraTalaoFinanceiro;
     }
 
-    public Date getIniciosafratalaofinanceiro() {
-        return iniciosafratalaofinanceiro;
+    public Date getIniciosafraTalaoFinanceiro() {
+        return iniciosafraTalaoFinanceiro;
     }
 
-    public void setIniciosafratalaofinanceiro(Date iniciosafratalaofinanceiro) {
-        this.iniciosafratalaofinanceiro = iniciosafratalaofinanceiro;
+    public void setIniciosafraTalaoFinanceiro(Date iniciosafraTalaoFinanceiro) {
+        this.iniciosafraTalaoFinanceiro = iniciosafraTalaoFinanceiro;
     }
 
-    public Date getTerminosafratalaofinanceiro() {
-        return terminosafratalaofinanceiro;
+    public Date getTerminosafraTalaoFinanceiro() {
+        return terminosafraTalaoFinanceiro;
     }
 
-    public void setTerminosafratalaofinanceiro(Date terminosafratalaofinanceiro) {
-        this.terminosafratalaofinanceiro = terminosafratalaofinanceiro;
+    public void setTerminosafraTalaoFinanceiro(Date terminosafraTalaoFinanceiro) {
+        this.terminosafraTalaoFinanceiro = terminosafraTalaoFinanceiro;
     }
 
-    public Double getCustosafratalaofinanceiro() {
-        return custosafratalaofinanceiro;
+    public Double getCustosafraTalaoFinanceiro() {
+        return custosafraTalaoFinanceiro;
     }
 
-    public void setCustosafratalaofinanceiro(Double custosafratalaofinanceiro) {
-        this.custosafratalaofinanceiro = custosafratalaofinanceiro;
+    public void setCustosafraTalaoFinanceiro(Double custosafraTalaoFinanceiro) {
+        this.custosafraTalaoFinanceiro = custosafraTalaoFinanceiro;
     }
 
-    public Double getDespesassafratalaofinanceiro() {
-        return despesassafratalaofinanceiro;
+    public Double getDespesassafraTalaoFinanceiro() {
+        return despesassafraTalaoFinanceiro;
     }
 
-    public void setDespesassafratalaofinanceiro(Double despesassafratalaofinanceiro) {
-        this.despesassafratalaofinanceiro = despesassafratalaofinanceiro;
+    public void setDespesassafraTalaoFinanceiro(Double despesassafraTalaoFinanceiro) {
+        this.despesassafraTalaoFinanceiro = despesassafraTalaoFinanceiro;
     }
 
-    public Double getVendabrutasafratalaofinanceiro() {
-        return vendabrutasafratalaofinanceiro;
+    public Double getVendabrutassafraTalaoFinanceiro() {
+        return vendabrutassafraTalaoFinanceiro;
     }
 
-    public void setVendabrutasafratalaofinanceiro(Double vendabrutasafratalaofinanceiro) {
-        this.vendabrutasafratalaofinanceiro = vendabrutasafratalaofinanceiro;
+    public void setVendabrutassafraTalaoFinanceiro(Double vendabrutassafraTalaoFinanceiro) {
+        this.vendabrutassafraTalaoFinanceiro = vendabrutassafraTalaoFinanceiro;
     }
 
-    public Double getVendaliquidasafratalaofinanceiro() {
-        return vendaliquidasafratalaofinanceiro;
+    public Double getVendasliquidassafraTalaoFinanceiro() {
+        return vendasliquidassafraTalaoFinanceiro;
     }
 
-    public void setVendaliquidasafratalaofinanceiro(Double vendaliquidasafratalaofinanceiro) {
-        this.vendaliquidasafratalaofinanceiro = vendaliquidasafratalaofinanceiro;
+    public void setVendasliquidassafraTalaoFinanceiro(Double vendasliquidassafraTalaoFinanceiro) {
+        this.vendasliquidassafraTalaoFinanceiro = vendasliquidassafraTalaoFinanceiro;
     }
-    
+
 }
