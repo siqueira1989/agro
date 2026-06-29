@@ -1,0 +1,10 @@
+target/
+*.class
+*.war
+*.jar
+
+# estado local do agente / IDE
+.claude/
+
+# credenciais — nunca commitar
+src/main/resources/email.properties
