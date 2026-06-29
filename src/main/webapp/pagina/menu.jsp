@@ -1,62 +1,111 @@
 <nav class="navbar navbar-expand-lg navbar-dark bg-success">
-	<a class="navbar-brand" href="#"> <h3 class="font-weight-bold text-white">AgroFazenda</h3></a>
-	<button class="navbar-toggler" type="button" data-toggle="collapse"
-		data-target="#navbarNav" aria-controls="navbarNav"
-		aria-expanded="false" aria-label="Toggle navigation">
-		<span class="navbar-toggler-icon"></span>
-	</button>
-	<div class="collapse navbar-collapse" id="navbarNav">
-		<ul class="navbar-nav ml-auto">
-			<li class="nav-item"><a class="nav-link active" href="http://localhost:8080/agro/index.jsp">Home</a>
-			</li>
-			<li class="nav-item"><a class="nav-link" href="#">RelatÛrios</a>
-			</li>
-			<li class="nav-item dropdown"><a
-				class="nav-link dropdown-toggle" href="#" id="navbarDropdown"
-				role="button" data-toggle="dropdown" aria-haspopup="true"
-				aria-expanded="false">ConfiguraÁ„o</a>
-				<div class="dropdown-menu" aria-labelledby="navbarDropdown">
-					<a class="dropdown-item" href="http://localhost:8080/agro/view/admin/classificacao.jsp">ClassificaÁ„o</a> 
-					<a class="dropdown-item" href="http://localhost:8080/agro/view/admin/despesascustos.jsp">Custos e Despesas</a>
-					<a class="dropdown-item" href="http://localhost:8080/agro/view/admin/parceiro.jsp">Parceiro</a>
-					<div class="dropdown-divider"></div>
-					<a class="dropdown-item" href="#">Algo mais aqui</a>
-				</div>
-                        </li>
-                        <li class="nav-item dropdown"><a
-				class="nav-link dropdown-toggle" href="#" id="navbarDropdown"
-				role="button" data-toggle="dropdown" aria-haspopup="true"
-				aria-expanded="false">ProduÁ„o</a>
-				<div class="dropdown-menu" aria-labelledby="navbarDropdown">
-					<a class="dropdown-item" href="http://localhost:8080/agro/view/admin/alimento.jsp">Alimento</a>
-                                        <a class="dropdown-item" href="http://localhost:8080/agro/view/admin/area.jsp">Area</a> 
-					
-				</div>
-                        </li>
-			<li class="nav-item"><a class="nav-link" href="#">Perfil</a></li>
-			<li class="nav-item"><a class="nav-link" href="#">Sair</a></li>
-		</ul>
-	</div>
+    <a class="navbar-brand" href="<%=request.getContextPath()%>/view/admin/index.jsp">
+        <h3 class="fw-bold text-white mb-0">AgroFazenda</h3>
+    </a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+            data-bs-target="#navbarNav" aria-controls="navbarNav"
+            aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav ms-auto">
+            <li class="nav-item">
+                <a class="nav-link" href="<%=request.getContextPath()%>/view/admin/index.jsp">
+                    <i class="fas fa-home me-1"></i>Home
+                </a>
+            </li>
+
+            <!-- Configura√ß√£o -->
+            <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" href="#" role="button"
+                   data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    <i class="fas fa-cog me-1"></i>Configura√ß√£o
+                </a>
+                <div class="dropdown-menu">
+                    <a class="dropdown-item" href="<%=request.getContextPath()%>/view/admin/classificacao.jsp">
+                        <i class="fas fa-tags me-1"></i>Classifica√ß√£o
+                    </a>
+                    <a class="dropdown-item" href="<%=request.getContextPath()%>/view/admin/despesascustos.jsp">
+                        <i class="fas fa-receipt me-1"></i>Custos e Despesas
+                    </a>
+                    <a class="dropdown-item" href="<%=request.getContextPath()%>/view/admin/parceiro.jsp">
+                        <i class="fas fa-handshake me-1"></i>Parceiro
+                    </a>
+                </div>
+            </li>
+
+            <!-- Produ√ß√£o -->
+            <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" href="#" role="button"
+                   data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    <i class="fas fa-seedling me-1"></i>Produ√ß√£o
+                </a>
+                <div class="dropdown-menu">
+                    <a class="dropdown-item" href="<%=request.getContextPath()%>/view/admin/alimento.jsp">
+                        <i class="fas fa-apple-alt me-1"></i>Alimento
+                    </a>
+                    <a class="dropdown-item" href="<%=request.getContextPath()%>/view/admin/areaproducao.jsp">
+                        <i class="fas fa-map-marked-alt me-1"></i>√Årea de Produ√ß√£o
+                    </a>
+                    <a class="dropdown-item" href="<%=request.getContextPath()%>/view/admin/talao.jsp">
+                        <i class="fas fa-leaf me-1"></i>Tal√£o
+                    </a>
+                </div>
+            </li>
+
+            <!-- RH -->
+            <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" href="#" role="button"
+                   data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    <i class="fas fa-users me-1"></i>RH
+                </a>
+                <div class="dropdown-menu">
+                    <a class="dropdown-item" href="<%=request.getContextPath()%>/view/admin/Colaboradores.jsp">
+                        <i class="fas fa-user-tie me-1"></i>Funcion√°rios
+                    </a>
+                    <a class="dropdown-item" href="<%=request.getContextPath()%>/view/admin/folhapagamento.jsp">
+                        <i class="fas fa-money-bill-wave me-1"></i>Folha de Pagamento
+                    </a>
+                    <div class="dropdown-divider"></div>
+                    <a class="dropdown-item" href="<%=request.getContextPath()%>/view/admin/pontoeletronico.jsp">
+                        <i class="fas fa-fingerprint me-1"></i>Ponto Eletr√¥nico
+                    </a>
+                    <div class="dropdown-divider"></div>
+                    <a class="dropdown-item fw-semibold text-success" href="<%=request.getContextPath()%>/view/admin/Colaboradores.jsp?tipo=CLT">
+                        <i class="fas fa-id-badge me-1 text-success"></i>CLT ‚Äî Perfis e Fechamento
+                    </a>
+                </div>
+            </li>
+
+            <!-- Relat√≥rios -->
+            <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" href="#" role="button"
+                   data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    <i class="fas fa-chart-bar me-1"></i>Relat√≥rio
+                </a>
+                <div class="dropdown-menu">
+                    <a class="dropdown-item" href="<%=request.getContextPath()%>/RelatorioExportServlet?tipo=excel&modulo=funcionario">
+                        <i class="fas fa-file-excel me-1 text-success"></i>Funcion√°rio (Excel)
+                    </a>
+                    <a class="dropdown-item" href="<%=request.getContextPath()%>/RelatorioExportServlet?tipo=pdf&modulo=funcionario">
+                        <i class="fas fa-file-pdf me-1 text-danger"></i>Funcion√°rio (PDF)
+                    </a>
+                    <div class="dropdown-divider"></div>
+                    <a class="dropdown-item" href="<%=request.getContextPath()%>/RelatorioExportServlet?tipo=excel&modulo=areaproducao">
+                        <i class="fas fa-file-excel me-1 text-success"></i>√Årea Produtiva (Excel)
+                    </a>
+                    <a class="dropdown-item" href="<%=request.getContextPath()%>/RelatorioExportServlet?tipo=pdf&modulo=areaproducao">
+                        <i class="fas fa-file-pdf me-1 text-danger"></i>√Årea de Produ√ß√£o (PDF)
+                    </a>
+                </div>
+            </li>
+
+            <!-- Usu√°rio -->
+            <li class="nav-item">
+                <a class="nav-link" href="<%=request.getContextPath()%>/LogoutServlet">
+                    <i class="fas fa-sign-out-alt me-1"></i>Sair
+                </a>
+            </li>
+        </ul>
+    </div>
 </nav>
- <!--  let id = $('#exclusaoId').val();
-                // Adicione a lÛgica para excluir a despesa/custo
-               // alert('Parceiro ' + id + ' excluÌdo com sucesso!');
-                //$('#modalExclusao').modal('hide');
-                // Atualiza a tabela apÛs a exclus„o
-                url: '/agro/ControllerParceiro',
-                method: 'POST',
-                data: {
-                    acao: 'delete',
-                    idparceiro: id
-                },
-                success: function(response) {
-                    alert('Despesa excluÌda com sucesso!');
-                    $('#modalExclusao').modal('hide');
-                    tabela.ajax.reload();
-                },
-                error: function(xhr) {
-                    alert('AtenÁ„o: ' + xhr.responseText);
-                }
-            });
-            };
-        }); -->

@@ -1,162 +1,229 @@
+﻿<!DOCTYPE html>
 <%@ page contentType="text/html;charset=UTF-8" language="java"%>
-<%
-  // Simulação de perfil. Troque para ADMIN, GESTOR ou VISITANTE
-  String perfil = "ADMIN";
-%>
-<html>
+<html lang="pt-br">
 <head>
-    <title>Agro- Gestão de  Colaboradores</title>
+    <title>Agro - Colaboradores</title>
+    <%@ include file="../../pagina/importacao.html"%>
 
-    <!-- Bootstrap 4 CSS -->
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
-
-    <!-- jQuery -->
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-
-    <!-- Bootstrap 4 JS -->
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
-
-    <!-- DataTables core -->
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.11.5/css/jquery.dataTables.min.css">
-    <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
-
-    <!-- DataTables Buttons -->
-    <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.2.3/css/buttons.dataTables.min.css">
-    <script src="https://cdn.datatables.net/buttons/2.2.3/js/dataTables.buttons.min.js"></script>
-    <script src="https://cdn.datatables.net/buttons/2.2.3/js/buttons.html5.min.js"></script>
-    <script src="https://cdn.datatables.net/buttons/2.2.3/js/buttons.print.min.js"></script>
-
-    <!-- Dependências para export -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
-
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 <body>
-<div class="container-fluid mt-3">
-    <h4>Painel de Funcionários (Simulação)</h4>
+<header>
+    <%@ include file="../../pagina/menu.jsp"%>
+</header>
 
-    <div class="form-row my-3">
-        <div class="form-group col-md-3">
-            <label for="filtroStatus">Filtrar por Status</label>
-            <select id="filtroStatus" class="form-control">
+<div class="container-fluid content mt-3">
+
+    <div class="bg-success text-white p-3 rounded mb-4">
+        <h2 class="m-0"><i class="fas fa-users me-2"></i>Colaboradores</h2>
+    </div>
+
+    <div id="alerta" class="alert d-none" role="alert"></div>
+
+    <!-- Filtros e botão novo -->
+    <div class="row g-2 align-items-end mb-3">
+        <div class="col-md-3 mb-0">
+            <label for="filtroTipo">Tipo</label>
+            <select id="filtroTipo" class="form-control">
                 <option value="">Todos</option>
-                <option value="ATIVO">ATIVO</option>
-                <option value="INATIVO">INATIVO</option>
+                <option value="CLT">CLT</option>
+                <option value="DIARIA">Diária</option>
+                <option value="EMPREITA">Empreita</option>
+                <option value="PRODUCAO">Produção</option>
             </select>
         </div>
-        <div class="form-group col-md-3">
-            <label for="filtroCargo">Filtrar por Cargo</label>
-            <select id="filtroCargo" class="form-control">
+        <div class="col-md-3 mb-0">
+            <label for="filtroSituacao">Situação</label>
+            <select id="filtroSituacao" class="form-control">
                 <option value="">Todos</option>
+                <option value="Ativo">Ativo</option>
+                <option value="Inativo">Inativo</option>
             </select>
+        </div>
+        <div class="col-md-auto ms-auto">
+            <a href="${pageContext.request.contextPath}/view/admin/ColaboCadastro.jsp"
+               class="btn btn-primary">
+                <i class="fas fa-plus-circle me-1"></i> Novo Funcionário
+            </a>
         </div>
     </div>
 
-    <table id="tblFuncionarios" class="table table-striped table-hover w-100">
-        <thead>
-        <tr>
-            <th>#</th>
-            <th>Nome</th>
-            <th>CPF</th>
-            <th>Cargo</th>
-            <th>E-mail</th>
-            <th>Status</th>
-            <th>Ações</th>
-        </tr>
-        </thead>
-    </table>
+    <!-- Tabela -->
+    <div class="table-responsive rounded shadow-custom m-2 p-2">
+        <table id="tabelaFuncionarios" class="table table-bordered table-striped">
+            <thead class="thead-green">
+                <tr>
+                    <th>ID</th>
+                    <th>Nome</th>
+                    <th>CPF</th>
+                    <th>Cargo</th>
+                    <th>Tipo</th>
+                    <th>E-mail</th>
+                    <th>Situação</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
 </div>
 
-<script>
-/* =========================
-   SIMULAÇÃO DE DADOS
-========================= */
-const funcionariosFake = [
-  {id:1, nome:"Ana Souza", cpf:"123.456.789-00", cargo:"Analista", email:"ana@empresa.com", status:"ATIVO"},
-  {id:2, nome:"Bruno Lima", cpf:"987.654.321-00", cargo:"Supervisor", email:"bruno@empresa.com", status:"INATIVO"},
-  {id:3, nome:"Carlos Mendes", cpf:"111.222.333-44", cargo:"Gerente", email:"carlos@empresa.com", status:"ATIVO"},
-  {id:4, nome:"Daniela Rocha", cpf:"555.666.777-88", cargo:"Analista", email:"daniela@empresa.com", status:"ATIVO"},
-  {id:5, nome:"Eduardo Alves", cpf:"999.888.777-66", cargo:"Estagiário", email:"eduardo@empresa.com", status:"INATIVO"},
-  {id:6, nome:"Fernanda Dias", cpf:"444.333.222-11", cargo:"Supervisor", email:"fernanda@empresa.com", status:"ATIVO"}
-];
+<!-- ===== Modal Editar ===== -->
+<div class="modal fade" id="modalEditar" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <form id="formEditar" class="modal-content needs-validation" novalidate>
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="fas fa-user-edit me-1"></i> Editar Funcionário</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
 
-// Perfil vindo do servidor
-const USER_ROLE = "<%= perfil %>";  // ADMIN, GESTOR, VISITANTE
+            <div class="modal-body">
+                <div id="alertaModalEditar"></div>
 
-/* =========================
-   DATATABLE
-========================= */
-let dt;
-const DT_COL = { ID:0, NOME:1, CPF:2, CARGO:3, EMAIL:4, STATUS:5, ACOES:6 };
+                <input type="hidden" id="editIdPessoa">
+                <input type="hidden" id="editCpfPf">
+                <input type="hidden" id="editMatricula">
+                <input type="hidden" id="editSenhaPessoa">
+                <input type="hidden" id="editDataNasc">
+                <input type="hidden" id="editDataInicio">
+                <input type="hidden" id="editDataFim">
+                <input type="hidden" id="editCep">
+                <input type="hidden" id="editNumero">
+                <input type="hidden" id="editComplemento">
 
-function actionButtons(row) {
-  const canEdit   = (USER_ROLE === "ADMIN" || USER_ROLE === "GESTOR");
-  const canDelete = (USER_ROLE === "ADMIN");
+                <div class="row g-2">
+                    <div class="col-md-8">
+                        <label>Nome *</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-user"></i></span>
+                            <input type="text" class="form-control" id="editNome" minlength="3" maxlength="120" required>
+                            <div class="invalid-feedback">Informe o nome.</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <label>Nível *</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-layer-group"></i></span>
+                            <select class="form-select" id="editNivel" required>
+                                <option value="">Selecione</option>
+                                <option value="admin">Admin</option>
+                                <option value="gerente">Gerente</option>
+                                <option value="operador">Operador</option>
+                            </select>
+                            <div class="invalid-feedback">Selecione o nível.</div>
+                        </div>
+                    </div>
+                </div>
 
-  return `
-    <div class="btn-group btn-group-sm">
-      <button class="btn btn-outline-primary" ${canEdit ? "" : "disabled"}>
-        <i class="fas fa-edit"></i>
-      </button>
-      <button class="btn btn-outline-danger" ${canDelete ? "" : "disabled"}>
-        <i class="fas fa-trash-alt"></i>
-      </button>
+                <div class="row g-2">
+                    <div class="col-md-6">
+                        <label>E-mail *</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-envelope"></i></span>
+                            <input type="email" class="form-control" id="editEmail" maxlength="120" required>
+                            <div class="invalid-feedback">Informe um e-mail válido.</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label>Telefone</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-phone"></i></span>
+                            <input type="text" class="form-control" id="editTelefone" maxlength="20">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-2">
+                    <div class="col-md-4">
+                        <label>Cargo *</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-user-tie"></i></span>
+                            <input type="text" class="form-control" id="editCargo" minlength="2" maxlength="80" required>
+                            <div class="invalid-feedback">Informe o cargo.</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <label>Tipo *</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-users-cog"></i></span>
+                            <select class="form-select" id="editTipo" required>
+                                <option value="">Selecione</option>
+                                <option value="CLT">CLT</option>
+                                <option value="DIARIA">Diária</option>
+                                <option value="EMPREITA">Empreita</option>
+                                <option value="PRODUCAO">Produção</option>
+                            </select>
+                            <div class="invalid-feedback">Selecione o tipo.</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <label>Situação</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-toggle-on"></i></span>
+                            <select class="form-select" id="editSituacao">
+                                <option value="true">Ativo</option>
+                                <option value="false">Inativo</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-2">
+                    <div class="col-md-6">
+                        <label>Usuário *</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-user-circle"></i></span>
+                            <input type="text" class="form-control" id="editUsuario" minlength="3" maxlength="40" required>
+                            <div class="invalid-feedback">Informe o usuário.</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label>Nova Senha <small class="text-muted">(deixe em branco para manter)</small></label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                            <input type="password" class="form-control" id="editSenhaNova" minlength="4" maxlength="60">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="submit" class="btn btn-success"><i class="fas fa-save me-1"></i> Salvar</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-1"></i> Cancelar
+                </button>
+            </div>
+        </form>
     </div>
-  `;
-}
+</div>
+<!-- Fim modal editar -->
 
-function initTable() {
-  dt = $("#tblFuncionarios").DataTable({
-    data: funcionariosFake,
-    columns: [
-      { data: "id" },
-      { data: "nome" },
-      { data: "cpf" },
-      { data: "cargo" },
-      { data: "email" },
-      { data: "status" },
-      { data: null, render: (_,__,row) => actionButtons(row), orderable:false, searchable:false }
-    ],
-    language: { url: "https://cdn.datatables.net/plug-ins/1.11.5/i18n/pt-BR.json" },
-    order: [[DT_COL.NOME, "asc"]],
-    dom: 'Bfrtip',
-    buttons: [
-      { extend:'csvHtml5', text:'<i class="fas fa-file-csv"></i> CSV' },
-      { extend:'pdfHtml5', text:'<i class="fas fa-file-pdf"></i> PDF', orientation:'landscape', pageSize:'A4' },
-      { extend:'print', text:'<i class="fas fa-print"></i> Imprimir' }
-    ]
-  });
+<!-- ===== Modal Confirmar Desativar/Reativar ===== -->
+<div class="modal fade" id="modalSituacao" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-sm" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title"><i class="fas fa-exclamation-triangle me-1"></i> Confirmar</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <p id="textoConfirmacaoSituacao"></p>
+                <input type="hidden" id="situacaoId">
+                <input type="hidden" id="situacaoNova">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-warning" id="btnConfirmarSituacao">
+                    <i class="fas fa-check me-1"></i> Confirmar
+                </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Fim modal situação -->
 
-  preencherFiltroCargo(funcionariosFake);
-}
+<footer>
+    <%@ include file="../../pagina/footer.jsp"%>
+</footer>
 
-/* =========================
-   FILTROS
-========================= */
-function preencherFiltroCargo(lista) {
-  const set = new Set(lista.map(x => x.cargo));
-  const $sel = $("#filtroCargo");
-  set.forEach(c => $sel.append('<option value="'+c+'">'+c+'</option>'));
-}
-
-function aplicarFiltros() {
-  const st = $("#filtroStatus").val();
-  const cg = $("#filtroCargo").val();
-  dt.column(DT_COL.STATUS).search(st ? '^'+st+'$' : '', true, false);
-  dt.column(DT_COL.CARGO).search(cg ? '^'+cg+'$' : '', true, false);
-  dt.draw();
-}
-
-/* =========================
-   INIT
-========================= */
-$(function(){
-  initTable();
-  $("#filtroStatus,#filtroCargo").on("change", aplicarFiltros);
-});
-</script>
 </body>
 </html>
