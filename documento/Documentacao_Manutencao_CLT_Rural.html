@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Documentação Técnica — Módulo CLT Rural (Agro Tech One)</title>
+<style>
+  body { font-family: 'Calibri','Arial',sans-serif; font-size: 11pt; color: #1a1a1a; line-height: 1.45; }
+  h1 { font-size: 22pt; color: #1f5c1f; border-bottom: 3px solid #1f5c1f; padding-bottom: 4px; }
+  h2 { font-size: 16pt; color: #1f5c1f; margin-top: 22px; border-bottom: 1px solid #bcd6bc; padding-bottom: 2px; }
+  h3 { font-size: 13pt; color: #2a6e2a; margin-top: 16px; }
+  table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+  th, td { border: 1px solid #b0b0b0; padding: 6px 8px; font-size: 10pt; vertical-align: top; text-align: left; }
+  th { background: #d9ecd9; font-weight: bold; }
+  code, .mono { font-family: 'Consolas','Courier New',monospace; font-size: 9.5pt; background: #f2f2f2; padding: 1px 3px; }
+  pre { font-family: 'Consolas','Courier New',monospace; font-size: 9pt; background: #f5f5f5; border: 1px solid #ddd; padding: 8px; white-space: pre-wrap; }
+  .capa { text-align: center; margin-top: 60px; }
+  .capa .sub { font-size: 13pt; color: #555; }
+  .tag { background: #1f5c1f; color: #fff; padding: 1px 6px; border-radius: 3px; font-size: 9pt; }
+  .alerta { background: #fff6e0; border-left: 4px solid #e0a800; padding: 8px 12px; margin: 10px 0; }
+  .ok { color: #1f5c1f; font-weight: bold; }
+  ul { margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<div class="capa">
+  <h1 style="border:none;">Documentação Técnica de Manutenção</h1>
+  <p class="sub">Sistema <b>Agro Tech One</b> — Módulo de Funcionário CLT Rural</p>
+  <p class="sub">Registro de Ponto, Adicional Noturno, DSR e Auditoria</p>
+  <p>Conformidade: <b>Lei nº 5.889/1973</b> (Trabalho Rural) e <b>Portaria 671 do MTE</b></p>
+  <p style="margin-top:40px;">Documento gerado em <b>27/06/2026</b></p>
+  <p style="color:#777;">Uso interno — referência para manutenção futura</p>
+</div>
+
+<p style="page-break-before: always;"></p>
+
+<h1>1. Visão Geral</h1>
+<p>Este documento descreve todas as alterações realizadas no sistema <b>Agro Tech One</b> referentes ao módulo de
+<b>Funcionário CLT</b> adaptado para o contexto de <b>propriedade rural</b>. O objetivo central foi transformar o
+cálculo de horas e valores financeiros em um motor <b>justo e preciso</b>, em conformidade com a legislação do
+trabalho rural, de modo que as informações (horas trabalhadas e valores) possam ser consumidas por outras partes
+do sistema.</p>
+
+<p><b>Premissa importante:</b> o registro do ponto é feito pelo <b>gerente/administrador</b> (não pelo próprio
+trabalhador no campo). Por isso, os horários de entrada/saída são dados lançados pelo gestor, e a auditoria recai
+sobre a <b>ação do gestor</b> (quem registrou e quando).</p>
+
+<h2>1.1. Ambiente e Tecnologias</h2>
+<table>
+  <tr><th style="width:32%;">Item</th><th>Detalhe</th></tr>
+  <tr><td>Plataforma</td><td>Jakarta EE 10 (Servlets + JSP), sem frameworks</td></tr>
+  <tr><td>Front-end</td><td>JSP + Bootstrap 5.3 + jQuery (arquivo único <code>JS/main.js</code>)</td></tr>
+  <tr><td>Banco de dados</td><td>PostgreSQL 17 (com herança de tabelas em <code>funcionario</code>)</td></tr>
+  <tr><td>Servidor</td><td>Apache Tomcat 10.1.28 (<code>C:\apache-tomcat-10.1.28</code>)</td></tr>
+  <tr><td>Build</td><td>Maven Wrapper — <code>mvnw.cmd clean package -DskipTests</code></td></tr>
+  <tr><td>Java</td><td>JDK 24 (<code>JAVA_HOME=C:\Program Files\Java\jdk-24</code>)</td></tr>
+  <tr><td>Serialização JSON</td><td>Gson 2.12.1</td></tr>
+</table>
+
+<h1>2. Histórico de Alterações (Resumo)</h1>
+<table>
+  <tr><th style="width:18%;">Data</th><th>Bloco</th><th>Resumo</th></tr>
+  <tr><td>23/06/2026</td><td>Módulo Funcionário</td><td>Correções de login, roteamento de INSERT por tipo, máscaras e vazamentos de recursos.</td></tr>
+  <tr><td>26/06/2026</td><td>Cadastro CLT + Perfil</td><td>Correção de validação de formulário, data de nascimento obrigatória, triggers de integridade (FK x herança), serialização de <code>LocalTime</code>, cálculo de horas extras.</td></tr>
+  <tr><td>26/06/2026</td><td>Editar/Excluir Ponto</td><td>Novo módulo de edição e exclusão de registros de ponto na tela de perfil CLT.</td></tr>
+  <tr><td>27/06/2026</td><td>CLT Rural</td><td>DSR rural, domingo 100%, adicional noturno, tolerância (Art. 58) e auditoria (Portaria 671).</td></tr>
+</table>
+
+<h1>3. Migrações de Banco de Dados</h1>
+<p>As migrações ficam em <code>src/main/resources/db/migration/</code> e são aplicadas via
+<code>psql -U postgres -d agro -f &lt;arquivo&gt;</code>.</p>
+
+<h2>3.1. V2 — Triggers de Integridade (FK x Herança)</h2>
+<p>Arquivo: <code>V2__triggers_integridade_funcionario.sql</code></p>
+<div class="alerta"><b>Problema resolvido (crítico):</b> no PostgreSQL, chaves estrangeiras <b>não respeitam herança de
+tabelas</b>. As 7 FKs que apontavam para <code>funcionario(idpessoa)</code> não enxergavam as linhas das tabelas
+filhas (<code>funcionarioclt</code>, <code>funcionariodiarista</code>, <code>funcionarioempreita</code>,
+<code>funcionarioproducao</code>). Isso tornava <b>impossível</b> inserir ponto, vale, falta ou folha para qualquer
+funcionário.</p>
+<p><b>Solução:</b> as 7 FKs foram substituídas por triggers:</p>
+<ul>
+  <li><code>trg_valida_funcionario_existe()</code> — <span class="mono">BEFORE INSERT/UPDATE</span> valida o
+  <code>idpessoa</code> contra a hierarquia completa (um <code>SELECT</code> em <code>funcionario</code> enxerga as
+  filhas).</li>
+  <li><code>trg_cascade_delete_funcionario()</code> — <span class="mono">AFTER DELETE</span> nas 5 tabelas da
+  hierarquia, replicando o comportamento <code>ON DELETE CASCADE</code>.</li>
+</ul>
+<p>Tabelas dependentes cobertas: <code>ponto_eletronico</code>, <code>falta_funcionario</code>,
+<code>vale_funcionario</code>, <code>fechamento_folha_ponto</code>, <code>folha_pagamento</code>,
+<code>registroponto</code>.</p>
+
+<h2>3.2. V3 — Schema CLT Rural</h2>
+<p>Arquivo: <code>V3__clt_rural.sql</code> (idempotente, com <code>IF NOT EXISTS</code>).</p>
+
+<h3>Novo tipo ENUM</h3>
+<pre>CREATE TYPE tipo_atividade_rural AS ENUM ('LAVOURA', 'PECUARIA');</pre>
+
+<h3>Coluna em <code>funcionarioclt</code></h3>
+<table>
+  <tr><th style="width:35%;">Coluna</th><th>Tipo / Default</th><th>Finalidade</th></tr>
+  <tr><td>tipo_atividade_rural</td><td>tipo_atividade_rural NOT NULL DEFAULT 'LAVOURA'</td><td>Define a janela do horário noturno.</td></tr>
+</table>
+
+<h3>Colunas em <code>ponto_eletronico</code></h3>
+<table>
+  <tr><th style="width:30%;">Coluna</th><th style="width:28%;">Tipo</th><th>Finalidade</th></tr>
+  <tr><td>minutos_noturnos</td><td>INT NOT NULL DEFAULT 0</td><td>Horas noturnas rurais (minutos reais).</td></tr>
+  <tr><td>latitude / longitude</td><td>NUMERIC(10,7) (nullable)</td><td>Reservadas para futuro app móvel do trabalhador.</td></tr>
+  <tr><td>ip_origem</td><td>VARCHAR(45)</td><td>IP da ação do gestor.</td></tr>
+  <tr><td>user_agent</td><td>VARCHAR(255)</td><td>Navegador/app do gestor.</td></tr>
+  <tr><td>hash_autenticidade</td><td>VARCHAR(64)</td><td>SHA-256 de autenticidade do registro.</td></tr>
+  <tr><td>registrado_por</td><td>INT</td><td>idpessoa do gestor/admin que lançou.</td></tr>
+  <tr><td>atualizado_em</td><td>TIMESTAMP</td><td>Timestamp do servidor na última edição.</td></tr>
+</table>
+
+<h3>Colunas em <code>fechamento_folha_ponto</code></h3>
+<p>Esta tabela é a <b>fonte canônica</b> consultada por outros módulos (chave <code>idpessoa</code> + <code>periodo</code>).</p>
+<table>
+  <tr><th style="width:35%;">Coluna</th><th>Tipo</th><th>Finalidade</th></tr>
+  <tr><td>desconto_dsr</td><td>NUMERIC(10,2)</td><td>Desconto do descanso semanal remunerado.</td></tr>
+  <tr><td>valor_adicional_noturno</td><td>NUMERIC(10,2)</td><td>Adicional noturno (25%).</td></tr>
+  <tr><td>valor_extra_100</td><td>NUMERIC(10,2)</td><td>Horas extras 100% (domingo sem folga).</td></tr>
+  <tr><td>minutos_noturnos</td><td>INT</td><td>Total de minutos noturnos no mês.</td></tr>
+  <tr><td>minutos_extra_100</td><td>INT</td><td>Total de minutos de domingo a 100%.</td></tr>
+</table>
+
+<h1>4. Regras de Negócio — CLT Rural (Lei 5.889/73)</h1>
+
+<h2>4.1. DSR e Falta Injustificada</h2>
+<ul>
+  <li>A semana é considerada de <b>segunda a domingo</b>.</li>
+  <li>Cada <b>semana com ao menos uma falta injustificada</b> desconta <b>1 DSR</b> (valor de um dia). Várias faltas
+  na mesma semana descontam apenas 1 DSR.</li>
+  <li>O desconto da falta em si (valor do dia) é aplicado separadamente do desconto do DSR.</li>
+</ul>
+
+<h2>4.2. Domingo Trabalhado</h2>
+<ul>
+  <li><b>Folga compensatória</b> é inferida automaticamente: existe um dia útil (segunda a sábado) na mesma semana,
+  dentro do mês, <b>sem ponto e sem falta</b>.</li>
+  <li>Se há folga compensatória na semana → o domingo conta como <b>jornada normal</b>.</li>
+  <li>Se <b>não há</b> folga compensatória → <b>todas as horas do domingo</b> são pagas como <b>hora extra 100%</b>.</li>
+</ul>
+
+<h2>4.3. Adicional Noturno Rural</h2>
+<ul>
+  <li>Janela noturna por atividade: <b>Lavoura = 21h00 às 05h00</b>; <b>Pecuária = 20h00 às 04h00</b>.</li>
+  <li>A hora noturna rural tem <b>60 minutos reais</b> (não se aplica a redução urbana de 52min30s).</li>
+  <li>Os minutos noturnos são contabilizados por dia (campo <code>minutos_noturnos</code>) e servem de base para o
+  <b>adicional de 25%</b>.</li>
+</ul>
+
+<h2>4.4. Tolerância (Art. 58 da CLT)</h2>
+<ul>
+  <li>Variações de até <b>10 minutos diários</b> no total não geram hora extra nem atraso.</li>
+  <li>Implementado como banda líquida de 10 min/dia em <code>CalculoPontoRural</code> (a nuance de 5 min por batida
+  fica absorvida pela banda diária e documentada no código para refinamento futuro).</li>
+</ul>
+
+<h2>4.5. Fórmulas de Cálculo Financeiro</h2>
+<table>
+  <tr><th style="width:42%;">Grandeza</th><th>Fórmula</th></tr>
+  <tr><td>Valor do dia</td><td>salário ÷ dias úteis do mês</td></tr>
+  <tr><td>Valor da hora (base)</td><td>valor do dia ÷ jornada (horas/dia)</td></tr>
+  <tr><td>Valor hora extra (efetivo)</td><td>valor cadastrado se &gt; 0; senão valor da hora × 1,5</td></tr>
+  <tr><td>Hora extra normal</td><td>(min. extras ÷ 60) × valor hora extra efetivo</td></tr>
+  <tr><td>Hora extra 100% (domingo)</td><td>(min. 100% ÷ 60) × valor da hora × 2,0</td></tr>
+  <tr><td>Adicional noturno</td><td>(min. noturnos ÷ 60) × valor da hora × 0,25</td></tr>
+  <tr><td>Desconto faltas</td><td>nº faltas injustificadas × valor do dia</td></tr>
+  <tr><td>Desconto DSR</td><td>nº semanas com falta × valor do dia</td></tr>
+  <tr><td>Salário bruto</td><td>salário + extra normal + extra 100% + adicional noturno</td></tr>
+  <tr><td>Salário líquido</td><td>bruto − faltas − DSR − vales (mínimo zero)</td></tr>
+</table>
+<div class="alerta"><b>Base de rateio:</b> mantida como <code>salário ÷ dias úteis</code> para preservar a consistência
+com o restante do sistema. Pode tornar-se configurável (ex.: divisor 30) em manutenção futura.</div>
+
+<h1>5. Auditoria e Imutabilidade (Portaria 671 do MTE)</h1>
+<ul>
+  <li>Como o gestor lança/corrige o ponto, os <b>horários de entrada/saída são dados do administrador</b> e
+  <b>não</b> são sobrescritos com a hora do servidor.</li>
+  <li>A auditoria registra a <b>ação do gestor</b>: <code>ip_origem</code> (cabeçalho <code>X-Forwarded-For</code> ou
+  <code>getRemoteAddr</code>), <code>user_agent</code>, <code>registrado_por</code> (idpessoa da sessão
+  <code>usuarioLogado</code>) e os timestamps de servidor <code>criado_em</code>/<code>atualizado_em</code>.</li>
+  <li><b>Hash SHA-256</b> (<code>Util.HashUtil.sha256</code>) calculado sobre string canônica do registro
+  (<span class="mono">idfunc | data | horários | minutos | registrado_por</span>), permitindo detectar adulteração.</li>
+  <li><code>latitude</code>/<code>longitude</code> permanecem nulas neste fluxo — reservadas para uma futura tela/app
+  em que o próprio trabalhador registre o ponto no campo.</li>
+</ul>
+
+<h1>6. Arquitetura — Classes</h1>
+
+<h2>6.1. Arquivos Novos</h2>
+<table>
+  <tr><th style="width:48%;">Arquivo</th><th>Responsabilidade</th></tr>
+  <tr><td>db/migration/V3__clt_rural.sql</td><td>Migração do schema rural.</td></tr>
+  <tr><td>Model/Model/TipoAtividadeRural.java</td><td>ENUM Lavoura/Pecuária; cálculo de minutos noturnos (janela que cruza a meia-noite, minutos reais).</td></tr>
+  <tr><td>Service/CalculoPontoRural.java</td><td>Cálculo de 1 dia: total, tolerância (10 min/dia), minutos noturnos.</td></tr>
+  <tr><td>Service/FolhaCalculoRuralService.java</td><td>Fechamento mensal: semana seg–dom, folga compensatória, domingo 100%, DSR e adicional noturno.</td></tr>
+  <tr><td>Util/HashUtil.java</td><td>Hash SHA-256 de autenticidade.</td></tr>
+</table>
+
+<h2>6.2. Arquivos Modificados</h2>
+<table>
+  <tr><th style="width:48%;">Arquivo</th><th>Alteração</th></tr>
+  <tr><td>Model/Model/FuncionarioCLT.java</td><td>Campo <code>tipoAtividadeRural</code>; constante <code>ADICIONAL_NOTURNO_PCT = 0.25</code>.</td></tr>
+  <tr><td>Model/Dao/FuncionarioCLTDAO.java</td><td>Leitura/gravação do tipo de atividade; <code>updateSalario</code> passa a receber o tipo.</td></tr>
+  <tr><td>Model/Model/PontoEletronico.java</td><td>Campos <code>minutosNoturnos</code> e auditoria (lat/long, IP, UA, hash, registradoPor).</td></tr>
+  <tr><td>Model/Dao/PontoEletronicoDAO.java</td><td>Cálculo rural ao salvar/atualizar; persiste minutos noturnos + auditoria + hash.</td></tr>
+  <tr><td>Model/Model/FechamentoFolha.java</td><td>Campos: descontoDsr, valorAdicionalNoturno, valorExtra100, minutosNoturnos, minutosExtra100.</td></tr>
+  <tr><td>Model/Dao/FechamentoFolhaDAO.java</td><td>Upsert e leitura das novas colunas.</td></tr>
+  <tr><td>Controller/ControllerCLT.java</td><td><code>handleCalcularFechamento</code> delega ao <code>FolhaCalculoRuralService</code>; <code>handleAtualizarSalario</code> recebe o tipo de atividade.</td></tr>
+  <tr><td>Controller/ControllerPontoEletronico.java</td><td><code>preencherAuditoria</code> (IP/UA/registradoPor); ação <code>editar_ponto</code>.</td></tr>
+  <tr><td>webapp/view/admin/perfilCLT.jsp</td><td>Seletor de Tipo de Atividade; coluna "Noturno"; novas linhas de fechamento.</td></tr>
+  <tr><td>webapp/JS/main.js</td><td>Header com atividade; tabela de ponto com badge noturno; <code>renderFechamento</code> com DSR, extra 100% e adicional noturno; envio do tipo no salvar salário.</td></tr>
+</table>
+
+<h1>7. Correções de Bugs Relevantes</h1>
+<table>
+  <tr><th style="width:30%;">Bug</th><th>Causa</th><th>Correção</th></tr>
+  <tr><td>Cadastro CLT não validava campos</td><td>JS procurava seletor <code>.required</code> (classe) mas os inputs usam o atributo HTML <code>required</code>.</td><td>Seletor corrigido para <code>[required]</code>.</td></tr>
+  <tr><td>Cadastro CLT falhava no banco</td><td><code>datanascimentopf</code> é NOT NULL e podia ir vazio.</td><td>Validação obrigatória no servidor e no JS (formato dd/mm/aaaa).</td></tr>
+  <tr><td>Perfil CLT retornava vazio (HTTP 200)</td><td>Gson sem adaptador para <code>LocalTime</code> (falha de reflexão no Java moderno).</td><td>Adicionado <code>registerTypeAdapter(LocalTime.class, ...)</code>.</td></tr>
+  <tr><td>Horas extras davam R$ 0,00</td><td>Fechamento multiplicava o campo manual <code>valorhoraextra</code> (zerado).</td><td>Helper <code>valorHoraExtraEfetivo</code> (cadastrado &gt; 0 ou salário × 1,5).</td></tr>
+  <tr><td>"Lançar Ponto" nunca funcionou</td><td>Payload sem <code>acao</code> e com <code>idpessoa</code> em vez de <code>idfuncionario</code>.</td><td><code>salvarPontoCLT</code> corrigido; nova ação <code>editar_ponto</code>.</td></tr>
+</table>
+
+<h1>8. Como Compilar e Implantar</h1>
+<pre>cd C:\projeto\agro
+.\mvnw.cmd clean package -DskipTests        # gera target\agro-1.0-SNAPSHOT (exploded) e o .war
+
+# Aplicar migração de banco (quando houver nova):
+&amp; "C:\Program Files\PostgreSQL\17\bin\psql.exe" -U postgres -d agro -f src\main\resources\db\migration\V3__clt_rural.sql
+
+# Redeploy no Tomcat (recarrega o contexto /agro):
+#  - tocar o descriptor conf\Catalina\localhost\agro.xml (atualiza LastWriteTime), OU
+#  - reiniciar com JAVA_HOME=C:\Program Files\Java\jdk-24 e CATALINA_HOME=C:\apache-tomcat-10.1.28</pre>
+<div class="alerta">Após o redeploy, a sessão é encerrada — refazer login (perfil administrador).</div>
+
+<h1>9. Validação Realizada (Cenários de Teste)</h1>
+<p>Funcionário de teste: <b>eduardo</b> (<code>idpessoa = 50</code>), salário R$ 1.600,00, jornada 8h, atividade Lavoura, período 2026-06.</p>
+<table>
+  <tr><th style="width:34%;">Cenário</th><th>Entrada</th><th>Resultado <span class="ok">(OK)</span></th></tr>
+  <tr><td>Tolerância (Art. 58)</td><td>Saída 17:04 (4 min além)</td><td>Total 484 min, extra = 0.</td></tr>
+  <tr><td>Turno noturno</td><td>21:00 às 05:00</td><td>480 minutos noturnos contabilizados.</td></tr>
+  <tr><td>Domingo COM folga</td><td>Domingo 21/06 (sábado 20 sem ponto)</td><td>Conta como jornada normal.</td></tr>
+  <tr><td>Domingo SEM folga</td><td>Domingo 28/06 (semana toda trabalhada)</td><td>480 min como extra 100% → R$ 145,45.</td></tr>
+  <tr><td>Adicional noturno</td><td>8 h noturnas</td><td>R$ 18,18 (8 × valor hora × 0,25).</td></tr>
+  <tr><td>DSR</td><td>1 semana com falta (17/06)</td><td>Desconto DSR R$ 72,73.</td></tr>
+  <tr><td>Auditoria</td><td>Lançamento via gestor admin</td><td>registrado_por=27, IP, User-Agent e hash preenchidos.</td></tr>
+</table>
+<p><b>Fechamento final validado:</b> Salário base R$ 1.600,00; extra normal R$ 88,64; extra 100% R$ 145,45;
+adicional noturno R$ 18,18; desconto faltas R$ 72,73; desconto DSR R$ 72,73; vales R$ 400,00; <b>líquido R$ 1.306,81</b>.</p>
+
+<h1>10. Pontos de Atenção para Manutenção Futura</h1>
+<ul>
+  <li><b>FKs por triggers:</b> a integridade de <code>idpessoa</code> nas tabelas dependentes é mantida por triggers
+  (V2), não por FKs nativas — devido à herança de tabelas. Ao criar novas tabelas que referenciem funcionário,
+  replicar o padrão do trigger <code>trg_valida_funcionario_existe</code>.</li>
+  <li><b>Tabela canônica:</b> <code>fechamento_folha_ponto</code> é a fonte para outros módulos. Manter todos os
+  valores granulares persistidos ao alterar o cálculo.</li>
+  <li><b>Geolocalização:</b> colunas <code>latitude</code>/<code>longitude</code> já existem (nulas). Para um app do
+  trabalhador no campo, capturar via API de geolocalização do navegador e enviar no payload do ponto.</li>
+  <li><b>Tolerância:</b> hoje é banda diária de 10 min. Se for exigida a regra estrita "5 min por batida", refinar
+  <code>CalculoPontoRural</code>.</li>
+  <li><b>Pecuária:</b> o ENUM já contempla <code>PECUARIA</code> (janela 20h–04h); basta selecionar no cadastro.</li>
+  <li><b>Build sem Node:</b> o ambiente não tem Node/pandoc; esta documentação foi gerada via LibreOffice a partir de
+  HTML.</li>
+</ul>
+
+<h1>11. Diagrama — Fluxo de Cálculo do Fechamento</h1>
+<p>O fechamento mensal é produzido por <code>Service.FolhaCalculoRuralService</code>. O fluxo abaixo resume as
+etapas, do dado de entrada à persistência na tabela canônica.</p>
+<p style="text-align:center;"><img src="fluxo_fechamento.png" alt="Fluxo de cálculo do fechamento" style="width:520px;"/></p>
+
+<h1>12. Consultas SQL para Integração</h1>
+<p>A tabela <code>fechamento_folha_ponto</code> é a fonte oficial de horas e valores já calculados. Os exemplos
+abaixo mostram como outros módulos podem consumir esses dados (chave <code>idpessoa</code> + <code>periodo</code>,
+formato <span class="mono">AAAA-MM</span>).</p>
+
+<h3>12.1. Fechamento de um funcionário num período</h3>
+<pre>SELECT ff.*, p.nomepessoa
+FROM fechamento_folha_ponto ff
+JOIN pessoa p ON p.idpessoa = ff.idpessoa
+WHERE ff.idpessoa = 50
+  AND ff.periodo = '2026-06';</pre>
+
+<h3>12.2. Custo total da folha no mês (todos os funcionários)</h3>
+<pre>SELECT periodo,
+       COUNT(*)                  AS funcionarios,
+       SUM(salario_bruto)        AS total_bruto,
+       SUM(salario_liquido)      AS total_liquido,
+       SUM(valor_horas_extras)   AS total_extra_normal,
+       SUM(valor_extra_100)      AS total_extra_100,
+       SUM(valor_adicional_noturno) AS total_noturno,
+       SUM(desconto_dsr)         AS total_dsr
+FROM fechamento_folha_ponto
+WHERE periodo = '2026-06'
+GROUP BY periodo;</pre>
+
+<h3>12.3. Horas (extra + noturno) por funcionário no ano</h3>
+<pre>SELECT p.nomepessoa,
+       SUM(ff.total_minutos_extras) / 60.0 AS horas_extra_normal,
+       SUM(ff.minutos_extra_100)    / 60.0 AS horas_extra_100,
+       SUM(ff.minutos_noturnos)     / 60.0 AS horas_noturnas
+FROM fechamento_folha_ponto ff
+JOIN pessoa p ON p.idpessoa = ff.idpessoa
+WHERE ff.periodo LIKE '2026-%'
+GROUP BY p.nomepessoa
+ORDER BY horas_extra_normal DESC;</pre>
+
+<h3>12.4. Ranking de horas extras no mês</h3>
+<pre>SELECT p.nomepessoa,
+       (ff.total_minutos_extras + ff.minutos_extra_100) / 60.0 AS horas_extras
+FROM fechamento_folha_ponto ff
+JOIN pessoa p ON p.idpessoa = ff.idpessoa
+WHERE ff.periodo = '2026-06'
+ORDER BY horas_extras DESC
+LIMIT 10;</pre>
+
+<h3>12.5. View sugerida para consumo simplificado</h3>
+<p>Para evitar repetir os <code>JOIN</code>s e cálculos, sugere-se criar uma view que outros módulos consultem
+diretamente:</p>
+<pre>CREATE OR REPLACE VIEW vw_folha_resumo AS
+SELECT ff.idpessoa,
+       p.nomepessoa,
+       ff.periodo,
+       ff.salario_base,
+       ff.salario_bruto,
+       ff.salario_liquido,
+       ff.total_minutos_extras            AS min_extra_normal,
+       ff.minutos_extra_100               AS min_extra_100,
+       ff.minutos_noturnos                AS min_noturno,
+       ff.valor_horas_extras              AS valor_extra_normal,
+       ff.valor_extra_100,
+       ff.valor_adicional_noturno,
+       ff.desconto_faltas,
+       ff.desconto_dsr,
+       ff.total_vales,
+       ff.fechado_em
+FROM fechamento_folha_ponto ff
+JOIN pessoa p ON p.idpessoa = ff.idpessoa;</pre>
+<div class="alerta"><b>Importante:</b> o registro só existe após o gestor executar o <b>fechamento do mês</b> na tela
+de perfil CLT (botão "Calcular"). Módulos consumidores devem tratar a ausência do registro (mês ainda não fechado).</div>
+
+<h1>13. Vínculos Empregatícios (períodos de trabalho)</h1>
+<p>Para suportar o caso de um trabalhador que <b>sai e volta</b> à empresa (ex.: trabalhou 2019–2020 e retornou
+2022–2026), o sistema separa a <b>Pessoa</b> (identidade) do <b>Vínculo</b> (período de trabalho). Uma pessoa pode
+ter <b>N vínculos</b> não sobrepostos, cada um com seus próprios salário, hora extra, jornada, cargo, atividade e
+datas — preservando o histórico de cada passagem.</p>
+<p style="text-align:center;"><img src="modelo_vinculo_empregaticio.png" alt="Modelo de vínculos" style="width:540px;"/></p>
+
+<h2>13.1. Tabela <code>vinculo_empregaticio</code></h2>
+<p>Criada na migração <code>V4__vinculo_empregaticio.sql</code>. Colunas: <code>id_vinculo</code>,
+<code>idpessoa</code>, <code>tipo_funcionario</code>, <code>cargo</code>, <code>tipo_atividade_rural</code>,
+<code>data_admissao</code>, <code>data_desligamento</code> (NULL = ativo), <code>salario_mensal</code>,
+<code>valor_hora_extra</code>, <code>carga_horaria_diaria</code>, <code>status</code>,
+<code>motivo_desligamento</code>. Um <b>índice único parcial</b> (<code>uk_vinculo_ativo</code>) garante no máximo
+<b>1 vínculo ativo por pessoa</b>. A integridade de <code>idpessoa</code> é mantida por trigger (mesmo padrão da V2).
+A matrícula permanece em <code>funcionario</code> (constante por pessoa).</p>
+
+<h2>13.2. Atribuição dos lançamentos ao período</h2>
+<p>A migração <code>V5__id_vinculo_operacional.sql</code> adicionou a coluna <code>id_vinculo</code> em
+<code>ponto_eletronico</code>, <code>vale_funcionario</code>, <code>falta_funcionario</code>,
+<code>fechamento_folha_ponto</code>, <code>folha_pagamento</code>, <code>lancamento_producao</code> e
+<code>registroponto</code> (com backfill por data). Em novos lançamentos, os DAOs resolvem o vínculo pela
+<b>data</b> (<code>admissao ≤ data ≤ coalesce(desligamento, hoje)</code>). Como os períodos não se sobrepõem,
+sempre resolve um único vínculo. Assim, "5h em um talão de 2020" ficam atribuídas ao vínculo de 2019–2020.</p>
+
+<h2>13.3. Implementação em fases</h2>
+<table>
+  <tr><th style="width:14%;">Fase</th><th>Entrega</th></tr>
+  <tr><td>Fase 1</td><td>Tabela <code>vinculo_empregaticio</code> + trigger + índice único; migração dos funcionários atuais (1 vínculo cada); <code>Vinculo</code>/<code>VinculoDAO</code>; cadastro cria vínculo e trata <b>readmissão</b> (CPF existente sem vínculo ativo → novo vínculo).</td></tr>
+  <tr><td>Fase 2</td><td><code>id_vinculo</code> nas tabelas operacionais + backfill por data; DAOs gravam o vínculo nos novos lançamentos.</td></tr>
+  <tr><td>Fase 3</td><td>Fechamento e perfil leem salário/jornada/atividade do <b>vínculo do período</b>; header mostra o período; ações <b>Desligar</b> e <b>Readmitir</b>; badge/botões refletem o estado atual da pessoa.</td></tr>
+</table>
+
+<h2>13.4. Validação</h2>
+<p>Pessoa de teste com 2 vínculos: fechamento de <b>2020</b> usou o salário do vínculo 2019–2020 (R$ 1.000) e o de
+<b>2023</b> usou o do vínculo 2022–… (R$ 2.000), cada um gravando o <code>id_vinculo</code> correto. Desligar +
+readmitir abriu um novo vínculo ativo mantendo os anteriores como histórico.</p>
+<div class="alerta"><b>Consumo por outros módulos:</b> a tabela <code>fechamento_folha_ponto</code> agora carrega
+<code>id_vinculo</code>, permitindo relatórios por <b>pessoa</b> ou por <b>período de trabalho</b>.</div>
+
+<h1>14. Acessos de Desenvolvimento</h1>
+<table>
+  <tr><th style="width:32%;">Recurso</th><th>Valor</th></tr>
+  <tr><td>Aplicação</td><td>http://localhost:8080/agro/</td></tr>
+  <tr><td>Login administrador</td><td>usuário <code>admin</code> / senha <code>123456</code></td></tr>
+  <tr><td>Banco PostgreSQL</td><td><code>psql -U postgres -d agro</code> (porta padrão)</td></tr>
+  <tr><td>Perfil CLT (exemplo)</td><td>/view/admin/perfilCLT.jsp?id=50</td></tr>
+</table>
+<div class="alerta">As credenciais acima são de <b>ambiente de desenvolvimento</b>. Trocar por senhas fortes antes de
+qualquer uso em produção.</div>
+
+<p style="margin-top:30px; color:#777; font-size:9pt;">— Fim do documento —</p>
+
+</body>
+</html>
