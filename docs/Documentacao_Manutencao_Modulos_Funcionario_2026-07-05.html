@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Documentação de Manutenção — Módulos de Funcionário (05/07/2026)</title>
+<style>
+  body { font-family: 'Calibri','Arial',sans-serif; font-size: 11pt; color: #1a1a1a; line-height: 1.45; }
+  h1 { font-size: 21pt; color: #1f5c1f; border-bottom: 3px solid #1f5c1f; padding-bottom: 4px; }
+  h2 { font-size: 15pt; color: #1f5c1f; margin-top: 20px; border-bottom: 1px solid #bcd6bc; padding-bottom: 2px; }
+  h3 { font-size: 12.5pt; color: #2a6e2a; margin-top: 14px; }
+  table { border-collapse: collapse; width: 100%; margin: 8px 0; }
+  th, td { border: 1px solid #b0b0b0; padding: 5px 7px; font-size: 10pt; vertical-align: top; text-align: left; }
+  th { background: #d9ecd9; font-weight: bold; }
+  code, .mono { font-family: 'Consolas','Courier New',monospace; font-size: 9.5pt; background: #f2f2f2; padding: 1px 3px; }
+  pre { font-family: 'Consolas','Courier New',monospace; font-size: 9pt; background: #f5f5f5; border: 1px solid #ddd; padding: 8px; white-space: pre-wrap; }
+  .capa { text-align: center; margin-top: 50px; }
+  .capa .sub { font-size: 13pt; color: #555; }
+  .alerta { background: #fff6e0; border-left: 4px solid #e0a800; padding: 8px 12px; margin: 10px 0; }
+  .ok { color: #1f5c1f; font-weight: bold; }
+  ul { margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<div class="capa">
+  <h1 style="border:none;">Documentação de Manutenção</h1>
+  <p class="sub">Sistema <b>Agro Tech One</b> — Finalização dos Módulos de Funcionário</p>
+  <p class="sub">Produção · Empreita · CLT multi-modo · Pagamentos · Cadastro dinâmico</p>
+  <p style="margin-top:30px;">Trabalho de <b>05/07/2026</b> — código novo e ajustado</p>
+</div>
+
+<p style="page-break-before: always;"></p>
+
+<h1>1. Visão Geral do Dia</h1>
+<p>Foram implementadas <b>5 frentes</b> para finalizar o processo de funcionário, em fases, cada uma validada:</p>
+<table>
+  <tr><th style="width:16%;">Fase</th><th>Entrega</th></tr>
+  <tr><td>1 — Cadastro por tipo</td><td>Campos do cadastro mudam conforme o tipo (valor de diária/empreita, cargo select de produção).</td></tr>
+  <tr><td>2 — Perfil Empreita</td><td>Lançamentos dia+valor, vales, fechamento e histórico.</td></tr>
+  <tr><td>3 — Perfil Produção</td><td>Caixas × preço, tipos por cargo, preços com histórico (ano/funcionário), vales.</td></tr>
+  <tr><td>4 — CLT multi-modo</td><td>CLT trabalha dia em produção/empreita sem falta/extra, ganhos somados ao fechamento.</td></tr>
+  <tr><td>5 — Pagamentos</td><td>Forma (PIX/transferência/dinheiro/cheque) + dados bancários; prazo CLT (5º dia útil do mês seguinte).</td></tr>
+</table>
+
+<h1>2. Migrações de Banco (V6 – V9)</h1>
+<p>Em <code>src/main/resources/db/migration/</code>, aplicadas via <code>psql -U postgres -d agro -f &lt;arquivo&gt;</code>.</p>
+<table>
+  <tr><th style="width:34%;">Arquivo</th><th>Conteúdo</th></tr>
+  <tr><td>V6__lancamento_empreita.sql</td><td>Tabela <code>lancamento_empreita</code> (dia + valor) + trigger de validação + cascade.</td></tr>
+  <tr><td>V7__producao_caixas.sql</td><td>Tabelas <code>preco_caixa</code> (histórico de preços: tipo/ano/funcionário) e <code>producao_caixa</code> (caixas por dia, com preço snapshot).</td></tr>
+  <tr><td>V8__clt_multimodo.sql</td><td>Colunas <code>valor_producao</code> e <code>valor_empreita</code> em <code>fechamento_folha_ponto</code>.</td></tr>
+  <tr><td>V9__pagamentos.sql</td><td>Tabela <code>pagamento</code> (forma + dados bancários) + coluna <code>pago</code> em produção.</td></tr>
+</table>
+<p>Todas as migrações atualizam a função de cascade <code>trg_cascade_delete_funcionario</code> para remover os novos registros ao excluir o funcionário.</p>
+
+<h1>3. Fase 1 — Cadastro Dinâmico por Tipo</h1>
+<p>O formulário <code>ColaboCadastro.jsp</code> passa a mostrar campos conforme o <b>Tipo Funcionário</b>:</p>
+<table>
+  <tr><th style="width:22%;">Tipo</th><th>Campos</th><th>Onde grava</th></tr>
+  <tr><td>CLT</td><td>Data de Admissão e Desligamento (como antes)</td><td>funcionario</td></tr>
+  <tr><td>Diária</td><td>Esconde datas; campo <b>Valor da Diária</b> (máscara R$)</td><td>funcionariodiarista.valorpordia</td></tr>
+  <tr><td>Empreita</td><td>Esconde datas; campo <b>Valor da Empreita</b> (máscara R$)</td><td>funcionarioempreita.valorfixoacordado</td></tr>
+  <tr><td>Produção</td><td>Esconde datas; Cargo vira <b>select Colhedor/Embalador</b></td><td>funcionario.cargofuncionario</td></tr>
+</table>
+<h3>Ajustes de código</h3>
+<ul>
+  <li><b>ColaboCadastro.jsp</b>: select <code>#cargoProducao</code>, linha <code>#rowValor</code> (campo <code>#valorEspecifico</code>), linha <code>#rowDatas</code>.</li>
+  <li><b>main.js</b> (<code>initFuncionarioCadastro</code>): <code>ajustarCamposPorTipo()</code> no change do tipo; máscara BRL; helpers <code>parseBRL</code>/<code>formatBRLnum</code>; payload envia cargo (input ou select) + <code>valorespecifico</code>; validação por tipo; <code>preencherFormularioEdicao</code> restaura tipo→campos→valor.</li>
+  <li><b>ControllerFuncionario.java</b>: lê <code>valorespecifico</code>; <code>validarPorTipo</code> (diária/empreita exigem valor&gt;0; produção exige cargo Colhedor/Embalador); grava via <code>FuncionarioDAO.updateValorEspecifico</code> (create/readmissão/update); <code>doGet(id)</code> inclui <code>valorEspecifico</code>.</li>
+  <li><b>FuncionarioDAO.java</b>: <code>updateValorEspecifico</code>, <code>getValorEspecifico</code>, <code>tabelaColunaValor</code> (whitelist por tipo).</li>
+</ul>
+
+<h1>4. Fase 2 — Perfil Empreita</h1>
+<p>Empreita recebe por serviço/dia (cada lançamento = dia + valor). Bruto = Σ lançamentos; Líquido = bruto − vales.</p>
+<h3>Arquivos</h3>
+<ul>
+  <li>Novos: <code>Model/Model/LancamentoEmpreita.java</code>, <code>Model/Dao/LancamentoEmpreitaDAO.java</code>, <code>Controller/ControllerEmpreita.java</code> (URL <code>/ControllerEmpreita</code>), <code>view/admin/perfilEmpreita.jsp</code>.</li>
+  <li><b>main.js</b>: módulo <code>initPerfilEmpreita</code> (cards, tabela add/editar/remover com máscara BRL, vales, fechamento). Botão roxo "Perfil Empreita".</li>
+</ul>
+<div class="alerta"><b>Atenção (bug corrigido):</b> ao registrar um novo servlet no <code>web.xml</code> é obrigatório adicionar TANTO o bloco <code>&lt;servlet&gt;</code> QUANTO o <code>&lt;servlet-mapping&gt;</code>. A falta do mapping causa erro <b>404</b> mesmo com a classe compilada.</div>
+
+<h1>5. Fase 3 — Perfil Produção + Histórico de Preços</h1>
+<p>Produção ganha por caixa: <b>quantidade × preço</b>. Tipos de caixa por cargo:</p>
+<ul>
+  <li><b>Colhedor</b>: Caixa Contentor.</li>
+  <li><b>Embalador</b>: Papelão 7kg/10kg, Plástico 7kg/25kg, Madeira 7kg/15kg.</li>
+</ul>
+<h3>Preços com histórico</h3>
+<ul>
+  <li>Ficam em <code>preco_caixa</code> (tipo, ano, idpessoa). <b>Preço geral do ano</b> (idpessoa nulo) ou <b>preço por competência</b> (idpessoa preenchido — funcionário mais experiente pode ganhar mais).</li>
+  <li>Resolução: preço do funcionário no ano tem prioridade; senão o geral do ano.</li>
+  <li>Cada lançamento grava o <b>preço unitário aplicado (snapshot)</b> — o valor histórico não muda se o preço for alterado depois.</li>
+</ul>
+<div class="alerta"><b>Nota:</b> os preços NÃO ficam na tabela <code>despesascusto</code> (que não tem colunas de ano/funcionário e não comportaria o histórico exigido). A fonte com histórico é <code>preco_caixa</code>.</div>
+<h3>Arquivos</h3>
+<ul>
+  <li>Novos: <code>Model/Model/TipoCaixa.java</code> (enum rótulo+cargo), <code>Model/Dao/PrecoCaixaDAO.java</code>, <code>Model/Dao/ProducaoCaixaDAO.java</code>, <code>Controller/ControllerProducao.java</code> (URL <code>/ControllerProducao</code>), <code>view/admin/perfilProducao.jsp</code>.</li>
+  <li><b>main.js</b>: módulo <code>initPerfilProducao</code> (cards, tabela de caixas add/editar/remover, select de tipo filtrado pelo cargo, modal "Preços das Caixas" para ajustar geral/por-funcionário, vales). Botão azul-claro "Perfil Produção".</li>
+</ul>
+
+<h1>6. Fase 4 — CLT Multi-modo (Produção / Empreita)</h1>
+<p>Um CLT pode trabalhar um dia em produção ou empreita <b>sem perder o vínculo</b>. Nesses dias:</p>
+<ul>
+  <li><b>Não conta falta</b> (nem desconto de DSR).</li>
+  <li><b>Não marca hora extra / noturno</b> daquele dia.</li>
+  <li><b>Ganha por produção/empreita</b>, somado ao bruto do fechamento CLT.</li>
+</ul>
+<p>Implementação em <code>FolhaCalculoRuralService</code>: monta o conjunto <code>diasModoAlt</code> (datas com <code>producao_caixa</code> ou <code>lancamento_empreita</code>); ignora faltas nesses dias e pula o excedente/noturno; soma <code>valorProducao + valorEmpreita</code> ao bruto. Os valores são persistidos em <code>fechamento_folha_ponto</code> e exibidos no fechamento do perfil CLT.</p>
+<div class="alerta"><b>Cuidado preservado:</b> o cálculo CLT normal permanece intacto — os ganhos só entram quando há lançamentos de produção/empreita no período (comportamento sem lançamentos = idêntico ao anterior).</div>
+
+<h1>7. Fase 5 — Pagamentos</h1>
+<p>Registro de pagamentos comum a todos os tipos, disponível nos 4 perfis (botão "Gerar Pagamento").</p>
+<ul>
+  <li><b>Forma de pagamento</b>: PIX · Transferência bancária · Dinheiro · Cheque.</li>
+  <li><b>PIX</b> exige a chave; <b>Transferência</b> exige banco, agência e conta (validado no servidor).</li>
+  <li>Valor pré-preenchido com o <b>líquido</b> do período; lista os pagamentos do período.</li>
+  <li><b>Prazo CLT</b>: o modal mostra a data-limite = <b>5º dia útil do mês seguinte</b> ao período (ex.: junho → pago até 07/07). Cálculo em <code>Util.DataUtil.quintoDiaUtilProximoMes</code> (considera sáb/dom; sem feriados).</li>
+</ul>
+<h3>Arquivos</h3>
+<ul>
+  <li>Novos: <code>Model/Dao/PagamentoDAO.java</code>, <code>Util/DataUtil.java</code>, <code>Controller/ControllerPagamento.java</code> (URL <code>/ControllerPagamento</code>), <code>pagina/modalPagamento.jsp</code> (modal compartilhado).</li>
+  <li><b>main.js</b>: <code>abrirModalPagamento</code>, <code>salvarPagamento</code>, <code>carregarPagamentos</code>, <code>excluirPagamento</code> (leem <code>window.__pgCtx</code>). Cada perfil define <code>__pgCtx = {id, periodo, tipo, valor=líquido}</code> e chama <code>carregarPagamentos()</code>.</li>
+  <li>Card "Pagamentos" + include do modal adicionados em perfilCLT/Diarista/Empreita/Producao.</li>
+</ul>
+<div class="alerta"><b>Refinamento futuro:</b> "selecionar quais dias foram pagos" (marcar lançamentos individuais de empreita/produção como pagos) ainda não foi implementado — o pagamento é por período/valor. A coluna <code>pago</code> já existe nas tabelas para essa evolução.</div>
+
+<h1>8. Arquivos — Resumo</h1>
+<h3>Novos</h3>
+<table>
+  <tr><th style="width:52%;">Arquivo</th><th>Módulo</th></tr>
+  <tr><td>db/migration/V6..V9 (.sql)</td><td>Banco</td></tr>
+  <tr><td>Model/Model/LancamentoEmpreita.java, TipoCaixa.java</td><td>Empreita / Produção</td></tr>
+  <tr><td>Model/Dao/LancamentoEmpreitaDAO, PrecoCaixaDAO, ProducaoCaixaDAO, PagamentoDAO</td><td>Empreita / Produção / Pagamento</td></tr>
+  <tr><td>Controller/ControllerEmpreita, ControllerProducao, ControllerPagamento</td><td>Servlets</td></tr>
+  <tr><td>Util/DataUtil.java</td><td>Prazo CLT</td></tr>
+  <tr><td>view/admin/perfilEmpreita.jsp, perfilProducao.jsp</td><td>Telas</td></tr>
+  <tr><td>pagina/modalPagamento.jsp</td><td>Modal compartilhado</td></tr>
+</table>
+<h3>Modificados</h3>
+<table>
+  <tr><th style="width:52%;">Arquivo</th><th>O quê</th></tr>
+  <tr><td>Model/Dao/FuncionarioDAO.java</td><td>updateValorEspecifico / getValorEspecifico</td></tr>
+  <tr><td>Controller/ControllerFuncionario.java</td><td>valor específico + validação por tipo</td></tr>
+  <tr><td>Model/Model/FechamentoFolha.java, Model/Dao/FechamentoFolhaDAO.java</td><td>valor_producao / valor_empreita</td></tr>
+  <tr><td>Service/FolhaCalculoRuralService.java</td><td>CLT multi-modo</td></tr>
+  <tr><td>webapp/view/admin/ColaboCadastro.jsp</td><td>campos dinâmicos por tipo</td></tr>
+  <tr><td>webapp/JS/main.js</td><td>módulos empreita/produção/pagamentos + cadastro dinâmico</td></tr>
+  <tr><td>WEB-INF/web.xml</td><td>3 servlets (Empreita, Produção, Pagamento)</td></tr>
+  <tr><td>perfilCLT/Diarista/Empreita/Producao.jsp</td><td>card + modal de pagamento</td></tr>
+</table>
+
+<h1>9. Build, Deploy e Testes</h1>
+<pre>cd C:\projeto\agro
+.\mvnw.cmd clean package -DskipTests        # BUILD SUCCESS
+
+# Aplicar migrações novas:
+&amp; "C:\Program Files\PostgreSQL\17\bin\psql.exe" -U postgres -d agro -f src\main\resources\db\migration\V6__lancamento_empreita.sql
+# ... idem V7, V8, V9
+
+# Redeploy: tocar conf\Catalina\localhost\agro.xml (LastWriteTime) — recarrega o contexto /agro</pre>
+<h3>Validação realizada (via API)</h3>
+<table>
+  <tr><th style="width:30%;">Cenário</th><th>Resultado <span class="ok">(OK)</span></th></tr>
+  <tr><td>Cadastro por tipo</td><td>Empreita R$5000, Produção Embalador, Diária R$180; rejeições corretas.</td></tr>
+  <tr><td>Empreita</td><td>2 lançamentos = R$2000 − vale R$300 = líquido R$1700; editar/remover.</td></tr>
+  <tr><td>Produção</td><td>160 caixas = R$480; preço por competência (3,00) vs geral (2,50), snapshot preservado.</td></tr>
+  <tr><td>CLT multi-modo</td><td>Falta do dia de produção ignorada; +produção R$300 +empreita R$500; líquido 1306,81 → 2252,27.</td></tr>
+  <tr><td>Pagamentos</td><td>Prazo CLT 06/2026 → 07/07/2026; PIX exige chave; transferência exige banco/ag/conta.</td></tr>
+</table>
+<div class="alerta"><b>Teste visual no Chrome pendente:</b> a extensão do navegador ficou indisponível durante a sessão; toda a lógica foi validada por API e o front está implantado.</div>
+
+<h1>10. Pontos de Atenção para Manutenção</h1>
+<ul>
+  <li><b>Novos servlets</b> exigem <code>&lt;servlet&gt;</code> + <code>&lt;servlet-mapping&gt;</code> no web.xml (a falta do mapping dá 404).</li>
+  <li><b>Preços de produção</b>: fonte é <code>preco_caixa</code> (com histórico). Ao mudar preço, lançamentos antigos mantêm o preço gravado (snapshot).</li>
+  <li><b>CLT multi-modo</b>: dias com produção/empreita são inferidos pelas datas dos lançamentos — não há flag manual. Não conta falta/extra e soma os ganhos.</li>
+  <li><b>Máscara de valor</b>: enviar ao servidor via <code>parseBRL()</code> (número); exibir via <code>formatBRLnum()</code>.</li>
+  <li><b>Vínculo</b>: todos os novos lançamentos resolvem <code>id_vinculo</code> pela data (integração com o histórico de vínculos).</li>
+</ul>
+
+<p style="margin-top:24px; color:#777; font-size:9pt;">— Fim do documento —</p>
+
+</body>
+</html>
