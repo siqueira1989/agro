@@ -37,10 +37,6 @@
         <servlet-class>Controller.ControllerAreaProducao</servlet-class>
     </servlet>
     <servlet>
-        <servlet-name>ControllerTalao</servlet-name>
-        <servlet-class>Controller.ControllerTalao</servlet-class>
-    </servlet>
-    <servlet>
         <servlet-name>LoginServlet</servlet-name>
         <servlet-class>Controller.LoginServlet</servlet-class>
     </servlet>
@@ -56,7 +52,22 @@
         <servlet-name>ControllerCLT</servlet-name>
         <servlet-class>Controller.ControllerCLT</servlet-class>
     </servlet>
-
+    <servlet>
+        <servlet-name>ControllerDiarista</servlet-name>
+        <servlet-class>Controller.ControllerDiarista</servlet-class>
+    </servlet>
+    <servlet>
+        <servlet-name>ControllerEmpreita</servlet-name>
+        <servlet-class>Controller.ControllerEmpreita</servlet-class>
+    </servlet>
+    <servlet>
+        <servlet-name>ControllerProducao</servlet-name>
+        <servlet-class>Controller.ControllerProducao</servlet-class>
+    </servlet>
+    <servlet>
+        <servlet-name>ControllerPagamento</servlet-name>
+        <servlet-class>Controller.ControllerPagamento</servlet-class>
+    </servlet>
     <servlet-mapping>
         <servlet-name>ClassificacaoServlet</servlet-name>
         <url-pattern>/ClassificacaoServlet</url-pattern>
@@ -86,10 +97,6 @@
         <url-pattern>/ControllerAreaProducao</url-pattern>
     </servlet-mapping>
     <servlet-mapping>
-        <servlet-name>ControllerTalao</servlet-name>
-        <url-pattern>/ControllerTalao</url-pattern>
-    </servlet-mapping>
-    <servlet-mapping>
         <servlet-name>LoginServlet</servlet-name>
         <url-pattern>/LoginServlet</url-pattern>
     </servlet-mapping>
@@ -105,7 +112,22 @@
         <servlet-name>ControllerCLT</servlet-name>
         <url-pattern>/ControllerCLT</url-pattern>
     </servlet-mapping>
-
+    <servlet-mapping>
+        <servlet-name>ControllerDiarista</servlet-name>
+        <url-pattern>/ControllerDiarista</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>ControllerEmpreita</servlet-name>
+        <url-pattern>/ControllerEmpreita</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>ControllerProducao</servlet-name>
+        <url-pattern>/ControllerProducao</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>ControllerPagamento</servlet-name>
+        <url-pattern>/ControllerPagamento</url-pattern>
+    </servlet-mapping>
     <session-config>
         <session-timeout>
             30

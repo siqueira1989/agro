@@ -418,6 +418,21 @@
     </div>
 </div>
 
+    <div class="container-fluid content mb-4">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h6 class="text-success fw-bold mb-0"><i class="fas fa-money-check-dollar me-2"></i>Pagamentos</h6>
+                <button class="btn btn-success btn-sm" id="btnGerarPagamento"><i class="fas fa-plus me-1"></i>Gerar Pagamento</button>
+            </div>
+            <div class="card-body p-0"><div class="table-responsive">
+                <table class="table table-sm table-hover mb-0">
+                    <thead class="table-light"><tr><th>Data</th><th class="text-end">Valor</th><th>Forma / Dados</th><th></th></tr></thead>
+                    <tbody id="bodyPagamentos"><tr><td colspan="4" class="text-center text-muted py-2">Sem pagamentos no período.</td></tr></tbody>
+                </table>
+            </div></div>
+        </div>
+    </div>
+<%@ include file="../../pagina/modalPagamento.jsp"%>
 <%@ include file="../../pagina/footer.jsp"%>
 </body>
 </html>

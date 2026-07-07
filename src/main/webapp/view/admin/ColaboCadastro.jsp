@@ -176,13 +176,31 @@
                         <div class="input-group">
                             <span class="input-group-text"><i class="fas fa-user-tie"></i></span>
                             <input type="text" class="form-control" id="cargo" name="cargo"
-                                   minlength="2" maxlength="80" required>
-                            <div class="invalid-feedback">Informe o cargo (mín. 2 caracteres).</div>
+                                   minlength="2" maxlength="80">
+                            <select class="form-select d-none" id="cargoProducao">
+                                <option value="">Selecione</option>
+                                <option value="Colhedor">Colhedor</option>
+                                <option value="Embalador">Embalador</option>
+                            </select>
+                            <div class="invalid-feedback">Informe o cargo.</div>
                         </div>
                     </div>
                 </div>
 
-                <div class="row g-2 mt-1">
+                <!-- Valor específico (Diária / Empreita) -->
+                <div class="row g-2 mt-1 d-none" id="rowValor">
+                    <div class="col-md-4">
+                        <label class="form-label" id="labelValor">Valor *</label>
+                        <div class="input-group">
+                            <span class="input-group-text">R$</span>
+                            <input type="text" class="form-control" id="valorEspecifico" name="valorEspecifico"
+                                   placeholder="0,00" autocomplete="off">
+                            <div class="invalid-feedback">Informe o valor.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-2 mt-1" id="rowDatas">
                     <div class="col-md-4">
                         <label class="form-label">Data de Admissão</label>
                         <div class="input-group date" id="grpDataInicio">

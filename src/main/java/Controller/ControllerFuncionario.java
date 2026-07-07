@@ -149,6 +149,7 @@ public class ControllerFuncionario extends HttpServlet {
             LocalDate dataNascimentoPf = getAsLocalDate(jsonObject, "datanascimentopf");
             LocalDate dataInicio = getAsLocalDate(jsonObject, "datainiciofuncionario");
             LocalDate dataFim = getAsLocalDate(jsonObject, "datafimfuncionario");
+            java.math.BigDecimal valorEspecifico = getAsBigDecimal(jsonObject, "valorespecifico");
 
             if (isBlank(nomePessoa) || isBlank(cpfPf) || isBlank(matricula) || isBlank(cargo) || isBlank(tipoStr)) {
                 writeJson(response, HttpServletResponse.SC_BAD_REQUEST, false,
@@ -173,6 +174,13 @@ public class ControllerFuncionario extends HttpServlet {
                 return;
             }
 
+            // Validações específicas por tipo
+            String erroTipo = validarPorTipo(tipoFuncionario, cargo, valorEspecifico);
+            if (erroTipo != null) {
+                writeJson(response, HttpServletResponse.SC_BAD_REQUEST, false, erroTipo, "modalCadastroFuncionario");
+                return;
+            }
+
             // ── Pessoa já existe (mesmo CPF) → READMISSÃO (novo vínculo) ──
             Integer idExistente = funcionariodao.obterIdFuncionarioPorCPF(cpfPf);
             if (idExistente != null) {
@@ -190,6 +198,9 @@ public class ControllerFuncionario extends HttpServlet {
                         matricula, cargo, tipoFuncionario, dataInicio, dataFim);
                 funcionariodao.updateFuncionario(fEx);
                 criarVinculo(idExistente, tipoFuncionario, cargo, dataInicio, dataFim);
+                if (valorEspecifico != null) {
+                    funcionariodao.updateValorEspecifico(idExistente, tipoFuncionario, valorEspecifico);
+                }
 
                 writeJson(response, HttpServletResponse.SC_OK, true,
                         "Funcionário readmitido com sucesso! Novo vínculo criado.", "page");
@@ -229,6 +240,9 @@ public class ControllerFuncionario extends HttpServlet {
             Integer novoId = funcionariodao.obterIdFuncionarioPorCPF(cpfPf);
             if (novoId != null) {
                 criarVinculo(novoId, tipoFuncionario, cargo, dataInicio, dataFim);
+                if (valorEspecifico != null) {
+                    funcionariodao.updateValorEspecifico(novoId, tipoFuncionario, valorEspecifico);
+                }
             }
 
             writeJson(response, HttpServletResponse.SC_OK, true,
@@ -266,6 +280,7 @@ public class ControllerFuncionario extends HttpServlet {
             LocalDate dataNascimentoPf = getAsLocalDate(jsonObject, "datanascimentopf");
             LocalDate dataInicio = getAsLocalDate(jsonObject, "datainiciofuncionario");
             LocalDate dataFim = getAsLocalDate(jsonObject, "datafimfuncionario");
+            java.math.BigDecimal valorEspecifico = getAsBigDecimal(jsonObject, "valorespecifico");
 
             if (idPessoa == null || isBlank(nomePessoa) || isBlank(cpfPf) || isBlank(matricula)
                     || isBlank(cargo) || isBlank(tipoStr)) {
@@ -288,6 +303,12 @@ public class ControllerFuncionario extends HttpServlet {
             } catch (IllegalArgumentException e) {
                 writeJson(response, HttpServletResponse.SC_BAD_REQUEST, false,
                         "Tipo de funcionário inválido.", "modalAtualizarFuncionario");
+                return;
+            }
+
+            String erroTipo = validarPorTipo(tipoFuncionario, cargo, valorEspecifico);
+            if (erroTipo != null) {
+                writeJson(response, HttpServletResponse.SC_BAD_REQUEST, false, erroTipo, "modalAtualizarFuncionario");
                 return;
             }
 
@@ -333,6 +354,9 @@ public class ControllerFuncionario extends HttpServlet {
             );
 
             funcionariodao.updateFuncionario(funcionario);
+            if (valorEspecifico != null) {
+                funcionariodao.updateValorEspecifico(idPessoa, tipoFuncionario, valorEspecifico);
+            }
 
             writeJson(response, HttpServletResponse.SC_OK, true,
                     "Funcionário atualizado com sucesso!", "page");
@@ -495,12 +519,31 @@ public class ControllerFuncionario extends HttpServlet {
             String tipo = request.getParameter("tipo");
             String somenteAtivos = request.getParameter("ativos");
 
+            // Verificação em tempo real de duplicidade (cpf | matricula | usuario)
+            String existeCampo = request.getParameter("existe");
+            if (existeCampo != null) {
+                String valor = request.getParameter("valor");
+                Integer excluir = null;
+                String exStr = request.getParameter("excluir");
+                if (exStr != null && !exStr.isBlank()) {
+                    try { excluir = Integer.parseInt(exStr.trim()); } catch (NumberFormatException ignored) { }
+                }
+                boolean existe = funcionariodao.existeValor(existeCampo, valor, excluir);
+                out.print("{\"existe\":" + existe + "}");
+                out.flush();
+                return;
+            }
+
             if (id != null && !id.isEmpty()) {
                 int idPessoa = Integer.parseInt(id);
                 Funcionario funcionario = funcionariodao.getFuncionarioById(idPessoa);
 
                 if (funcionario != null) {
-                    out.print(gson.toJson(funcionario));
+                    // inclui o valor específico do tipo (diária/empreita/unidade) p/ edição
+                    JsonObject jo = gson.toJsonTree(funcionario).getAsJsonObject();
+                    jo.addProperty("valorEspecifico",
+                            funcionariodao.getValorEspecifico(idPessoa, funcionario.getTipoFuncionario()));
+                    out.print(gson.toJson(jo));
                 } else {
                     writeJson(response, HttpServletResponse.SC_BAD_REQUEST, false,
                             "Funcionário não encontrado.", "page");
@@ -562,6 +605,31 @@ public class ControllerFuncionario extends HttpServlet {
         v.setDataDesligamento(desligamento);
         v.setStatus(desligamento != null ? "DESLIGADO" : "ATIVO");
         vinculodao.inserir(v);
+    }
+
+    /** Valida os campos específicos por tipo. Retorna a mensagem de erro ou null. */
+    private String validarPorTipo(TipoFuncionario tipo, String cargo, java.math.BigDecimal valor) {
+        if (tipo == TipoFuncionario.DIARISTA
+                && (valor == null || valor.compareTo(java.math.BigDecimal.ZERO) <= 0)) {
+            return "Informe o valor da diária.";
+        }
+        if (tipo == TipoFuncionario.EMPREITA
+                && (valor == null || valor.compareTo(java.math.BigDecimal.ZERO) <= 0)) {
+            return "Informe o valor da empreita.";
+        }
+        if (tipo == TipoFuncionario.PRODUCAO
+                && !("Colhedor".equalsIgnoreCase(cargo) || "Embalador".equalsIgnoreCase(cargo))) {
+            return "Cargo do funcionário de produção deve ser Colhedor ou Embalador.";
+        }
+        return null;
+    }
+
+    private java.math.BigDecimal getAsBigDecimal(JsonObject jsonObject, String campo) {
+        try {
+            if (!jsonObject.has(campo) || jsonObject.get(campo).isJsonNull()) return null;
+            String s = jsonObject.get(campo).getAsString().trim();
+            return s.isEmpty() ? null : new java.math.BigDecimal(s);
+        } catch (Exception e) { return null; }
     }
 
     private boolean isBlank(String valor) {

@@ -257,6 +257,26 @@ public class PontoEletronicoDAO {
         }
     }
 
+    /**
+     * Marca um dia trabalhado (presença) — usado para diarista, sem horas.
+     * Cria um registro do dia (idempotente por idpessoa+data).
+     */
+    public void marcarPresenca(int idpessoa, LocalDate data, Integer registradoPor) throws SQLException {
+        Integer idVinculo = resolverVinculoId(idpessoa, data);
+        String sql = "INSERT INTO ponto_eletronico "
+                + "(idpessoa, dataregistro, total_minutos, extra_minutos, minutos_noturnos, "
+                + " id_vinculo, registrado_por) VALUES (?,?,0,0,0,?,?) "
+                + "ON CONFLICT (idpessoa, dataregistro) DO NOTHING";
+        try (Connection c = new PostgresConnection().getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, idpessoa);
+            ps.setDate(2, Date.valueOf(data));
+            if (idVinculo != null) ps.setInt(3, idVinculo); else ps.setNull(3, Types.INTEGER);
+            if (registradoPor != null) ps.setInt(4, registradoPor); else ps.setNull(4, Types.INTEGER);
+            ps.executeUpdate();
+        }
+    }
+
     public void excluir(int idPonto) throws SQLException {
         PostgresConnection pc = new PostgresConnection();
         try (Connection c = pc.getConnection();

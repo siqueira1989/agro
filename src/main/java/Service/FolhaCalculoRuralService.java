@@ -37,6 +37,8 @@ public class FolhaCalculoRuralService {
     private final FaltaFuncionarioDAO faltaDAO = new FaltaFuncionarioDAO();
     private final ValeFuncionarioDAO  valeDAO  = new ValeFuncionarioDAO();
     private final Model.Dao.VinculoDAO vinculoDAO = new Model.Dao.VinculoDAO();
+    private final Model.Dao.ProducaoCaixaDAO    producaoDAO = new Model.Dao.ProducaoCaixaDAO();
+    private final Model.Dao.LancamentoEmpreitaDAO empreitaDAO = new Model.Dao.LancamentoEmpreitaDAO();
 
     private static final BigDecimal C60 = BigDecimal.valueOf(60);
 
@@ -61,6 +63,20 @@ public class FolhaCalculoRuralService {
         BigDecimal totalVales = valeDAO.somarPorMes(id, periodo);
         if (totalVales == null) totalVales = BigDecimal.ZERO;
 
+        // Multi-modo: dias em que o CLT trabalhou em produção/empreita.
+        // Nesses dias não conta falta nem hora extra; ganha por produção/empreita.
+        java.util.Set<LocalDate> diasModoAlt = new java.util.HashSet<>();
+        for (Map<String, Object> lp : producaoDAO.listarPorMes(id, periodo)) {
+            diasModoAlt.add(LocalDate.parse((String) lp.get("dataProducao")));
+        }
+        for (Model.Model.LancamentoEmpreita le : empreitaDAO.listarPorMes(id, periodo)) {
+            diasModoAlt.add(le.getDataEmpreita());
+        }
+        BigDecimal valorProducao = producaoDAO.somarValor(id, periodo);
+        BigDecimal valorEmpreita = empreitaDAO.somarPorMes(id, periodo);
+        if (valorProducao == null) valorProducao = BigDecimal.ZERO;
+        if (valorEmpreita == null) valorEmpreita = BigDecimal.ZERO;
+
         // Índices por dia
         Map<LocalDate, PontoEletronico> pontoPorDia = new HashMap<>();
         for (PontoEletronico p : pontos) pontoPorDia.put(p.getDataRegistro(), p);
@@ -68,7 +84,8 @@ public class FolhaCalculoRuralService {
         Map<LocalDate, Boolean> faltaInjustPorDia = new HashMap<>();
         int faltasInjust = 0;
         for (FaltaFuncionario fa : faltas) {
-            if (!fa.isJustificada()) {
+            // Ignora falta em dia de modo alternativo (produção/empreita)
+            if (!fa.isJustificada() && !diasModoAlt.contains(fa.getDataFalta())) {
                 faltaInjustPorDia.put(fa.getDataFalta(), true);
                 faltasInjust++;
             }
@@ -116,6 +133,7 @@ public class FolhaCalculoRuralService {
             for (LocalDate dia : e.getValue()) {
                 PontoEletronico p = pontoPorDia.get(dia);
                 if (p == null) continue;
+                if (diasModoAlt.contains(dia)) continue;  // dia de produção/empreita: sem extra/noturno CLT
                 minutosNoturnos += p.getMinutosNoturnos();
 
                 boolean isDomingo = dia.getDayOfWeek() == DayOfWeek.SUNDAY;
@@ -160,7 +178,9 @@ public class FolhaCalculoRuralService {
         BigDecimal descontoDsr = valorDia.multiply(BigDecimal.valueOf(semanasComFalta))
                 .setScale(2, RoundingMode.HALF_UP);
 
+        // Ganhos de produção/empreita (dias em modo alternativo) somam ao bruto
         BigDecimal bruto = salario.add(valorExtraNormal).add(valorExtra100).add(valorAdicNoturno)
+                .add(valorProducao).add(valorEmpreita)
                 .setScale(2, RoundingMode.HALF_UP);
         BigDecimal liquido = bruto.subtract(descontoFaltas).subtract(descontoDsr)
                 .subtract(totalVales).setScale(2, RoundingMode.HALF_UP);
@@ -187,6 +207,8 @@ public class FolhaCalculoRuralService {
         fc.setValorExtra100(valorExtra100);
         fc.setMinutosNoturnos(minutosNoturnos);
         fc.setMinutosExtra100(minutosExtra100);
+        fc.setValorProducao(valorProducao.setScale(2, RoundingMode.HALF_UP));
+        fc.setValorEmpreita(valorEmpreita.setScale(2, RoundingMode.HALF_UP));
         return fc;
     }
 

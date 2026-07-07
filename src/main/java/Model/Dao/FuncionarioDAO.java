@@ -10,6 +10,7 @@ import Model.Model.TipoFuncionario;
 
 import Util.PostgresConnection;
 
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -199,6 +200,32 @@ public class FuncionarioDAO {
         }
     }
 
+    /**
+     * Verifica em tempo real se um valor já existe (cpf | matricula | usuario),
+     * opcionalmente ignorando um idpessoa (para o modo edição).
+     * A coluna/tabela vêm de whitelist — seguro contra SQL injection.
+     */
+    public boolean existeValor(String campo, String valor, Integer excluirId) throws SQLException {
+        String coluna, tabela;
+        switch (campo == null ? "" : campo) {
+            case "cpf":       coluna = "cpfpf";                tabela = "funcionario"; break;
+            case "matricula": coluna = "matriculafuncionario"; tabela = "funcionario"; break;
+            case "usuario":   coluna = "usuariopessoa";        tabela = "pessoa";      break;
+            default: return false;
+        }
+        if (valor == null || valor.trim().isEmpty()) return false;
+        String sql = "SELECT COUNT(*) FROM " + tabela + " WHERE " + coluna + " = ?"
+                   + (excluirId != null ? " AND idpessoa <> ?" : "");
+        try (Connection conexao = new PostgresConnection().getConnection();
+             PreparedStatement stmt = conexao.prepareStatement(sql)) {
+            stmt.setString(1, valor.trim());
+            if (excluirId != null) stmt.setInt(2, excluirId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                return rs.next() && rs.getInt(1) > 0;
+            }
+        }
+    }
+
     public Funcionario buscarPorCPF(String cpf) throws SQLException {
         String sql = "SELECT * FROM funcionario WHERE cpfpf = ?";
         try (Connection conexao = new PostgresConnection().getConnection();
@@ -268,6 +295,48 @@ public class FuncionarioDAO {
             }
         }
         return lista;
+    }
+
+    /** Colunas de valor específico por tipo (whitelist). */
+    private String[] tabelaColunaValor(TipoFuncionario tipo) {
+        if (tipo == null) return null;
+        switch (tipo) {
+            case DIARISTA: return new String[]{"funcionariodiarista", "valorpordia"};
+            case EMPREITA: return new String[]{"funcionarioempreita", "valorfixoacordado"};
+            case PRODUCAO: return new String[]{"funcionarioproducao", "valorporunidade"};
+            default:       return null;
+        }
+    }
+
+    /** Atualiza o valor específico do tipo (diária, empreita ou por unidade). */
+    public void updateValorEspecifico(int idpessoa, TipoFuncionario tipo, BigDecimal valor) throws SQLException {
+        String[] tc = tabelaColunaValor(tipo);
+        if (tc == null || valor == null) return;
+        String sql = "UPDATE " + tc[0] + " SET " + tc[1] + "=? WHERE idpessoa=?";
+        try (Connection conexao = new PostgresConnection().getConnection();
+             PreparedStatement stmt = conexao.prepareStatement(sql)) {
+            stmt.setBigDecimal(1, valor);
+            stmt.setInt(2, idpessoa);
+            stmt.executeUpdate();
+        }
+    }
+
+    /** Lê o valor específico do tipo (para o modo edição). */
+    public BigDecimal getValorEspecifico(int idpessoa, TipoFuncionario tipo) throws SQLException {
+        String[] tc = tabelaColunaValor(tipo);
+        if (tc == null) return BigDecimal.ZERO;
+        String sql = "SELECT " + tc[1] + " FROM " + tc[0] + " WHERE idpessoa=?";
+        try (Connection conexao = new PostgresConnection().getConnection();
+             PreparedStatement stmt = conexao.prepareStatement(sql)) {
+            stmt.setInt(1, idpessoa);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    BigDecimal v = rs.getBigDecimal(1);
+                    return v != null ? v : BigDecimal.ZERO;
+                }
+            }
+        }
+        return BigDecimal.ZERO;
     }
 
     public Integer obterIdFuncionarioPorCPF(String cpf) throws SQLException {

@@ -26,6 +26,9 @@ public class FechamentoFolha {
     private BigDecimal valorExtra100        = BigDecimal.ZERO;
     private int        minutosNoturnos;
     private int        minutosExtra100;
+    // ── multi-modo (CLT que trabalhou em produção/empreita) ──
+    private BigDecimal valorProducao        = BigDecimal.ZERO;
+    private BigDecimal valorEmpreita        = BigDecimal.ZERO;
 
     public int getIdFechamento()                         { return idFechamento; }
     public void setIdFechamento(int v)                   { this.idFechamento = v; }
@@ -86,6 +89,12 @@ public class FechamentoFolha {
 
     public int getMinutosExtra100()                      { return minutosExtra100; }
     public void setMinutosExtra100(int v)                { this.minutosExtra100 = v; }
+
+    public BigDecimal getValorProducao()                 { return valorProducao; }
+    public void setValorProducao(BigDecimal v)           { this.valorProducao = v; }
+
+    public BigDecimal getValorEmpreita()                 { return valorEmpreita; }
+    public void setValorEmpreita(BigDecimal v)           { this.valorEmpreita = v; }
 
     public String getNoturnoFormatado() {
         return String.format("%02d:%02d", minutosNoturnos / 60, minutosNoturnos % 60);

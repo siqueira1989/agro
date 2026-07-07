@@ -1193,6 +1193,21 @@ function converterDataParaISO(valor) {
   return null;
 }
 
+/** Converte "1.500,00" (máscara BRL) → número 1500.00. */
+function parseBRL(s) {
+  if (s === null || s === undefined) return 0;
+  s = String(s).trim();
+  if (!s) return 0;
+  s = s.replace(/\./g, '').replace(',', '.').replace(/[^\d.]/g, '');
+  var n = parseFloat(s);
+  return isNaN(n) ? 0 : n;
+}
+
+/** Converte número → "1.500,00" para exibir na máscara. */
+function formatBRLnum(n) {
+  return Number(n || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 /**
  * Converte yyyy-MM-dd → dd/mm/yyyy para exibição no datepicker.
  * Suporta também objetos {year, monthValue, dayOfMonth} retornados pelo Gson.
@@ -1226,7 +1241,13 @@ function preencherFormularioEdicao(f) {
   $('#cpfPf').val(f.cpfPf || '');
   $('#matricula').val(f.matricula || '');
   $('#tipoFuncionario').val(f.tipoFuncionario || '').trigger('change');
-  $('#cargo').val(f.cargo || '');
+  // cargo: select para produção, texto para os demais
+  if (f.tipoFuncionario === 'PRODUCAO') { $('#cargoProducao').val(f.cargo || ''); }
+  else { $('#cargo').val(f.cargo || ''); }
+  // valor específico (diária/empreita/unidade)
+  if (f.valorEspecifico != null && Number(f.valorEspecifico) > 0) {
+    $('#valorEspecifico').val(formatBRLnum(f.valorEspecifico));
+  }
   $('#cep').val(f.Cep || f.cep || '');
   $('#numero').val(f.numero || '');
   $('#complemento').val(f.complemento || '');
@@ -1270,6 +1291,7 @@ function initFuncionarioCadastro() {
     $('#dataNascimentoPf').mask('00/00/0000');
     $('#dataInicio').mask('00/00/0000');
     $('#dataFim').mask('00/00/0000');
+    $('#valorEspecifico').mask('#.##0,00', { reverse: true });
     $('#telefonePessoa').mask('(00) 00000-0000').on('blur', function () {
       $(this).mask($(this).val().length === 14 ? '(00) 0000-0000' : '(00) 00000-0000');
     });
@@ -1363,10 +1385,31 @@ function initFuncionarioCadastro() {
     $box.attr('class', cfg.cls).html(cfg.html);
   }
 
+  // Mostra/esconde campos conforme o tipo de funcionário
+  function ajustarCamposPorTipo() {
+    var tipo = $('#tipoFuncionario').val();
+    // reset padrão (CLT): cargo texto, datas visíveis, valor escondido
+    $('#cargo').removeClass('d-none');
+    $('#cargoProducao').addClass('d-none');
+    $('#rowDatas').removeClass('d-none');
+    $('#rowValor').addClass('d-none');
+
+    if (tipo === 'DIARISTA' || tipo === 'EMPREITA') {
+      $('#rowDatas').addClass('d-none');
+      $('#rowValor').removeClass('d-none');
+      $('#labelValor').text(tipo === 'DIARISTA' ? 'Valor da Diária *' : 'Valor da Empreita *');
+    } else if (tipo === 'PRODUCAO') {
+      $('#rowDatas').addClass('d-none');
+      $('#cargo').addClass('d-none');
+      $('#cargoProducao').removeClass('d-none');
+    }
+  }
+
   $(document).off('change', '#tipoFuncionario')
-    .on('change', '#tipoFuncionario', atualizarBoxTipoInfo);
+    .on('change', '#tipoFuncionario', function () { atualizarBoxTipoInfo(); ajustarCamposPorTipo(); });
 
   atualizarBoxTipoInfo();
+  ajustarCamposPorTipo();
 
   // ======== Botão limpar ========
   $(document).off('click', '#btnLimpar')
@@ -1382,6 +1425,55 @@ function initFuncionarioCadastro() {
         preencherEnderecoViaCep(cep);
       }
     });
+
+  // ======== Verificação em tempo real de duplicidade ========
+  window.__existeDup = { cpf: false, matricula: false, usuario: false };
+
+  function atualizarBotaoSalvar() {
+    var d = window.__existeDup;
+    var bloqueado = d.cpf || d.matricula || d.usuario;
+    $('#btnSalvar').prop('disabled', bloqueado)
+      .attr('title', bloqueado ? 'Há dados já cadastrados — corrija para continuar' : '');
+  }
+
+  function verificarDup(campo, seletor, rotulo) {
+    var $el = $(seletor);
+    var valor = ($el.val() || '').trim();
+    var editId = new URLSearchParams(window.location.search).get('id') || '';
+    if (!valor) {
+      window.__existeDup[campo] = false;
+      $el.removeClass('is-invalid');
+      atualizarBotaoSalvar();
+      return;
+    }
+    $.getJSON((window.__ctxPath || '') + '/ControllerFuncionario',
+      { existe: campo, valor: valor, excluir: editId })
+      .done(function (r) {
+        var existe = !!(r && r.existe);
+        window.__existeDup[campo] = existe;
+        if (existe) {
+          $el.addClass('is-invalid').removeClass('is-valid');
+          $el.siblings('.invalid-feedback').text(rotulo + ' já cadastrado no sistema.');
+        } else {
+          $el.removeClass('is-invalid').addClass('is-valid');
+        }
+        atualizarBotaoSalvar();
+      });
+  }
+
+  // Checa ENQUANTO digita (evento input) com debounce; e também ao sair do campo (blur)
+  var dupTimers = {};
+  function agendarDup(campo, seletor, rotulo) {
+    clearTimeout(dupTimers[campo]);
+    dupTimers[campo] = setTimeout(function () { verificarDup(campo, seletor, rotulo); }, 450);
+  }
+  [['cpf', '#cpfPf', 'CPF'],
+   ['matricula', '#matricula', 'Matrícula'],
+   ['usuario', '#usuarioPessoa', 'Usuário']].forEach(function (c) {
+    $(document).off('input.dup blur.dup', c[1])
+      .on('input.dup', c[1], function () { agendarDup(c[0], c[1], c[2]); })
+      .on('blur.dup',  c[1], function () { verificarDup(c[0], c[1], c[2]); });
+  });
 
   // ======== Submit (create/update) ========
   $(document).off('submit', '#formFuncionario')
@@ -1412,12 +1504,43 @@ function initFuncionarioCadastro() {
         ok = false;
       }
 
+      // Bloqueia se CPF / matrícula / usuário já existirem
+      var dup = window.__existeDup || {};
+      if (dup.cpf || dup.matricula || dup.usuario) {
+        var quais = [];
+        if (dup.cpf) quais.push('CPF');
+        if (dup.matricula) quais.push('matrícula');
+        if (dup.usuario) quais.push('usuário');
+        mostrarAlerta('Já cadastrado no sistema: ' + quais.join(', ') + '. Corrija para continuar.',
+                      'danger', '#alerta', 5000);
+        return;
+      }
+
       if (!ok) {
         if (typeof mostrarAlerta === 'function') {
           mostrarAlerta('Revise os campos obrigatórios.', 'warning', '#alerta', 4000);
         } else {
           $('#alerta').removeClass('d-none').addClass('alert-warning').text('Revise os campos obrigatórios.');
         }
+        return;
+      }
+
+      // Cargo e valor específico dependem do tipo
+      var tipoSel = $('#tipoFuncionario').val();
+      var cargoVal = (tipoSel === 'PRODUCAO') ? $('#cargoProducao').val() : $('#cargo').val().trim();
+      var valorEsp = parseBRL($('#valorEspecifico').val());
+
+      // Validações específicas por tipo (frontend)
+      if (!cargoVal) {
+        (tipoSel === 'PRODUCAO' ? $('#cargoProducao') : $('#cargo')).addClass('is-invalid');
+        mostrarAlerta(tipoSel === 'PRODUCAO' ? 'Selecione o cargo (Colhedor ou Embalador).' : 'Informe o cargo.',
+                      'warning', '#alerta', 4000);
+        return;
+      }
+      if ((tipoSel === 'DIARISTA' || tipoSel === 'EMPREITA') && (!valorEsp || valorEsp <= 0)) {
+        $('#valorEspecifico').addClass('is-invalid');
+        mostrarAlerta('Informe o valor da ' + (tipoSel === 'DIARISTA' ? 'diária' : 'empreita') + '.',
+                      'warning', '#alerta', 4000);
         return;
       }
 
@@ -1438,10 +1561,11 @@ function initFuncionarioCadastro() {
         cpfpf: $('#cpfPf').val().trim(),
         datanascimentopf: converterDataParaISO($('#dataNascimentoPf').val().trim()),
         matriculafuncionario: $('#matricula').val().trim(),
-        tipofuncionario: $('#tipoFuncionario').val(),
-        cargofuncionario: $('#cargo').val().trim(),
-        datainiciofuncionario: converterDataParaISO($('#dataInicio').val().trim()),
-        datafimfuncionario: converterDataParaISO($('#dataFim').val().trim())
+        tipofuncionario: tipoSel,
+        cargofuncionario: cargoVal,
+        datainiciofuncionario: (tipoSel === 'CLT') ? converterDataParaISO($('#dataInicio').val().trim()) : null,
+        datafimfuncionario: (tipoSel === 'CLT') ? converterDataParaISO($('#dataFim').val().trim()) : null,
+        valorespecifico: valorEsp
       };
 
       $.ajax({
@@ -1966,11 +2090,24 @@ function botoesAcaoColaborador(row) {
         + ' title="' + (ativo ? 'Desativar' : 'Reativar') + '"'
         + ' onclick="abrirModalSituacao(' + id + ', \'' + nome + '\', ' + ativo + ')">'
         + '<i class="fas fa-' + (ativo ? 'ban' : 'circle-check') + '"></i></button>';
-    var btnPerfil = tipo === 'CLT'
-        ? ' <a href="' + CTX + '/view/admin/perfilCLT.jsp?id=' + id + '"'
+    var btnPerfil = '';
+    if (tipo === 'CLT') {
+        btnPerfil = ' <a href="' + CTX + '/view/admin/perfilCLT.jsp?id=' + id + '"'
           + ' class="btn-acao" style="background:#198754;color:#fff;" title="Perfil CLT">'
-          + '<i class="fas fa-id-badge"></i></a>'
-        : '';
+          + '<i class="fas fa-id-badge"></i></a>';
+    } else if (tipo === 'DIARISTA') {
+        btnPerfil = ' <a href="' + CTX + '/view/admin/perfilDiarista.jsp?id=' + id + '"'
+          + ' class="btn-acao" style="background:#fd7e14;color:#fff;" title="Perfil Diarista">'
+          + '<i class="fas fa-user-clock"></i></a>';
+    } else if (tipo === 'EMPREITA') {
+        btnPerfil = ' <a href="' + CTX + '/view/admin/perfilEmpreita.jsp?id=' + id + '"'
+          + ' class="btn-acao" style="background:#6f42c1;color:#fff;" title="Perfil Empreita">'
+          + '<i class="fas fa-hard-hat"></i></a>';
+    } else if (tipo === 'PRODUCAO') {
+        btnPerfil = ' <a href="' + CTX + '/view/admin/perfilProducao.jsp?id=' + id + '"'
+          + ' class="btn-acao" style="background:#0dcaf0;color:#fff;" title="Perfil Produção">'
+          + '<i class="fas fa-boxes-stacked"></i></a>';
+    }
     return btnEditar + ' ' + btnSit + btnPerfil;
 }
 
@@ -2068,6 +2205,743 @@ $(document).ready(function () {
     initPerfilCLT();
 });
 
+/******************************************************************************************************/
+/* MÓDULO DIARISTA — perfilDiarista.jsp                                                              */
+/******************************************************************************************************/
+
+$(document).ready(function () {
+    if (!$('#painelFechamentoDiarista').length) return;
+    initPerfilDiarista();
+});
+
+function initPerfilDiarista() {
+    var id = new URLSearchParams(window.location.search).get('id');
+    if (!id) { mostrarAlerta('ID do funcionário não informado na URL.', 'danger', '#alerta'); return; }
+
+    var hoje = new Date();
+    $('#inputPeriodo').val(hoje.getFullYear() + '-' + String(hoje.getMonth() + 1).padStart(2, '0'));
+    $('#presencaData, #valeData').val(hoje.toISOString().substring(0, 10));
+
+    carregarPerfilDiarista(id, $('#inputPeriodo').val());
+
+    $('#btnCarregarPeriodo').on('click', function () { carregarPerfilDiarista(id, $('#inputPeriodo').val()); });
+    $('#btnSalvarDiaria').on('click', function () { salvarDiaria(id); });
+    $('#btnSalvarPresenca').on('click', function () { salvarPresenca(id); });
+    $('#btnSalvarVale').on('click', function () { salvarValeDiarista(id); });
+}
+
+function carregarPerfilDiarista(id, periodo) {
+    $.ajax({
+        url: (window.__ctxPath || '') + '/ControllerDiarista?acao=perfil&id=' + id + '&periodo=' + periodo,
+        method: 'GET', dataType: 'json',
+        success: function (data) {
+            renderHeaderDiarista(data);
+            renderCardsDiarista(data);
+            renderTabelaPresenca(data.presencas || []);
+            renderTabelaValesDiarista(data.vales || []);
+            renderFechamentoDiarista(data);
+            window.__pgCtx = { id: parseInt(id), periodo: periodo, tipo: 'DIARISTA', valor: data.valorLiquido };
+            carregarPagamentos();
+        },
+        error: function () { mostrarAlerta('Erro ao carregar perfil do diarista.', 'danger', '#alerta', 5000); }
+    });
+}
+
+function renderHeaderDiarista(data) {
+    var f = data.funcionario; if (!f) return;
+    var v = data.vinculo;
+    $('#nomeFunc').text(f.nomePessoa || '');
+    $('#cargoMatricula').text(((v ? v.cargo : f.cargo) || '') + ' · Matrícula: ' + (f.matricula || ''));
+    $('#infoValorDia').text(formatBRL(data.valorPorDia) + '/dia');
+
+    var totalVinc = (data.vinculos || []).length;
+    var periodoTxt = '—';
+    if (v) {
+        var ini = v.dataAdmissao ? formatDataBR(v.dataAdmissao) : '?';
+        var fim = v.dataDesligamento ? formatDataBR(v.dataDesligamento) : 'atual';
+        periodoTxt = ini + ' – ' + fim + (totalVinc > 1 ? ' (' + totalVinc + ' vínculos)' : '');
+    }
+    $('#infoVinculoPeriodo').text(periodoTxt);
+
+    var ativo = (data.vinculos || []).filter(function (x) { return !x.dataDesligamento; })[0];
+    var st = ativo ? (ativo.status || 'ATIVO').toUpperCase() : 'DESLIGADO';
+    $('#badgeStatus').text(st).attr('class', 'badge fs-6 px-3 py-2 ' +
+        (st === 'ATIVO' ? 'bg-success' : st === 'AFASTADO' ? 'bg-warning text-dark' : 'bg-danger'));
+
+    $('#editValorDia').val(data.valorPorDia || 0);
+    $('#headerFuncionario').removeClass('d-none');
+    window.__idDiarista = f.idPessoa;
+}
+
+function renderCardsDiarista(data) {
+    $('#cardDiasTrabalhados').text(data.diasTrabalhados || 0);
+    $('#cardBruto').text(formatBRL(data.valorBruto || 0));
+    $('#cardTotalVales').text(formatBRL(data.totalVales || 0));
+    $('#cardLiquido').text(formatBRL(data.valorLiquido || 0));
+    $('#cardsResumo').css('display', '').removeClass('d-none');
+}
+
+function renderTabelaPresenca(presencas) {
+    var tbody = $('#bodyPresenca').empty();
+    if (!presencas.length) {
+        tbody.append('<tr><td colspan="2" class="text-center text-muted py-3">Nenhum dia trabalhado no período.</td></tr>');
+        return;
+    }
+    presencas.forEach(function (p) {
+        tbody.append('<tr><td>' + formatDataBR(p.dataRegistro) + '</td>'
+            + '<td class="text-end"><button class="btn btn-outline-danger btn-sm py-0" title="Remover" '
+            + 'onclick="excluirPresenca(' + p.idPonto + ')"><i class="fas fa-trash"></i></button></td></tr>');
+    });
+}
+
+function renderTabelaValesDiarista(vales) {
+    var tbody = $('#bodyVales').empty();
+    if (!vales.length) {
+        tbody.append('<tr><td colspan="4" class="text-center text-muted py-3">Sem vales.</td></tr>');
+        return;
+    }
+    vales.forEach(function (v) {
+        var status = v.statusValeStr === 'DESCONTADO'
+            ? '<span class="badge bg-secondary">Descontado</span>'
+            : '<span class="badge bg-warning text-dark">Pendente</span>';
+        var btnDesc = v.statusValeStr === 'PENDENTE'
+            ? '<button class="btn btn-outline-success btn-sm py-0 me-1" title="Marcar descontado" '
+              + 'onclick="marcarValeDescontadoDiarista(' + v.idVale + ')"><i class="fas fa-check"></i></button>'
+            : '';
+        tbody.append('<tr><td>' + formatDataBR(v.dataVale) + '</td>'
+            + '<td class="text-end fw-bold">' + formatBRL(v.valor) + '</td>'
+            + '<td>' + status + '</td>'
+            + '<td class="text-nowrap">' + btnDesc
+            + '<button class="btn btn-outline-danger btn-sm py-0" title="Excluir" '
+            + 'onclick="excluirValeDiarista(' + v.idVale + ')"><i class="fas fa-trash"></i></button></td></tr>');
+    });
+}
+
+function renderFechamentoDiarista(data) {
+    $('#painelFechamentoDiarista').html(
+        '<table class="table table-sm mb-0">'
+        + '<tr><td>Dias trabalhados</td><td class="text-end fw-bold">' + (data.diasTrabalhados || 0) + '</td></tr>'
+        + '<tr><td>Valor por dia</td><td class="text-end">' + formatBRL(data.valorPorDia) + '</td></tr>'
+        + '<tr><td>Valor Bruto</td><td class="text-end text-success fw-bold">' + formatBRL(data.valorBruto) + '</td></tr>'
+        + '<tr><td>Total Vales</td><td class="text-end text-warning">- ' + formatBRL(data.totalVales) + '</td></tr>'
+        + '<tr class="table-success"><td class="fw-bold">Valor Líquido</td>'
+        + '<td class="text-end fw-bold fs-5">' + formatBRL(data.valorLiquido) + '</td></tr>'
+        + '</table>'
+        + '<small class="text-muted">Período: ' + (data.periodo || '') + '</small>'
+    );
+}
+
+function salvarDiaria(id) {
+    var valor = parseFloat($('#editValorDia').val());
+    if (isNaN(valor) || valor < 0) { mostrarAlerta('Informe um valor válido.', 'warning', '#alertaDiaria', 3000); return; }
+    postDiarista({ acao: 'atualizardiaria', idpessoa: parseInt(id), valorpordia: valor },
+        function () { $('#modalDiaria').modal('hide'); carregarPerfilDiarista(id, $('#inputPeriodo').val()); },
+        '#alertaDiaria');
+}
+
+function salvarPresenca(id) {
+    var data = $('#presencaData').val();
+    if (!data) { mostrarAlerta('Informe a data.', 'warning', '#alertaPresenca', 3000); return; }
+    postDiarista({ acao: 'marcarpresenca', idpessoa: parseInt(id), data: data },
+        function () { $('#modalPresenca').modal('hide'); carregarPerfilDiarista(id, $('#inputPeriodo').val()); },
+        '#alertaPresenca');
+}
+
+function excluirPresenca(idPonto) {
+    if (!confirm('Remover este dia trabalhado?')) return;
+    postDiarista({ acao: 'removerpresenca', idponto: idPonto },
+        function () { carregarPerfilDiarista(window.__idDiarista, $('#inputPeriodo').val()); }, '#alerta');
+}
+
+function salvarValeDiarista(id) {
+    var data = $('#valeData').val();
+    var valor = parseFloat($('#valeValor').val());
+    if (!data || isNaN(valor) || valor <= 0) { mostrarAlerta('Informe data e valor válidos.', 'warning', '#alertaVale', 3000); return; }
+    postDiarista({ acao: 'registrarvale', idpessoa: parseInt(id), datavale: data, valor: valor,
+                   tipovale: $('#valeTipo').val(), descricao: $('#valeDescricao').val() },
+        function () { $('#modalVale').modal('hide'); $('#valeValor,#valeDescricao').val('');
+                      carregarPerfilDiarista(id, $('#inputPeriodo').val()); },
+        '#alertaVale');
+}
+
+function excluirValeDiarista(idVale) {
+    if (!confirm('Excluir este vale?')) return;
+    postDiarista({ acao: 'excluirvale', idvale: idVale },
+        function () { carregarPerfilDiarista(window.__idDiarista, $('#inputPeriodo').val()); }, '#alerta');
+}
+
+function marcarValeDescontadoDiarista(idVale) {
+    postDiarista({ acao: 'marcarvaledescontado', idvale: idVale },
+        function () { carregarPerfilDiarista(window.__idDiarista, $('#inputPeriodo').val()); }, '#alerta');
+}
+
+function postDiarista(payload, onOk, alertaSel) {
+    $.ajax({
+        url: (window.__ctxPath || '') + '/ControllerDiarista',
+        method: 'POST', contentType: 'application/json; charset=utf-8',
+        data: JSON.stringify(payload), dataType: 'json',
+        success: function (r) {
+            if (r.ok) { if (r.msg) mostrarAlerta(r.msg, 'success', '#alerta', 3000); if (onOk) onOk(); }
+            else mostrarAlerta(r.msg || 'Falha na operação.', 'danger', alertaSel || '#alerta', 4000);
+        },
+        error: function () { mostrarAlerta('Erro de conexão.', 'danger', alertaSel || '#alerta', 4000); }
+    });
+}
+
+/******************************************************************************************************/
+/* MÓDULO EMPREITA — perfilEmpreita.jsp                                                              */
+/******************************************************************************************************/
+
+$(document).ready(function () {
+    if (!$('#painelFechamentoEmpreita').length) return;
+    initPerfilEmpreita();
+});
+
+function initPerfilEmpreita() {
+    var id = new URLSearchParams(window.location.search).get('id');
+    if (!id) { mostrarAlerta('ID do funcionário não informado na URL.', 'danger', '#alerta'); return; }
+
+    var hoje = new Date();
+    $('#inputPeriodo').val(hoje.getFullYear() + '-' + String(hoje.getMonth() + 1).padStart(2, '0'));
+    $('#empreitaData, #valeData').val(hoje.toISOString().substring(0, 10));
+    if ($.fn.mask) $('#empreitaValor').mask('#.##0,00', { reverse: true });
+
+    carregarPerfilEmpreita(id, $('#inputPeriodo').val());
+
+    $('#btnCarregarPeriodo').on('click', function () { carregarPerfilEmpreita(id, $('#inputPeriodo').val()); });
+    $('#btnNovaEmpreita').on('click', function () { resetModalEmpreita(); });
+    $('#btnSalvarEmpreita').on('click', function () { salvarEmpreita(id); });
+    $('#btnSalvarVale').on('click', function () { salvarValeEmpreita(id); });
+}
+
+function carregarPerfilEmpreita(id, periodo) {
+    $.ajax({
+        url: (window.__ctxPath || '') + '/ControllerEmpreita?acao=perfil&id=' + id + '&periodo=' + periodo,
+        method: 'GET', dataType: 'json',
+        success: function (data) {
+            renderHeaderEmpreita(data);
+            renderCardsEmpreita(data);
+            renderTabelaEmpreita(data.lancamentos || []);
+            renderTabelaValesEmpreita(data.vales || []);
+            renderFechamentoEmpreita(data);
+            window.__pgCtx = { id: parseInt(id), periodo: periodo, tipo: 'EMPREITA', valor: data.valorLiquido };
+            carregarPagamentos();
+        },
+        error: function () { mostrarAlerta('Erro ao carregar perfil do empreita.', 'danger', '#alerta', 5000); }
+    });
+}
+
+function renderHeaderEmpreita(data) {
+    var f = data.funcionario; if (!f) return;
+    var v = data.vinculo;
+    $('#nomeFunc').text(f.nomePessoa || '');
+    $('#cargoMatricula').text(((v ? v.cargo : f.cargo) || '') + ' · Matrícula: ' + (f.matricula || ''));
+    $('#infoValorAcordado').text(formatBRL(data.valorAcordado));
+
+    var totalVinc = (data.vinculos || []).length;
+    var periodoTxt = '—';
+    if (v) {
+        var ini = v.dataAdmissao ? formatDataBR(v.dataAdmissao) : '?';
+        var fim = v.dataDesligamento ? formatDataBR(v.dataDesligamento) : 'atual';
+        periodoTxt = ini + ' – ' + fim + (totalVinc > 1 ? ' (' + totalVinc + ' vínculos)' : '');
+    }
+    $('#infoVinculoPeriodo').text(periodoTxt);
+
+    var ativo = (data.vinculos || []).filter(function (x) { return !x.dataDesligamento; })[0];
+    var st = ativo ? (ativo.status || 'ATIVO').toUpperCase() : 'DESLIGADO';
+    $('#badgeStatus').text(st).attr('class', 'badge fs-6 px-3 py-2 ' +
+        (st === 'ATIVO' ? 'bg-success' : st === 'AFASTADO' ? 'bg-warning text-dark' : 'bg-danger'));
+    $('#headerFuncionario').removeClass('d-none');
+    window.__idEmpreita = f.idPessoa;
+}
+
+function renderCardsEmpreita(data) {
+    $('#cardQtd').text(data.qtdLancamentos || 0);
+    $('#cardBruto').text(formatBRL(data.valorBruto || 0));
+    $('#cardTotalVales').text(formatBRL(data.totalVales || 0));
+    $('#cardLiquido').text(formatBRL(data.valorLiquido || 0));
+    $('#cardsResumo').css('display', '').removeClass('d-none');
+}
+
+function renderTabelaEmpreita(lancs) {
+    window.__empreitas = lancs || [];
+    var tbody = $('#bodyEmpreita').empty();
+    if (!lancs.length) {
+        tbody.append('<tr><td colspan="4" class="text-center text-muted py-3">Nenhuma empreita no período.</td></tr>');
+        return;
+    }
+    lancs.forEach(function (l) {
+        tbody.append('<tr>'
+            + '<td>' + formatDataBR(l.dataEmpreita) + '</td>'
+            + '<td>' + (l.descricao || '-') + '</td>'
+            + '<td class="text-end fw-bold">' + formatBRL(l.valor) + '</td>'
+            + '<td class="text-end text-nowrap">'
+            + '<button class="btn btn-outline-primary btn-sm py-0 me-1" title="Editar" '
+            + 'onclick="editarEmpreita(' + l.idLancamento + ')"><i class="fas fa-pen"></i></button>'
+            + '<button class="btn btn-outline-danger btn-sm py-0" title="Remover" '
+            + 'onclick="excluirEmpreita(' + l.idLancamento + ')"><i class="fas fa-trash"></i></button>'
+            + '</td></tr>');
+    });
+}
+
+function renderTabelaValesEmpreita(vales) {
+    var tbody = $('#bodyVales').empty();
+    if (!vales.length) {
+        tbody.append('<tr><td colspan="4" class="text-center text-muted py-3">Sem vales.</td></tr>');
+        return;
+    }
+    vales.forEach(function (v) {
+        var status = v.statusValeStr === 'DESCONTADO'
+            ? '<span class="badge bg-secondary">Descontado</span>'
+            : '<span class="badge bg-warning text-dark">Pendente</span>';
+        var btnDesc = v.statusValeStr === 'PENDENTE'
+            ? '<button class="btn btn-outline-success btn-sm py-0 me-1" title="Marcar descontado" '
+              + 'onclick="marcarValeDescontadoEmpreita(' + v.idVale + ')"><i class="fas fa-check"></i></button>'
+            : '';
+        tbody.append('<tr><td>' + formatDataBR(v.dataVale) + '</td>'
+            + '<td class="text-end fw-bold">' + formatBRL(v.valor) + '</td>'
+            + '<td>' + status + '</td>'
+            + '<td class="text-nowrap">' + btnDesc
+            + '<button class="btn btn-outline-danger btn-sm py-0" title="Excluir" '
+            + 'onclick="excluirValeEmpreita(' + v.idVale + ')"><i class="fas fa-trash"></i></button></td></tr>');
+    });
+}
+
+function renderFechamentoEmpreita(data) {
+    $('#painelFechamentoEmpreita').html(
+        '<table class="table table-sm mb-0">'
+        + '<tr><td>Empreitas no mês</td><td class="text-end fw-bold">' + (data.qtdLancamentos || 0) + '</td></tr>'
+        + '<tr><td>Valor Bruto</td><td class="text-end text-success fw-bold">' + formatBRL(data.valorBruto) + '</td></tr>'
+        + '<tr><td>Total Vales</td><td class="text-end text-warning">- ' + formatBRL(data.totalVales) + '</td></tr>'
+        + '<tr class="table-success"><td class="fw-bold">Valor Líquido</td>'
+        + '<td class="text-end fw-bold fs-5">' + formatBRL(data.valorLiquido) + '</td></tr>'
+        + '</table><small class="text-muted">Período: ' + (data.periodo || '') + '</small>'
+    );
+}
+
+function resetModalEmpreita() {
+    window.__empreitaEditId = null;
+    $('#modalEmpreitaTitulo').html('<i class="fas fa-list-check me-2"></i>Nova Empreita');
+    $('#empreitaData').val(new Date().toISOString().substring(0, 10));
+    $('#empreitaDescricao, #empreitaValor').val('');
+    $('#alertaEmpreita').addClass('d-none');
+}
+
+function editarEmpreita(idLanc) {
+    var l = (window.__empreitas || []).find(function (x) { return x.idLancamento === idLanc; });
+    if (!l) { mostrarAlerta('Lançamento não encontrado.', 'warning', '#alerta', 3000); return; }
+    window.__empreitaEditId = idLanc;
+    $('#modalEmpreitaTitulo').html('<i class="fas fa-pen me-2"></i>Editar Empreita');
+    $('#empreitaData').val(l.dataEmpreita);
+    $('#empreitaDescricao').val(l.descricao || '');
+    $('#empreitaValor').val(formatBRLnum(l.valor));
+    $('#alertaEmpreita').addClass('d-none');
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('modalEmpreita')).show();
+}
+
+function salvarEmpreita(id) {
+    var data = $('#empreitaData').val();
+    var valor = parseBRL($('#empreitaValor').val());
+    if (!data || !valor || valor <= 0) { mostrarAlerta('Informe data e valor válidos.', 'warning', '#alertaEmpreita', 3000); return; }
+    var editId = window.__empreitaEditId || null;
+    var payload = { acao: editId ? 'editlancamento' : 'addlancamento', idpessoa: parseInt(id),
+                    data: data, descricao: $('#empreitaDescricao').val(), valor: valor };
+    if (editId) payload.idlancamento = editId;
+    postEmpreita(payload, function () { window.__empreitaEditId = null; $('#modalEmpreita').modal('hide');
+        carregarPerfilEmpreita(id, $('#inputPeriodo').val()); }, '#alertaEmpreita');
+}
+
+function excluirEmpreita(idLanc) {
+    if (!confirm('Remover esta empreita?')) return;
+    postEmpreita({ acao: 'removelancamento', idlancamento: idLanc },
+        function () { carregarPerfilEmpreita(window.__idEmpreita, $('#inputPeriodo').val()); }, '#alerta');
+}
+
+function salvarValeEmpreita(id) {
+    var data = $('#valeData').val();
+    var valor = parseFloat($('#valeValor').val());
+    if (!data || isNaN(valor) || valor <= 0) { mostrarAlerta('Informe data e valor válidos.', 'warning', '#alertaVale', 3000); return; }
+    postEmpreita({ acao: 'registrarvale', idpessoa: parseInt(id), datavale: data, valor: valor,
+                   tipovale: $('#valeTipo').val(), descricao: $('#valeDescricao').val() },
+        function () { $('#modalVale').modal('hide'); $('#valeValor,#valeDescricao').val('');
+            carregarPerfilEmpreita(id, $('#inputPeriodo').val()); }, '#alertaVale');
+}
+
+function excluirValeEmpreita(idVale) {
+    if (!confirm('Excluir este vale?')) return;
+    postEmpreita({ acao: 'excluirvale', idvale: idVale },
+        function () { carregarPerfilEmpreita(window.__idEmpreita, $('#inputPeriodo').val()); }, '#alerta');
+}
+
+function marcarValeDescontadoEmpreita(idVale) {
+    postEmpreita({ acao: 'marcarvaledescontado', idvale: idVale },
+        function () { carregarPerfilEmpreita(window.__idEmpreita, $('#inputPeriodo').val()); }, '#alerta');
+}
+
+function postEmpreita(payload, onOk, alertaSel) {
+    $.ajax({
+        url: (window.__ctxPath || '') + '/ControllerEmpreita',
+        method: 'POST', contentType: 'application/json; charset=utf-8',
+        data: JSON.stringify(payload), dataType: 'json',
+        success: function (r) {
+            if (r.ok) { if (r.msg) mostrarAlerta(r.msg, 'success', '#alerta', 3000); if (onOk) onOk(); }
+            else mostrarAlerta(r.msg || 'Falha na operação.', 'danger', alertaSel || '#alerta', 4000);
+        },
+        error: function () { mostrarAlerta('Erro de conexão.', 'danger', alertaSel || '#alerta', 4000); }
+    });
+}
+
+/******************************************************************************************************/
+/* MÓDULO PRODUÇÃO — perfilProducao.jsp                                                              */
+/******************************************************************************************************/
+
+$(document).ready(function () {
+    if (!$('#painelFechamentoProducao').length) return;
+    initPerfilProducao();
+});
+
+function initPerfilProducao() {
+    var id = new URLSearchParams(window.location.search).get('id');
+    if (!id) { mostrarAlerta('ID do funcionário não informado na URL.', 'danger', '#alerta'); return; }
+    var hoje = new Date();
+    $('#inputPeriodo').val(hoje.getFullYear() + '-' + String(hoje.getMonth() + 1).padStart(2, '0'));
+    $('#caixaData, #valeData').val(hoje.toISOString().substring(0, 10));
+
+    carregarPerfilProducao(id, $('#inputPeriodo').val());
+    $('#btnCarregarPeriodo').on('click', function () { carregarPerfilProducao(id, $('#inputPeriodo').val()); });
+    $('#btnNovaCaixa').on('click', function () { resetModalCaixa(); });
+    $('#btnSalvarCaixa').on('click', function () { salvarCaixa(id); });
+    $('#btnSalvarVale').on('click', function () { salvarValeProducao(id); });
+    $(document).on('change', '#caixaTipo', atualizarPrecoCaixaModal)
+               .on('input', '#caixaQtd', atualizarPrecoCaixaModal);
+}
+
+function carregarPerfilProducao(id, periodo) {
+    $.ajax({
+        url: (window.__ctxPath || '') + '/ControllerProducao?acao=perfil&id=' + id + '&periodo=' + periodo,
+        method: 'GET', dataType: 'json',
+        success: function (data) {
+            window.__idProducao = data.funcionario ? data.funcionario.idPessoa : id;
+            window.__ano = data.ano;
+            window.__tiposCaixa = data.tiposCaixa || [];
+            renderHeaderProducao(data);
+            renderCardsProducao(data);
+            popularTipoCaixaSelect();
+            renderTabelaCaixas(data.lancamentos || []);
+            renderPrecos(data);
+            renderTabelaValesProducao(data.vales || []);
+            renderFechamentoProducao(data);
+            window.__pgCtx = { id: parseInt(id), periodo: periodo, tipo: 'PRODUCAO', valor: data.valorLiquido };
+            carregarPagamentos();
+        },
+        error: function () { mostrarAlerta('Erro ao carregar perfil de produção.', 'danger', '#alerta', 5000); }
+    });
+}
+
+function rotuloCaixa(nome) {
+    var t = (window.__tiposCaixa || []).find(function (x) { return x.nome === nome; });
+    return t ? t.rotulo : nome;
+}
+function precoCaixa(nome) {
+    var t = (window.__tiposCaixa || []).find(function (x) { return x.nome === nome; });
+    return t ? Number(t.preco) : 0;
+}
+
+function renderHeaderProducao(data) {
+    var f = data.funcionario; if (!f) return;
+    var v = data.vinculo;
+    $('#nomeFunc').text(f.nomePessoa || '');
+    $('#cargoMatricula').text('Matrícula: ' + (f.matricula || ''));
+    $('#badgeCargo').text(data.cargo || '-');
+
+    var totalVinc = (data.vinculos || []).length;
+    var periodoTxt = '—';
+    if (v) {
+        var ini = v.dataAdmissao ? formatDataBR(v.dataAdmissao) : '?';
+        var fim = v.dataDesligamento ? formatDataBR(v.dataDesligamento) : 'atual';
+        periodoTxt = ini + ' – ' + fim + (totalVinc > 1 ? ' (' + totalVinc + ' vínculos)' : '');
+    }
+    $('#infoVinculoPeriodo').text(periodoTxt);
+
+    var ativo = (data.vinculos || []).filter(function (x) { return !x.dataDesligamento; })[0];
+    var st = ativo ? (ativo.status || 'ATIVO').toUpperCase() : 'DESLIGADO';
+    $('#badgeStatus').text(st).attr('class', 'badge fs-6 px-3 py-2 ' +
+        (st === 'ATIVO' ? 'bg-success' : st === 'AFASTADO' ? 'bg-warning text-dark' : 'bg-danger'));
+    $('#headerFuncionario').removeClass('d-none');
+    $('#precoAno').text('(' + (data.ano || '') + ')');
+}
+
+function renderCardsProducao(data) {
+    $('#cardTotalCaixas').text(data.totalCaixas || 0);
+    $('#cardValorProducao').text(formatBRL(data.valorProducao || 0));
+    $('#cardTotalVales').text(formatBRL(data.totalVales || 0));
+    $('#cardLiquido').text(formatBRL(data.valorLiquido || 0));
+    $('#cardsResumo').css('display', '').removeClass('d-none');
+}
+
+function popularTipoCaixaSelect() {
+    var $sel = $('#caixaTipo').empty();
+    (window.__tiposCaixa || []).forEach(function (t) {
+        $sel.append('<option value="' + t.nome + '">' + t.rotulo + '</option>');
+    });
+    atualizarPrecoCaixaModal();
+}
+
+function atualizarPrecoCaixaModal() {
+    var preco = precoCaixa($('#caixaTipo').val());
+    var qtd = parseInt($('#caixaQtd').val(), 10) || 0;
+    $('#caixaPrecoInfo').text(formatBRL(preco));
+    $('#caixaSubtotalInfo').text(formatBRL(preco * qtd));
+}
+
+function renderTabelaCaixas(lancs) {
+    window.__caixas = lancs || [];
+    var tbody = $('#bodyCaixas').empty();
+    if (!lancs.length) {
+        tbody.append('<tr><td colspan="6" class="text-center text-muted py-3">Nenhuma caixa no período.</td></tr>');
+        return;
+    }
+    lancs.forEach(function (l) {
+        tbody.append('<tr>'
+            + '<td>' + formatDataBR(l.dataProducao) + '</td>'
+            + '<td>' + rotuloCaixa(l.tipoCaixa) + '</td>'
+            + '<td class="text-end">' + l.quantidade + '</td>'
+            + '<td class="text-end">' + formatBRL(l.precoUnitario) + '</td>'
+            + '<td class="text-end fw-bold">' + formatBRL(l.subtotal) + '</td>'
+            + '<td class="text-end text-nowrap">'
+            + '<button class="btn btn-outline-primary btn-sm py-0 me-1" title="Editar" '
+            + 'onclick="editarCaixa(' + l.idProducao + ')"><i class="fas fa-pen"></i></button>'
+            + '<button class="btn btn-outline-danger btn-sm py-0" title="Remover" '
+            + 'onclick="excluirCaixa(' + l.idProducao + ')"><i class="fas fa-trash"></i></button>'
+            + '</td></tr>');
+    });
+}
+
+function renderPrecos(data) {
+    var tbody = $('#bodyPrecos').empty();
+    (data.tiposCaixa || []).forEach(function (t) {
+        tbody.append('<tr>'
+            + '<td>' + t.rotulo + '</td>'
+            + '<td><input type="number" class="form-control form-control-sm precoInput" '
+            + 'data-tipo="' + t.nome + '" min="0" step="0.01" value="' + Number(t.preco).toFixed(2) + '"></td>'
+            + '<td><select class="form-select form-select-sm escopoSel">'
+            + '<option value="geral">Geral</option>'
+            + '<option value="func">Só este func.</option></select></td>'
+            + '<td><button class="btn btn-primary btn-sm py-0" onclick="salvarPreco(this)">Salvar</button></td>'
+            + '</tr>');
+    });
+}
+
+function salvarPreco(btn) {
+    var $tr = $(btn).closest('tr');
+    var tipo = $tr.find('.precoInput').data('tipo');
+    var preco = parseFloat($tr.find('.precoInput').val()) || 0;
+    var escopo = $tr.find('.escopoSel').val();
+    var payload = { acao: 'setpreco', tipocaixa: tipo, ano: window.__ano, preco: preco };
+    if (escopo === 'func') payload.idpessoa = window.__idProducao;
+    postProducao(payload, function () {
+        carregarPerfilProducao(window.__idProducao, $('#inputPeriodo').val());
+    }, '#alertaPreco');
+}
+
+function resetModalCaixa() {
+    window.__caixaEditId = null;
+    $('#modalCaixaTitulo').html('<i class="fas fa-box me-2"></i>Registrar Caixas');
+    $('#caixaData').val(new Date().toISOString().substring(0, 10));
+    $('#caixaQtd').val('');
+    $('#alertaCaixa').addClass('d-none');
+    atualizarPrecoCaixaModal();
+}
+
+function editarCaixa(idProd) {
+    var l = (window.__caixas || []).find(function (x) { return x.idProducao === idProd; });
+    if (!l) return;
+    window.__caixaEditId = idProd;
+    $('#modalCaixaTitulo').html('<i class="fas fa-pen me-2"></i>Editar Caixas');
+    $('#caixaData').val(l.dataProducao);
+    $('#caixaTipo').val(l.tipoCaixa);
+    $('#caixaQtd').val(l.quantidade);
+    atualizarPrecoCaixaModal();
+    $('#alertaCaixa').addClass('d-none');
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('modalCaixa')).show();
+}
+
+function salvarCaixa(id) {
+    var data = $('#caixaData').val();
+    var tipo = $('#caixaTipo').val();
+    var qtd = parseInt($('#caixaQtd').val(), 10);
+    if (!data || !tipo || !qtd || qtd <= 0) { mostrarAlerta('Informe data, tipo e quantidade.', 'warning', '#alertaCaixa', 3000); return; }
+    var editId = window.__caixaEditId || null;
+    var payload = { acao: editId ? 'editcaixa' : 'addcaixa', idpessoa: parseInt(id),
+                    data: data, tipocaixa: tipo, quantidade: qtd };
+    if (editId) payload.idproducao = editId;
+    postProducao(payload, function () { window.__caixaEditId = null; $('#modalCaixa').modal('hide');
+        carregarPerfilProducao(id, $('#inputPeriodo').val()); }, '#alertaCaixa');
+}
+
+function excluirCaixa(idProd) {
+    if (!confirm('Remover este lançamento de caixas?')) return;
+    postProducao({ acao: 'removecaixa', idproducao: idProd },
+        function () { carregarPerfilProducao(window.__idProducao, $('#inputPeriodo').val()); }, '#alerta');
+}
+
+function renderTabelaValesProducao(vales) {
+    var tbody = $('#bodyVales').empty();
+    if (!vales.length) { tbody.append('<tr><td colspan="4" class="text-center text-muted py-3">Sem vales.</td></tr>'); return; }
+    vales.forEach(function (v) {
+        var status = v.statusValeStr === 'DESCONTADO'
+            ? '<span class="badge bg-secondary">Descontado</span>'
+            : '<span class="badge bg-warning text-dark">Pendente</span>';
+        var btnDesc = v.statusValeStr === 'PENDENTE'
+            ? '<button class="btn btn-outline-success btn-sm py-0 me-1" title="Marcar descontado" '
+              + 'onclick="marcarValeDescontadoProducao(' + v.idVale + ')"><i class="fas fa-check"></i></button>' : '';
+        tbody.append('<tr><td>' + formatDataBR(v.dataVale) + '</td>'
+            + '<td class="text-end fw-bold">' + formatBRL(v.valor) + '</td>'
+            + '<td>' + status + '</td>'
+            + '<td class="text-nowrap">' + btnDesc
+            + '<button class="btn btn-outline-danger btn-sm py-0" title="Excluir" '
+            + 'onclick="excluirValeProducao(' + v.idVale + ')"><i class="fas fa-trash"></i></button></td></tr>');
+    });
+}
+
+function renderFechamentoProducao(data) {
+    $('#painelFechamentoProducao').html(
+        '<table class="table table-sm mb-0">'
+        + '<tr><td>Total de caixas</td><td class="text-end fw-bold">' + (data.totalCaixas || 0) + '</td></tr>'
+        + '<tr><td>Valor Produção</td><td class="text-end text-success fw-bold">' + formatBRL(data.valorProducao) + '</td></tr>'
+        + '<tr><td>Total Vales</td><td class="text-end text-warning">- ' + formatBRL(data.totalVales) + '</td></tr>'
+        + '<tr class="table-success"><td class="fw-bold">Valor Líquido</td>'
+        + '<td class="text-end fw-bold fs-5">' + formatBRL(data.valorLiquido) + '</td></tr>'
+        + '</table><small class="text-muted">Período: ' + (data.periodo || '') + '</small>'
+    );
+}
+
+function salvarValeProducao(id) {
+    var data = $('#valeData').val();
+    var valor = parseFloat($('#valeValor').val());
+    if (!data || isNaN(valor) || valor <= 0) { mostrarAlerta('Informe data e valor válidos.', 'warning', '#alertaVale', 3000); return; }
+    postProducao({ acao: 'registrarvale', idpessoa: parseInt(id), datavale: data, valor: valor,
+                   tipovale: $('#valeTipo').val(), descricao: $('#valeDescricao').val() },
+        function () { $('#modalVale').modal('hide'); $('#valeValor,#valeDescricao').val('');
+            carregarPerfilProducao(id, $('#inputPeriodo').val()); }, '#alertaVale');
+}
+function excluirValeProducao(idVale) {
+    if (!confirm('Excluir este vale?')) return;
+    postProducao({ acao: 'excluirvale', idvale: idVale },
+        function () { carregarPerfilProducao(window.__idProducao, $('#inputPeriodo').val()); }, '#alerta');
+}
+function marcarValeDescontadoProducao(idVale) {
+    postProducao({ acao: 'marcarvaledescontado', idvale: idVale },
+        function () { carregarPerfilProducao(window.__idProducao, $('#inputPeriodo').val()); }, '#alerta');
+}
+
+function postProducao(payload, onOk, alertaSel) {
+    $.ajax({
+        url: (window.__ctxPath || '') + '/ControllerProducao',
+        method: 'POST', contentType: 'application/json; charset=utf-8',
+        data: JSON.stringify(payload), dataType: 'json',
+        success: function (r) {
+            if (r.ok) { if (r.msg) mostrarAlerta(r.msg, 'success', '#alerta', 3000); if (onOk) onOk(); }
+            else mostrarAlerta(r.msg || 'Falha na operação.', 'danger', alertaSel || '#alerta', 4000);
+        },
+        error: function () { mostrarAlerta('Erro de conexão.', 'danger', alertaSel || '#alerta', 4000); }
+    });
+}
+
+/******************************************************************************************************/
+/* PAGAMENTOS — compartilhado por todos os perfis (modalPagamento.jsp)                                */
+/******************************************************************************************************/
+
+/* Cada perfil define window.__pgCtx = {id, periodo, tipo, valor} e chama carregarPagamentos(). */
+
+$(document).on('change', '#pgForma', ajustarCamposPagamento);
+$(document).on('click', '#btnSalvarPagamento', salvarPagamento);
+$(document).on('click', '#btnGerarPagamento', abrirModalPagamento);
+
+function ajustarCamposPagamento() {
+    var f = $('#pgForma').val();
+    $('#pgRowPix').toggleClass('d-none', f !== 'PIX');
+    $('#pgRowBanco').toggleClass('d-none', f !== 'TRANSFERENCIA');
+}
+
+function abrirModalPagamento() {
+    var ctx = window.__pgCtx || {};
+    if (!ctx.id) { mostrarAlerta('Carregue um período antes.', 'warning', '#alerta', 3000); return; }
+    $('#pgValor').val(formatBRLnum(ctx.valor || 0));
+    $('#pgData').val(new Date().toISOString().substring(0, 10));
+    $('#pgForma').val('PIX'); ajustarCamposPagamento();
+    $('#pgBanco,#pgAgencia,#pgConta,#pgChavePix,#pgObs').val('');
+    $('#alertaPagamento').addClass('d-none');
+    if (ctx.tipo === 'CLT' && ctx.periodo) {
+        $.getJSON((window.__ctxPath || '') + '/ControllerPagamento', { acao: 'prazoclt', periodo: ctx.periodo })
+            .done(function (r) {
+                if (r && r.ok) $('#pgPrazoInfo').text('Prazo CLT: pagar até ' + formatDataBR(r.prazo) +
+                    ' (5º dia útil do mês seguinte).').removeClass('d-none');
+            });
+    } else { $('#pgPrazoInfo').addClass('d-none'); }
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('modalPagamento')).show();
+}
+
+function salvarPagamento() {
+    var ctx = window.__pgCtx || {};
+    var valor = parseBRL($('#pgValor').val());
+    var forma = $('#pgForma').val();
+    if (!valor || valor <= 0) { mostrarAlerta('Informe o valor.', 'warning', '#alertaPagamento', 3000); return; }
+    if (forma === 'TRANSFERENCIA' && (!$('#pgBanco').val() || !$('#pgAgencia').val() || !$('#pgConta').val())) {
+        mostrarAlerta('Para transferência informe banco, agência e conta.', 'warning', '#alertaPagamento', 4000); return;
+    }
+    if (forma === 'PIX' && !$('#pgChavePix').val()) {
+        mostrarAlerta('Para PIX informe a chave.', 'warning', '#alertaPagamento', 4000); return;
+    }
+    var payload = { acao: 'registrar', idpessoa: ctx.id, periodo: ctx.periodo, tipofuncionario: ctx.tipo,
+        valor: valor, forma: forma, datapagamento: $('#pgData').val(), observacao: $('#pgObs').val(),
+        banco: $('#pgBanco').val(), agencia: $('#pgAgencia').val(), conta: $('#pgConta').val(),
+        chavepix: $('#pgChavePix').val() };
+    $.ajax({
+        url: (window.__ctxPath || '') + '/ControllerPagamento', method: 'POST',
+        contentType: 'application/json; charset=utf-8', data: JSON.stringify(payload), dataType: 'json',
+        success: function (r) {
+            if (r.ok) { $('#modalPagamento').modal('hide'); mostrarAlerta(r.msg, 'success', '#alerta', 3000); carregarPagamentos(); }
+            else mostrarAlerta(r.msg, 'danger', '#alertaPagamento', 4000);
+        },
+        error: function () { mostrarAlerta('Erro de conexão.', 'danger', '#alertaPagamento', 4000); }
+    });
+}
+
+function carregarPagamentos() {
+    var ctx = window.__pgCtx || {};
+    if (!ctx.id || !$('#bodyPagamentos').length) return;
+    $.getJSON((window.__ctxPath || '') + '/ControllerPagamento', { acao: 'listar', id: ctx.id, periodo: ctx.periodo })
+        .done(function (lista) {
+            var tbody = $('#bodyPagamentos').empty();
+            if (!lista || !lista.length) {
+                tbody.append('<tr><td colspan="4" class="text-center text-muted py-2">Sem pagamentos no período.</td></tr>');
+                return;
+            }
+            lista.forEach(function (p) {
+                var det = p.formaPagamento === 'PIX' ? ('PIX · ' + (p.chavePix || ''))
+                    : p.formaPagamento === 'TRANSFERENCIA'
+                        ? ((p.banco || '') + ' · Ag ' + (p.agencia || '') + ' · C/C ' + (p.conta || ''))
+                        : (p.formaPagamento === 'DINHEIRO' ? 'Dinheiro' : 'Cheque');
+                tbody.append('<tr><td>' + formatDataBR(p.dataPagamento) + '</td>'
+                    + '<td class="text-end fw-bold">' + formatBRL(p.valor) + '</td>'
+                    + '<td class="small">' + det + '</td>'
+                    + '<td><button class="btn btn-outline-danger btn-sm py-0" title="Excluir" '
+                    + 'onclick="excluirPagamento(' + p.idPagamento + ')"><i class="fas fa-trash"></i></button></td></tr>');
+            });
+        });
+}
+
+function excluirPagamento(id) {
+    if (!confirm('Excluir este pagamento?')) return;
+    $.ajax({
+        url: (window.__ctxPath || '') + '/ControllerPagamento', method: 'POST',
+        contentType: 'application/json; charset=utf-8',
+        data: JSON.stringify({ acao: 'excluir', idpagamento: id }), dataType: 'json',
+        success: function () { carregarPagamentos(); }
+    });
+}
+
 function initPerfilCLT() {
     var idFuncionario = new URLSearchParams(window.location.search).get('id');
     if (!idFuncionario) {
@@ -2135,6 +3009,9 @@ function carregarPerfilCLT(idFuncionario, periodo) {
             renderTabelaFaltas(data.faltas || []);
             renderTabelaVales(data.vales || []);
             if (data.fechamento) renderFechamento(data.fechamento);
+            window.__pgCtx = { id: parseInt(idFuncionario), periodo: periodo, tipo: 'CLT',
+                valor: data.fechamento ? data.fechamento.salarioLiquido : 0 };
+            carregarPagamentos();
         },
         error: function () {
             mostrarAlerta('Erro ao carregar perfil do funcionário.', 'danger', '#alerta', 5000);
@@ -2305,6 +3182,10 @@ function renderFechamento(fc) {
         + '<td class="text-end text-primary">+ ' + formatBRL(fc.valorExtra100) + '</td></tr>'
         + '<tr><td>Adicional Noturno (' + (fc.minutosNoturnos ? formatMin(fc.minutosNoturnos) : '00:00') + ')</td>'
         + '<td class="text-end text-primary">+ ' + formatBRL(fc.valorAdicionalNoturno) + '</td></tr>'
+        + ((fc.valorProducao && fc.valorProducao > 0)
+            ? '<tr><td>Produção (dias em modo produção)</td><td class="text-end text-info">+ ' + formatBRL(fc.valorProducao) + '</td></tr>' : '')
+        + ((fc.valorEmpreita && fc.valorEmpreita > 0)
+            ? '<tr><td>Empreita (dias em modo empreita)</td><td class="text-end text-info">+ ' + formatBRL(fc.valorEmpreita) + '</td></tr>' : '')
         + '<tr><td>Desconto Faltas (' + fc.faltasInjustificadas + ' dia(s))</td>'
         + '<td class="text-end text-danger">- ' + formatBRL(fc.descontoFaltas) + '</td></tr>'
         + '<tr><td>Desconto DSR</td>'

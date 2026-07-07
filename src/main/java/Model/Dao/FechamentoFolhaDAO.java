@@ -22,8 +22,9 @@ public class FechamentoFolhaDAO {
                 + " dias_trabalhados, faltas_injustificadas, total_minutos_extras, "
                 + " valor_horas_extras, desconto_faltas, total_vales, salario_bruto, salario_liquido, "
                 + " desconto_dsr, valor_adicional_noturno, valor_extra_100, "
-                + " minutos_noturnos, minutos_extra_100, id_vinculo) "
-                + "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
+                + " minutos_noturnos, minutos_extra_100, id_vinculo, "
+                + " valor_producao, valor_empreita) "
+                + "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
                 + "ON CONFLICT (idpessoa, periodo) DO UPDATE SET "
                 + "salario_base=EXCLUDED.salario_base, "
                 + "jornada_horas_dia=EXCLUDED.jornada_horas_dia, "
@@ -42,6 +43,8 @@ public class FechamentoFolhaDAO {
                 + "minutos_noturnos=EXCLUDED.minutos_noturnos, "
                 + "minutos_extra_100=EXCLUDED.minutos_extra_100, "
                 + "id_vinculo=EXCLUDED.id_vinculo, "
+                + "valor_producao=EXCLUDED.valor_producao, "
+                + "valor_empreita=EXCLUDED.valor_empreita, "
                 + "fechado_em=NOW()";
         PostgresConnection pc = new PostgresConnection();
         try (Connection c = pc.getConnection();
@@ -66,6 +69,8 @@ public class FechamentoFolhaDAO {
             ps.setInt(17, f.getMinutosNoturnos());
             ps.setInt(18, f.getMinutosExtra100());
             if (idVinculo != null) ps.setInt(19, idVinculo); else ps.setNull(19, java.sql.Types.INTEGER);
+            ps.setBigDecimal(20, f.getValorProducao() != null ? f.getValorProducao() : java.math.BigDecimal.ZERO);
+            ps.setBigDecimal(21, f.getValorEmpreita() != null ? f.getValorEmpreita() : java.math.BigDecimal.ZERO);
             ps.executeUpdate();
             try (ResultSet gk = ps.getGeneratedKeys()) {
                 if (gk.next()) f.setIdFechamento(gk.getInt(1));
@@ -113,6 +118,8 @@ public class FechamentoFolhaDAO {
         f.setValorExtra100(rs.getBigDecimal("valor_extra_100"));
         f.setMinutosNoturnos(rs.getInt("minutos_noturnos"));
         f.setMinutosExtra100(rs.getInt("minutos_extra_100"));
+        f.setValorProducao(rs.getBigDecimal("valor_producao"));
+        f.setValorEmpreita(rs.getBigDecimal("valor_empreita"));
         return f;
     }
 }
