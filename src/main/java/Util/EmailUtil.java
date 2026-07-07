@@ -3,6 +3,7 @@ package Util;
 import jakarta.mail.*;
 import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
+import java.io.UnsupportedEncodingException;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -127,9 +128,9 @@ public class EmailUtil {
             msg.setContent(buildHtmlPonto(nomeFuncionario, campo, horaFmt, dataFmt, diaSem),
                     "text/html; charset=utf-8");
             Transport.send(msg);
-            LOG.info("Comprovante enviado → TO:" + destinatario
+            LOG.info(() -> "Comprovante enviado → TO:" + destinatario
                     + (ADMIN_CC.isEmpty() ? "" : " CC:" + ADMIN_CC));
-        } catch (Exception e) {
+        } catch (MessagingException | UnsupportedEncodingException e) {
             LOG.log(Level.WARNING, "Falha ao enviar e-mail de ponto: " + e.getMessage(), e);
         }
     }
