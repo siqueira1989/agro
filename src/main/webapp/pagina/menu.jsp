@@ -31,6 +31,9 @@
                     <a class="dropdown-item" href="<%=request.getContextPath()%>/view/admin/parceiro.jsp">
                         <i class="fas fa-handshake me-1"></i>Parceiro
                     </a>
+                    <a class="dropdown-item" href="<%=request.getContextPath()%>/view/admin/estoque.jsp">
+                        <i class="fas fa-warehouse me-1"></i>Estoque de Insumos
+                    </a>
                 </div>
             </li>
 
@@ -92,7 +95,7 @@
                     </a>
                     <div class="dropdown-divider"></div>
                     <a class="dropdown-item" href="<%=request.getContextPath()%>/RelatorioExportServlet?tipo=excel&modulo=areaproducao">
-                        <i class="fas fa-file-excel me-1 text-success"></i>Área Produtiva (Excel)
+                        <i class="fas fa-file-excel me-1 text-success"></i>Área de Produção (Excel)
                     </a>
                     <a class="dropdown-item" href="<%=request.getContextPath()%>/RelatorioExportServlet?tipo=pdf&modulo=areaproducao">
                         <i class="fas fa-file-pdf me-1 text-danger"></i>Área de Produção (PDF)

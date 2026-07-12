@@ -876,6 +876,17 @@ function salvarClassificacaoModalAtualizacaoAlimento() {
 /* MÓDULO PARCEIRO — parceiro.jsp e CadastroParceiro.jsp                                              */
 /******************************************************************************************************/
 
+/* Filtro de tipo atualmente selecionado nas abas de parceiro.jsp ("" = todos). */
+if (typeof filtroTipoParceiro === "undefined") { var filtroTipoParceiro = ""; }
+
+/** Traduz o código do tipo de parceiro num badge colorido. */
+function badgeTipoParceiro(tipo) {
+    const t = (tipo || "").toUpperCase();
+    if (t === "FORNECEDOR") return '<span class="badge bg-info text-dark">Fornecedor</span>';
+    if (t === "INSUMO")     return '<span class="badge bg-warning text-dark">Insumo</span>';
+    return '<span class="badge bg-success">Parceiro</span>';
+}
+
 /** Inicializa/recarrega o DataTable de parceiros via ControllerParceiro. Usado em: parceiro.jsp */
 function CarregarParceiros() {
 
@@ -883,19 +894,23 @@ function CarregarParceiros() {
     if ($.fn.DataTable.isDataTable('#tabelaParceiros')) {
         $('#tabelaParceiros').DataTable().destroy();
     }
+    const url = "/agro/ControllerParceiro" + (filtroTipoParceiro ? "?tipo=" + filtroTipoParceiro : "");
     const tabela = $('#tabelaParceiros').DataTable({
         "processing": false,
         "serverSide": false,
 
         "ajax": {
-            "url": "/agro/ControllerParceiro",
+            "url": url,
             "method": "GET",
             "dataSrc": ""
         },
         "columns": [
             {"data": "idPessoa"},
             {"data": "nomePessoa"},
-            {"data": "nivelPessoa"},
+            {
+                "data": "tipoParceiro",
+                "render": function (data) { return badgeTipoParceiro(data); }
+            },
             {
                 "data": "situacaoPessoa",
 
@@ -919,7 +934,7 @@ function CarregarParceiros() {
     const icone = estaAtivo ? "fa-ban" : "fa-circle-check";
 
     return `<button class="btn-acao btn-acao-editar" title="Editar"
-        onclick="window.location.href='/agro/view/admin/CadastroParceiro.jsp?id=${row.idPessoa}'">
+        onclick="abrirModalEditarParceiro(${row.idPessoa})">
         <i class="fas fa-pen-to-square"></i>
     </button>
     <button class="btn-acao ${classeToggle}" title="${textoBotao}"
@@ -978,7 +993,8 @@ function abrirModalDesativar(id, nome, situacaoAtual) {
     $("#modalDesativar").modal("show");
 }
 // Confirma e executa ativar/desativar parceiro via ControllerParceiro. Usado em: parceiro.jsp
-$("#btnConfirmarDesativar").on("click", function () {
+// Delegado no document: o main.js carrega no <head>, antes do botão existir no DOM.
+$(document).on("click", "#btnConfirmarDesativar", function () {
     if (!parceiroParaDesativar)
         return;
 
@@ -1016,9 +1032,76 @@ function carregarResumoParceiros() {
             $("#total").text(dados.total);
             $("#ativosParceiros").text(dados.ativos);
             $("#inativosParceiros").text(dados.inativos);
+            // Contagens por tipo (se os elementos existirem)
+            $("#countParceiros").text(dados.parceiros ?? 0);
+            $("#countFornecedores").text(dados.fornecedores ?? 0);
+            $("#countInsumos").text(dados.insumos ?? 0);
         },
         error: function () {
             console.warn("❌ Não foi possível carregar o resumo de parceiros.");
+        }
+    });
+}
+
+/** Aplica o filtro de tipo selecionado nas abas e recarrega a tabela. Usado em: parceiro.jsp */
+function filtrarParceirosPorTipo(tipo) {
+    filtroTipoParceiro = tipo || "";
+    $(".aba-tipo-parceiro").removeClass("active");
+    $('.aba-tipo-parceiro[data-tipo="' + filtroTipoParceiro + '"]').addClass("active");
+    CarregarParceiros();
+}
+
+/** Abre o modal de edição de parceiro e carrega os dados. Usado em: parceiro.jsp */
+function abrirModalEditarParceiro(id) {
+    $("#alertaParceiro").addClass("d-none").removeClass("alert-danger alert-success").text("");
+    carregarDadosParceiro(id);
+    $("#modalParceiro").modal("show");
+}
+
+/** Salva a edição do parceiro (modal), sem sair da listagem. Usado em: parceiro.jsp */
+function salvarParceiroModal() {
+    const tipo = $("#nivel").val();
+    const data = {
+        acao: "update",
+        idPessoa: $("#idPessoa").val(),
+        nome: $("#nome").val(),
+        nivel: (tipo || "").toLowerCase(),
+        tipo: tipo,
+        email: $("#email").val(),
+        telefone: $("#telefone").val(),
+        cep: $("#cep").val(),
+        numero: $("#numero").val(),
+        complemento: $("#complemento").val(),
+        situacao: $("#situacao").val(),
+        cnpj: $("#cnpj").val(),
+        razaosocial: $("#razao").val(),
+        inscricaoestadual: $("#inscricaoestadual").val(),
+        site: $("#site").val(),
+        usuario: $("#usuario").val(),
+        senha: $("#senha").val()
+    };
+
+    if (!data.nome || !tipo) {
+        $("#alertaParceiro").removeClass("d-none").addClass("alert-danger").text("Nome e tipo são obrigatórios.");
+        return;
+    }
+
+    $.ajax({
+        url: "/agro/ControllerParceiro",
+        method: "POST",
+        contentType: "application/json; charset=utf-8",
+        dataType: "json",
+        data: JSON.stringify(data),
+        success: function (resp) {
+            $("#modalParceiro").modal("hide");
+            mostrarAlerta(resp.msg || "Parceiro atualizado com sucesso!", "success", "#alerta");
+            CarregarParceiros();
+            carregarResumoParceiros();
+        },
+        error: function (xhr) {
+            let msg = "Erro ao atualizar parceiro!";
+            try { const j = JSON.parse(xhr.responseText); if (j.msg) msg = j.msg; } catch (e) {}
+            $("#alertaParceiro").removeClass("d-none").addClass("alert-danger").text(msg);
         }
     });
 }
@@ -1034,7 +1117,8 @@ function carregarDadosParceiro(id) {
       $("#nome").val(parceiro.nomePessoa);
       $("#usuario").val(parceiro.usuarioPessoa);
       $("#senha").val(parceiro.senhaPessoa);
-      $("#nivel").val(parceiro.nivelPessoa).trigger("change");
+      // Tipo de negócio (tipoParceiro é a fonte da verdade; nivelPessoa é fallback)
+      $("#nivel").val(parceiro.tipoParceiro || (parceiro.nivelPessoa || "").toUpperCase()).trigger("change");
       $("#email").val(parceiro.emailPessoa);
       $("#telefone").val(parceiro.telefonePessoa);
 
@@ -1046,7 +1130,7 @@ function carregarDadosParceiro(id) {
       $("#razao").val(parceiro.razaoSocialPessoaCnpj);
       $("#cnpj").val(parceiro.cnpjPessoaCnpj);
       $("#inscricaoestadual").val(parceiro.inscricaoEstadualPessoaCnpj);
-      $("#site").val(parceiro.sitePessoaCnpj || "");
+      $("#site").val(parceiro.siteparceiro || "");
 
       // Situação
       const sit = (parceiro.situacaoPessoa === true || parceiro.situacaoPessoa === "true") ? "true" : "false";
@@ -1069,17 +1153,18 @@ function carregarDadosParceiro(id) {
 function salvarParceiroCreateOuUpdate()
 {
   const idPessoa = $("#idPessoa").val();
-  const nivel = $("#nivel").val();
+  const tipo = $("#nivel").val();   // PARCEIRO | FORNECEDOR | INSUMO
 
   // detecta se é create ou update
  const acao = idPessoa  !== "" ? "update" : "create";
 
- 
+
   const data = {
     acao: acao,
     idPessoa: idPessoa,
     nome: $("#nome").val(),
-    nivel: nivel,
+    nivel: (tipo || "").toLowerCase(),  // mantém nivelpessoa (cadastro/login)
+    tipo: tipo,                          // classificação de negócio (tipo_parceiro)
     email: $("#email").val(),
     telefone: $("#telefone").val(),
     cep: $("#cep").val(),
@@ -1092,7 +1177,7 @@ function salvarParceiroCreateOuUpdate()
     site: $("#site").val()
   };
 
-  if (nivel === "parceiro") {
+  if (tipo === "PARCEIRO") {
     data.usuario = $("#usuario").val();
     data.senha = $("#senha").val();
   }
@@ -1840,6 +1925,15 @@ $(document).ready(function () {
     CarregarParceiros();
     carregarResumoParceiros();
     setInterval(CarregarParceiros, 20000);
+
+    // Abas de filtro por tipo
+    $(document).on("click", ".aba-tipo-parceiro", function (e) {
+        e.preventDefault();
+        filtrarParceirosPorTipo($(this).data("tipo"));
+    });
+
+    // Salvar edição do modal
+    $("#btnSalvarParceiro").on("click", salvarParceiroModal);
 });
 
 /* ========== AtualizacaoAlimento.jsp ========== */
@@ -4150,3 +4244,291 @@ function formatarData(iso) {
 function fmtMoeda(v) {
     return parseFloat(v || 0).toFixed(2).replace('.', ',');
 }
+
+/******************************************************************************************************/
+/* MÓDULO ESTOQUE DE INSUMOS — estoque.jsp                                                            */
+/******************************************************************************************************/
+
+/* Cache dos insumos carregados, usado para preencher selects e saldo da saída. */
+if (typeof insumosCache === "undefined") { var insumosCache = []; }
+
+/** Unidades disponíveis por grandeza. */
+const UNIDADES_POR_GRANDEZA = {
+    MASSA:      [["G", "Grama (g)"], ["KG", "Quilograma (kg)"], ["T", "Tonelada (t)"]],
+    CAPACIDADE: [["ML", "Mililitro (ml)"], ["L", "Litro (L)"]],
+    UNIDADE:    [["UN", "Unidade (un)"]]
+};
+
+/** Formata quantidade (até 3 casas, sem zeros à toa). */
+function fmtQtd(v) {
+    return Number(v || 0).toLocaleString('pt-BR', { maximumFractionDigits: 3 });
+}
+function badgeCategoriaInsumo(cat) {
+    return (cat === "ADUBO")
+        ? '<span class="badge bg-success">Adubo</span>'
+        : '<span class="badge bg-primary">Defensivo</span>';
+}
+
+/** Recarrega a DataTable de insumos aplicando o filtro de categoria. */
+function CarregarInsumos() {
+    if ($.fn.DataTable.isDataTable('#tabelaInsumos')) {
+        $('#tabelaInsumos').DataTable().destroy();
+    }
+    const cat = $("#filtroCategoria").val() || "";
+    const url = "/agro/ControllerInsumo" + (cat ? "?categoria=" + cat : "");
+    $('#tabelaInsumos').DataTable({
+        "ajax": { "url": url, "method": "GET", "dataSrc": function (json) { insumosCache = json; return json; } },
+        "columns": [
+            { "data": "nome" },
+            { "data": "categoria", "render": badgeCategoriaInsumo },
+            {
+                "data": null, "className": "text-end",
+                "render": function (row) {
+                    const txt = fmtQtd(row.quantidadeDisponivel) + " " + (row.unidade || "");
+                    return row.abaixoMinimo
+                        ? '<span class="text-danger fw-bold">' + txt + ' <i class="fas fa-triangle-exclamation" title="Abaixo do mínimo"></i></span>'
+                        : txt;
+                }
+            },
+            { "data": "precoMedio", "className": "text-end", "render": function (v) { return "R$ " + formatBRLnum(v); } },
+            { "data": null, "className": "text-end", "render": function (row) { return fmtQtd(row.estoqueMinimo) + " " + (row.unidade || ""); } },
+            {
+                "data": "situacao", "render": function (v) {
+                    return v ? '<span class="badge bg-success">Ativo</span>' : '<span class="badge bg-secondary">Inativo</span>';
+                }
+            },
+            {
+                "data": null, "className": "text-end", "orderable": false,
+                "render": function (row) {
+                    return `<button class="btn-acao btn-acao-editar" title="Editar" onclick="abrirModalEditarInsumo(${row.idInsumo})"><i class="fas fa-pen-to-square"></i></button>
+                        <button class="btn-acao" title="Movimentações" onclick="verMovimentos(${row.idInsumo}, '${(row.nome||'').replace(/'/g,"\\'")}')"><i class="fas fa-clock-rotate-left"></i></button>
+                        <button class="btn-acao ${row.situacao ? 'btn-acao-desativar' : 'btn-acao-ativar'}" title="${row.situacao ? 'Desativar' : 'Ativar'}" onclick="toggleInsumo(${row.idInsumo}, ${row.situacao})"><i class="fas ${row.situacao ? 'fa-ban' : 'fa-circle-check'}"></i></button>`;
+                }
+            }
+        ],
+        "language": { "url": 'https://cdn.datatables.net/plug-ins/2.1.6/i18n/pt-BR.json' }
+    });
+}
+
+/** Cards de resumo do estoque. */
+function carregarResumoEstoque() {
+    $.getJSON("/agro/ControllerInsumo?acao=dados", function (d) {
+        $("#cardTotalInsumos").text(d.total);
+        $("#cardAbaixoMinimo").text(d.abaixoMinimo);
+        $("#cardValorEstoque").text("R$ " + formatBRLnum(d.valorEstoque));
+    });
+}
+
+/** Preenche o select de unidades conforme a grandeza. */
+function popularUnidades(grandeza, selecionada) {
+    const $u = $("#insUnidade").empty();
+    (UNIDADES_POR_GRANDEZA[grandeza] || []).forEach(function (par) {
+        $u.append(`<option value="${par[0]}">${par[1]}</option>`);
+    });
+    if (selecionada) $u.val(selecionada);
+}
+
+/** Carrega os parceiros tipo insumo num select. */
+function carregarFornecedoresInsumo(selectId, incluirVazio) {
+    $.getJSON("/agro/ControllerInsumo?acao=fornecedores", function (lista) {
+        const $s = $("#" + selectId).empty();
+        if (incluirVazio) $s.append('<option value="">— nenhum —</option>');
+        lista.forEach(function (f) { $s.append(`<option value="${f.idPessoa}">${f.nome}</option>`); });
+    });
+}
+
+function abrirModalNovoInsumo() {
+    $("#alertaInsumo").addClass("d-none").text("");
+    $("#modalInsumoTitulo").html('<i class="fas fa-flask me-2"></i>Novo Insumo');
+    $("#insId").val("");
+    $("#insNome").val("");
+    $("#insCategoria").val("DEFENSIVO");
+    $("#insGrandeza").val("MASSA");
+    popularUnidades("MASSA");
+    $("#insMinimo").val("0");
+    carregarFornecedoresInsumo("insFornecedor", true);
+    $("#modalInsumo").modal("show");
+}
+
+function abrirModalEditarInsumo(id) {
+    $("#alertaInsumo").addClass("d-none").text("");
+    $("#modalInsumoTitulo").html('<i class="fas fa-pen-to-square me-2"></i>Editar Insumo');
+    carregarFornecedoresInsumo("insFornecedor", true);
+    $.getJSON("/agro/ControllerInsumo?id=" + id, function (i) {
+        $("#insId").val(i.idInsumo);
+        $("#insNome").val(i.nome);
+        $("#insCategoria").val(i.categoria);
+        $("#insGrandeza").val(i.grandeza);
+        popularUnidades(i.grandeza, i.unidade);
+        $("#insMinimo").val(i.estoqueMinimo);
+        setTimeout(function () { if (i.idFornecedor) $("#insFornecedor").val(i.idFornecedor); }, 200);
+        $("#modalInsumo").modal("show");
+    });
+}
+
+function salvarInsumo() {
+    const id = $("#insId").val();
+    const data = {
+        acao: id ? "update" : "create",
+        idInsumo: id ? parseInt(id) : 0,
+        nome: $("#insNome").val().trim(),
+        categoria: $("#insCategoria").val(),
+        grandeza: $("#insGrandeza").val(),
+        unidade: $("#insUnidade").val(),
+        estoqueMinimo: parseFloat($("#insMinimo").val() || "0"),
+        idFornecedor: $("#insFornecedor").val() ? parseInt($("#insFornecedor").val()) : 0,
+        situacao: true
+    };
+    if (!data.nome) { $("#alertaInsumo").removeClass("d-none").addClass("alert-danger").text("Informe o nome."); return; }
+    $.ajax({
+        url: "/agro/ControllerInsumo", method: "POST", contentType: "application/json; charset=utf-8",
+        data: JSON.stringify(data),
+        success: function (resp) {
+            $("#modalInsumo").modal("hide");
+            mostrarAlerta(resp.msg || "Insumo salvo!", "success", "#alerta");
+            CarregarInsumos(); carregarResumoEstoque();
+        },
+        error: function (xhr) {
+            let msg = "Erro ao salvar insumo!";
+            try { msg = JSON.parse(xhr.responseText).msg || msg; } catch (e) {}
+            $("#alertaInsumo").removeClass("d-none").addClass("alert-danger").text(msg);
+        }
+    });
+}
+
+function toggleInsumo(id, situacaoAtual) {
+    $.ajax({
+        url: "/agro/ControllerInsumo", method: "POST", contentType: "application/json; charset=utf-8",
+        data: JSON.stringify({ acao: "delete", idInsumo: id, situacao: situacaoAtual }),
+        success: function (resp) {
+            mostrarAlerta(resp.msg || "Situação alterada.", "info", "#alerta");
+            CarregarInsumos(); carregarResumoEstoque();
+        },
+        error: function () { mostrarAlerta("Erro ao alterar situação do insumo.", "danger", "#alerta"); }
+    });
+}
+
+/** Preenche um select com os insumos ativos do cache. */
+function preencherSelectInsumos(selectId) {
+    const $s = $("#" + selectId).empty();
+    insumosCache.filter(i => i.situacao).forEach(function (i) {
+        $s.append(`<option value="${i.idInsumo}" data-disp="${i.quantidadeDisponivel}" data-un="${i.unidade}">${i.nome} (${i.unidade})</option>`);
+    });
+}
+
+function abrirEntrada() {
+    $("#alertaEntrada").addClass("d-none").text("");
+    preencherSelectInsumos("entInsumo");
+    carregarFornecedoresInsumo("entFornecedor", false);
+    $("#entQtd").val(""); $("#entPreco").val(""); $("#entObs").val("");
+    $("#entData").val(new Date().toISOString().slice(0, 10));
+    $("#modalEntrada").modal("show");
+}
+
+function salvarEntrada() {
+    const data = {
+        acao: "entrada",
+        idInsumo: parseInt($("#entInsumo").val()),
+        idParceiro: $("#entFornecedor").val() ? parseInt($("#entFornecedor").val()) : 0,
+        quantidade: parseFloat($("#entQtd").val() || "0"),
+        precoUnitario: parseFloat($("#entPreco").val() || "0"),
+        data: $("#entData").val(),
+        observacao: $("#entObs").val()
+    };
+    if (!data.idInsumo || data.quantidade <= 0) { $("#alertaEntrada").removeClass("d-none").addClass("alert-danger").text("Insumo e quantidade (>0) obrigatórios."); return; }
+    $.ajax({
+        url: "/agro/ControllerEstoque", method: "POST", contentType: "application/json; charset=utf-8",
+        data: JSON.stringify(data),
+        success: function (resp) {
+            $("#modalEntrada").modal("hide");
+            mostrarAlerta(resp.msg || "Entrada registrada!", "success", "#alerta");
+            CarregarInsumos(); carregarResumoEstoque();
+        },
+        error: function (xhr) {
+            let msg = "Erro ao registrar entrada!";
+            try { msg = JSON.parse(xhr.responseText).msg || msg; } catch (e) {}
+            $("#alertaEntrada").removeClass("d-none").addClass("alert-danger").text(msg);
+        }
+    });
+}
+
+function atualizarDisponivelSaida() {
+    const opt = $("#saiInsumo").find(":selected");
+    $("#saiDisponivel").text(opt.length ? fmtQtd(opt.data("disp")) + " " + (opt.data("un") || "") : "-");
+}
+
+function abrirSaida() {
+    $("#alertaSaida").addClass("d-none").text("");
+    preencherSelectInsumos("saiInsumo");
+    $("#saiQtd").val(""); $("#saiObs").val("");
+    $("#saiData").val(new Date().toISOString().slice(0, 10));
+    atualizarDisponivelSaida();
+    $("#modalSaida").modal("show");
+}
+
+function salvarSaida() {
+    const data = {
+        acao: "saida",
+        idInsumo: parseInt($("#saiInsumo").val()),
+        quantidade: parseFloat($("#saiQtd").val() || "0"),
+        data: $("#saiData").val(),
+        observacao: $("#saiObs").val()
+    };
+    if (!data.idInsumo || data.quantidade <= 0) { $("#alertaSaida").removeClass("d-none").addClass("alert-danger").text("Insumo e quantidade (>0) obrigatórios."); return; }
+    $.ajax({
+        url: "/agro/ControllerEstoque", method: "POST", contentType: "application/json; charset=utf-8",
+        data: JSON.stringify(data),
+        success: function (resp) {
+            $("#modalSaida").modal("hide");
+            mostrarAlerta(resp.msg || "Saída registrada!", "success", "#alerta");
+            CarregarInsumos(); carregarResumoEstoque();
+        },
+        error: function (xhr) {
+            let msg = "Erro ao registrar saída!";
+            try { msg = JSON.parse(xhr.responseText).msg || msg; } catch (e) {}
+            $("#alertaSaida").removeClass("d-none").addClass("alert-danger").text(msg);
+        }
+    });
+}
+
+function verMovimentos(id, nome) {
+    $("#movInsumoNome").text(nome || "");
+    const $b = $("#bodyMovimentos").html('<tr><td colspan="7" class="text-center text-muted py-3">Carregando...</td></tr>');
+    $.getJSON("/agro/ControllerEstoque?acao=movimentos&idinsumo=" + id, function (lista) {
+        if (!lista.length) { $b.html('<tr><td colspan="7" class="text-center text-muted py-3">Sem movimentações.</td></tr>'); return; }
+        $b.empty();
+        lista.forEach(function (m) {
+            const badge = m.tipo === "ENTRADA"
+                ? '<span class="badge bg-info text-dark">Entrada</span>'
+                : '<span class="badge bg-warning text-dark">Saída</span>';
+            $b.append(`<tr>
+                <td>${formatarData(m.dataMov)}</td>
+                <td>${badge}</td>
+                <td class="text-end">${fmtQtd(m.quantidade)}</td>
+                <td class="text-end">${m.precoUnitario != null ? "R$ " + formatBRLnum(m.precoUnitario) : "—"}</td>
+                <td>${m.parceiroNome || "—"}</td>
+                <td class="text-end">${fmtQtd(m.saldoApos)}</td>
+                <td>${m.observacao || ""}</td>
+            </tr>`);
+        });
+    });
+    $("#modalMovimentos").modal("show");
+}
+
+/* ========== estoque.jsp init ========== */
+$(document).ready(function () {
+    if (!$('#tabelaInsumos').length) return;
+
+    CarregarInsumos();
+    carregarResumoEstoque();
+
+    $("#filtroCategoria").on("change", CarregarInsumos);
+    $("#insGrandeza").on("change", function () { popularUnidades($(this).val()); });
+    $("#btnNovoInsumo").on("click", abrirModalNovoInsumo);
+    $("#btnSalvarInsumo").on("click", salvarInsumo);
+    $("#btnEntrada").on("click", abrirEntrada);
+    $("#btnSalvarEntrada").on("click", salvarEntrada);
+    $("#btnSaida").on("click", abrirSaida);
+    $("#btnSalvarSaida").on("click", salvarSaida);
+    $("#saiInsumo").on("change", atualizarDisponivelSaida);
+});
