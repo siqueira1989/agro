@@ -121,14 +121,14 @@
                         <div class="row g-2">
 
                             <div class="col-md-6">
-                                <label>Nível *</label>
+                                <label>Tipo *</label>
                                 <select class="form-control required" id="nivel" name="nivel">
                                     <option value="">Selecione</option>
-                                    <option value="parceiro">Parceiro</option>
-                                    <option value="insumo">Insumo</option>
-                                    <option value="fornecedor">Fornecedor</option>
+                                    <option value="PARCEIRO">Parceiro — compra a produção</option>
+                                    <option value="FORNECEDOR">Fornecedor — vende indiretamente (caixas, gasolina)</option>
+                                    <option value="INSUMO">Insumo — defensivos e adubos</option>
                                 </select>
-                                <div class="invalid-feedback">Informe o Nivel.</div>
+                                <div class="invalid-feedback">Informe o Tipo.</div>
                             </div>
                             <div class="col-md-6">
                                 <label>Situação</label>

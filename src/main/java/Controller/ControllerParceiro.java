@@ -53,6 +53,17 @@ public class ControllerParceiro extends HttpServlet {
             out.flush();
         }
     }
+   /* Lê o tipo de parceiro do JSON (aceita "tipo"; cai para "nivel" por compat.). */
+   private String lerTipo(JsonObject jsonObject) {
+       String tipo = null;
+       if (jsonObject.has("tipo") && !jsonObject.get("tipo").isJsonNull()) {
+           tipo = jsonObject.get("tipo").getAsString();
+       } else if (jsonObject.has("nivel") && !jsonObject.get("nivel").isJsonNull()) {
+           tipo = jsonObject.get("nivel").getAsString();
+       }
+       return Model.Model.TipoParceiro.normalizar(tipo);
+   }
+
    @Override
 protected void doGet(HttpServletRequest request, HttpServletResponse response)
         throws ServletException, IOException {
@@ -96,8 +107,11 @@ protected void doGet(HttpServletRequest request, HttpServletResponse response)
             return;
         }
 
-        // 4️⃣ LISTAGEM
-        List<Parceiro> lista = parceiroDao.listAllParceiro();
+        // 4️⃣ LISTAGEM (opcionalmente filtrada por tipo de negócio)
+        String tipo = request.getParameter("tipo");
+        List<Parceiro> lista = (tipo != null && !tipo.isBlank())
+                ? parceiroDao.listarPorTipo(tipo)
+                : parceiroDao.listAllParceiro();
         out.print(gson.toJson(lista));
 
     } catch (Exception e) {
@@ -172,8 +186,9 @@ System.out.println("acao:"+ acao);
             cnpj,
             jsonObject.get("razaosocial").getAsString(),
             jsonObject.get("inscricaoestadual").getAsString(),
-            jsonObject.get("site").getAsString()
+            jsonObject.has("site") && !jsonObject.get("site").isJsonNull() ? jsonObject.get("site").getAsString() : null
         );
+        parceiro.setTipoParceiro(lerTipo(jsonObject));
 
         parceiroDao.addParceiro(parceiro);
 
@@ -205,8 +220,9 @@ System.out.println("acao:"+ acao);
             cnpj,
             jsonObject.get("razaosocial").getAsString(),
             jsonObject.get("inscricaoestadual").getAsString(),
-            jsonObject.get("site").getAsString()
+            jsonObject.has("site") && !jsonObject.get("site").isJsonNull() ? jsonObject.get("site").getAsString() : null
         );
+        parceiro.setTipoParceiro(lerTipo(jsonObject));
 
         parceiroDao.updateParceiro(parceiro);
 
@@ -251,6 +267,9 @@ System.out.println("acao:"+ acao);
         resultado.addProperty("total", total);
         resultado.addProperty("ativos", ativos);
         resultado.addProperty("inativos", inativos);
+        resultado.addProperty("parceiros", parceiroDao.contarPorTipo("PARCEIRO"));
+        resultado.addProperty("fornecedores", parceiroDao.contarPorTipo("FORNECEDOR"));
+        resultado.addProperty("insumos", parceiroDao.contarPorTipo("INSUMO"));
 
         out.print(resultado.toString());
 

@@ -21,8 +21,8 @@ public class ParceiroDAO {
             + "nomepessoa, usuariopessoa, senhapessoa, nivelpessoa, "
             + "situacaopessoa, emailpessoa,cep ,numero, complemento, "
             + "telefonepessoa, cnpjPessoaCnpj, razaosocialpessoacnpj, "
-            + "inscricaoestadualpessoacnpj, siteparceiro) "
-            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            + "inscricaoestadualpessoacnpj, siteparceiro, tipo_parceiro) "
+            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         	PreparedStatement stmt = conexao.prepareStatement(sql);
            stmt.setString(1, parceiro.getNomePessoa());
@@ -39,7 +39,8 @@ public class ParceiroDAO {
             stmt.setString(12, parceiro.getRazaoSocialPessoaCnpj());
             stmt.setString(13, parceiro.getInscricaoEstadualPessoaCnpj());
             stmt.setString(14, parceiro.getSiteparceiro());
-            stmt.executeUpdate();    
+            stmt.setString(15, Model.Model.TipoParceiro.normalizar(parceiro.getTipoParceiro()));
+            stmt.executeUpdate();
         } catch (SQLException e) {
              e.printStackTrace();
            System.out.println("Erro ao listar os parceiros: " + e.getMessage());
@@ -80,6 +81,7 @@ public class ParceiroDAO {
                     rs.getString("inscricaoEstadualPessoaCnpj"),
                     rs.getString("siteParceiro")
                 );
+                parceiro.setTipoParceiro(rs.getString("tipo_parceiro"));
             }
             }catch (SQLException e) {
                 e.printStackTrace();
@@ -127,6 +129,7 @@ public class ParceiroDAO {
                     rs.getString("inscricaoEstadualPessoaCnpj"), // Inscrição estadual
                     rs.getString("siteparceiro")          // Site do parceiro
                 );
+                parceiro.setTipoParceiro(rs.getString("tipo_parceiro"));
 
                 parceiroList.add(parceiro);
             }
@@ -255,8 +258,8 @@ public class ParceiroDAO {
        "nomepessoa = ?, usuariopessoa = ?, senhapessoa = ?, "+
        "nivelpessoa = ?, situacaopessoa = ?, emailpessoa = ?,"+
        "numero = ?, complemento = ?, cep = ?, "+
-       "telefonepessoa = ?, cnpjPessoaCnpj = ?, razaosocialpessoacnpj = ?,"+ 
-       "inscricaoestadualpessoacnpj = ?, siteparceiro = ? WHERE idpessoa = ?";
+       "telefonepessoa = ?, cnpjPessoaCnpj = ?, razaosocialpessoacnpj = ?,"+
+       "inscricaoestadualpessoacnpj = ?, siteparceiro = ?, tipo_parceiro = ? WHERE idpessoa = ?";
                 PreparedStatement stmt = conexao.prepareStatement(sql);
             stmt.setString(1, parceiro.getNomePessoa());
             stmt.setString(2, parceiro.getUsuarioPessoa());
@@ -276,13 +279,67 @@ public class ParceiroDAO {
           
             stmt.setString(13, parceiro.getInscricaoEstadualPessoaCnpj());
             stmt.setString(14, parceiro.getSiteparceiro());
-            stmt.setInt(15, parceiro.getIdPessoa());
+            stmt.setString(15, Model.Model.TipoParceiro.normalizar(parceiro.getTipoParceiro()));
+            stmt.setInt(16, parceiro.getIdPessoa());
 
             stmt.executeUpdate();
         } catch (SQLException e) {
         	e.printStackTrace();
             System.out.println("Erro no nivel dao: "+e.getMessage());
         }
+    }
+
+    /* Lista parceiros por tipo de negócio (PARCEIRO | FORNECEDOR | INSUMO).
+       Passar null/"" retorna todos. */
+    public List<Parceiro> listarPorTipo(String tipo) throws SQLException {
+        List<Parceiro> lista = new ArrayList<>();
+        boolean filtrar = tipo != null && !tipo.isBlank();
+        String sql = "SELECT * FROM parceiro"
+                   + (filtrar ? " WHERE tipo_parceiro = ?" : "")
+                   + " ORDER BY nomepessoa";
+
+        try (Connection conexao = new PostgresConnection().getConnection();
+             PreparedStatement stmt = conexao.prepareStatement(sql)) {
+
+            if (filtrar) stmt.setString(1, tipo.trim().toUpperCase());
+            ResultSet rs = stmt.executeQuery();
+
+            while (rs.next()) {
+                Parceiro parceiro = new Parceiro(
+                    rs.getInt("idpessoa"),
+                    rs.getString("nomepessoa"),
+                    rs.getString("usuariopessoa"),
+                    rs.getString("senhapessoa"),
+                    rs.getString("nivelpessoa"),
+                    rs.getBoolean("situacaopessoa"),
+                    rs.getString("emailpessoa"),
+                    rs.getString("telefonepessoa"),
+                    rs.getString("cep"),
+                    rs.getInt("numero"),
+                    rs.getString("complemento"),
+                    rs.getString("cnpjPessoaCnpj"),
+                    rs.getString("razaoSocialPessoaCnpj"),
+                    rs.getString("inscricaoEstadualPessoaCnpj"),
+                    rs.getString("siteparceiro")
+                );
+                parceiro.setTipoParceiro(rs.getString("tipo_parceiro"));
+                lista.add(parceiro);
+            }
+        }
+        return lista;
+    }
+
+    /* Conta parceiros por tipo de negócio. */
+    public int contarPorTipo(String tipo) throws SQLException {
+        int numero = 0;
+        String sql = "SELECT COUNT(*) FROM parceiro WHERE tipo_parceiro = ?";
+        try (Connection conexao = new PostgresConnection().getConnection();
+             PreparedStatement stmt = conexao.prepareStatement(sql)) {
+            stmt.setString(1, tipo == null ? "" : tipo.trim().toUpperCase());
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) numero = rs.getInt(1);
+        }
+        return numero;
     }
 
     public void deleteParceiro(int id, Boolean situacao) throws SQLException {
