@@ -68,6 +68,14 @@
         <servlet-name>ControllerPagamento</servlet-name>
         <servlet-class>Controller.ControllerPagamento</servlet-class>
     </servlet>
+    <servlet>
+        <servlet-name>ControllerInsumo</servlet-name>
+        <servlet-class>Controller.ControllerInsumo</servlet-class>
+    </servlet>
+    <servlet>
+        <servlet-name>ControllerEstoque</servlet-name>
+        <servlet-class>Controller.ControllerEstoque</servlet-class>
+    </servlet>
     <servlet-mapping>
         <servlet-name>ClassificacaoServlet</servlet-name>
         <url-pattern>/ClassificacaoServlet</url-pattern>
@@ -127,6 +135,14 @@
     <servlet-mapping>
         <servlet-name>ControllerPagamento</servlet-name>
         <url-pattern>/ControllerPagamento</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>ControllerInsumo</servlet-name>
+        <url-pattern>/ControllerInsumo</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>ControllerEstoque</servlet-name>
+        <url-pattern>/ControllerEstoque</url-pattern>
     </servlet-mapping>
     <session-config>
         <session-timeout>
