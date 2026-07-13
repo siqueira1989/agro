@@ -91,10 +91,6 @@
                        class="btn btn-outline-primary btn-sm text-start">
                         <i class="fas fa-map-marked-alt me-2"></i>Área de Produção
                     </a>
-                    <a href="<%=request.getContextPath()%>/view/admin/talao.jsp"
-                       class="btn btn-outline-primary btn-sm text-start">
-                        <i class="fas fa-leaf me-2"></i>Talão
-                    </a>
                 </div>
             </div>
         </div>
