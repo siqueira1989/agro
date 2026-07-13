@@ -121,7 +121,6 @@
       <li><a href="#s1">Visão Geral do Sistema</a></li>
       <li><a href="#s2">Módulo de Colaboradores (Funcionários)</a></li>
       <li><a href="#s3">Módulo de Área de Produção</a></li>
-      <li><a href="#s4">Módulo de Talão</a></li>
       <li><a href="#s5">Módulo de Registro de Ponto</a></li>
       <li><a href="#s6">Módulo de Folha de Pagamento</a></li>
       <li><a href="#s7">Migração Bootstrap 4 → Bootstrap 5</a></li>
@@ -143,7 +142,6 @@
         <tr><td>Autenticação / Sessão</td><td><span class="badge badge-fix">Aprimorado</span></td><td>LoginServlet com sessão real, AuthFilter protegendo /view/admin/*</td></tr>
         <tr><td>Colaboradores (Funcionários)</td><td><span class="badge badge-novo">Novo</span></td><td>CRUD completo, cadastro, edição, ativação/desativação</td></tr>
         <tr><td>Área de Produção</td><td><span class="badge badge-novo">Novo</span></td><td>CRUD completo com CEP/endereço automático</td></tr>
-        <tr><td>Talão</td><td><span class="badge badge-novo">Novo</span></td><td>CRUD + dados financeiros (safra, custos, vendas)</td></tr>
         <tr><td>Registro de Ponto</td><td><span class="badge badge-novo">Novo</span></td><td>Controle de presença diária por funcionário</td></tr>
         <tr><td>Folha de Pagamento</td><td><span class="badge badge-novo">Novo</span></td><td>Geração automática por período, cálculo por tipo de contrato</td></tr>
         <tr><td>Parceiros</td><td><span class="badge badge-refator">Refatorado</span></td><td>AJAX, DataTable, modal de ativação/desativação</td></tr>
@@ -263,48 +261,6 @@ function converterDataParaBR(isoDate) {
     </div>
   </div>
 
-  <!-- ===== SEÇÃO 4 ===== -->
-  <div class="secao" id="s4">
-    <div class="secao-header">4. Módulo de Talão</div>
-    <div class="secao-body">
-
-      <div class="sub">
-        <h4>4.1 Arquivos</h4>
-        <table>
-          <tr><th>Arquivo</th><th>Tipo</th></tr>
-          <tr><td><code>Controller/ControllerTalao.java</code></td><td><span class="badge badge-novo">Novo</span></td></tr>
-          <tr><td><code>Model/Dao/TalaoDAO.java</code> (planejado)</td><td><span class="badge badge-novo">Novo</span></td></tr>
-          <tr><td><code>view/admin/talao.jsp</code></td><td><span class="badge badge-refator">Refatorado</span></td></tr>
-        </table>
-      </div>
-
-      <div class="sub">
-        <h4>4.2 Funcionalidades</h4>
-        <ul style="padding-left:18px;line-height:2">
-          <li>CRUD de talões (descrição, alimento, área de produção, qtd. plantas)</li>
-          <li>Dados financeiros por talão: safra, início/término, custos, despesas, venda bruta, venda líquida</li>
-          <li>Modal financeiro separado do modal de edição principal</li>
-          <li>Ações: <code>create</code>, <code>update</code>, <code>delete</code>, <code>criarfinanceiro</code>, <code>atualizarfinanceiro</code></li>
-        </ul>
-      </div>
-
-      <div class="sub">
-        <h4>4.3 Campos — talaofinanceiro</h4>
-        <table>
-          <tr><th>Campo</th><th>Tipo</th><th>Descrição</th></tr>
-          <tr><td>safratalaofinanceiro</td><td>VARCHAR(50)</td><td>Identificador da safra</td></tr>
-          <tr><td>iniciosafratalaofinanceiro</td><td>DATE</td><td>Início do período de safra</td></tr>
-          <tr><td>terminosafratalaofinanceiro</td><td>DATE</td><td>Término do período de safra</td></tr>
-          <tr><td>custosafratalaofinanceiro</td><td>NUMERIC(12,2)</td><td>Custos totais da safra</td></tr>
-          <tr><td>despesassafratalaofinanceiro</td><td>NUMERIC(12,2)</td><td>Despesas totais da safra</td></tr>
-          <tr><td>vendabrutasafratalaofinanceiro</td><td>NUMERIC(12,2)</td><td>Receita bruta da safra</td></tr>
-          <tr><td>vendaliquidasafratalaofinanceiro</td><td>NUMERIC(12,2)</td><td>Receita líquida da safra</td></tr>
-        </table>
-      </div>
-
-    </div>
-  </div>
-
   <!-- ===== SEÇÃO 5 ===== -->
   <div class="secao" id="s5">
     <div class="secao-header">5. Módulo de Registro de Ponto</div>
@@ -408,7 +364,7 @@ function converterDataParaBR(isoDate) {
           <code>view/admin/ColaboCadastro.jsp</code><code>view/admin/Colaboradores.jsp</code>
           <code>view/admin/despesascustos.jsp</code><code>view/admin/folhapagamento.jsp</code>
           <code>view/admin/parceiro.jsp</code><code>view/admin/registroponto.jsp</code>
-          <code>view/admin/talao.jsp</code><code>login.jsp</code>
+          <code>login.jsp</code>
         </div>
       </div>
 
@@ -589,7 +545,6 @@ mostrarAlerta('CPF inválido.',       'danger',  '#alertModal', 6000);</pre>
 ├── Controller/
 │   ├── ControllerFuncionario.java   ← NOVO (CRUD funcionário, adapter LocalDate)
 │   ├── ControllerAreaProducao.java  ← NOVO (CRUD área de produção)
-│   ├── ControllerTalao.java         ← NOVO (CRUD talão + dados financeiros)
 │   ├── ControllerRegistroPonto.java ← NOVO (registro de presença)
 │   ├── ControleColaborador.java     ← NOVO (geração de folha de pagamento)
 │   ├── RelatorioExportServlet.java  ← NOVO (exportação Excel/PDF)
@@ -609,7 +564,6 @@ mostrarAlerta('CPF inválido.',       'danger',  '#alertModal', 6000);</pre>
 │       ├── AreaProducao.java        ← MODIFICADO (campo setter corrigido)
 │       ├── Alimento.java            ← MODIFICADO
 │       ├── PessoaFisica.java        ← MODIFICADO
-│       └── Talao.java               ← MODIFICADO
 └── Util/
     └── TransacaoUtil.java           ← NOVO (wrapper de transação JDBC)
 
@@ -626,7 +580,6 @@ src/main/webapp/
 │   ├── Colaboradores.jsp            ← NOVO (listagem funcionários)
 │   ├── ColaboCadastro.jsp           ← NOVO (cadastro/edição funcionário)
 │   ├── areaproducao.jsp             ← MODIFICADO (corrigido + BS5)
-│   ├── talao.jsp                    ← MODIFICADO (BS5)
 │   ├── registroponto.jsp            ← NOVO
 │   ├── folhapagamento.jsp           ← NOVO
 │   ├── parceiro.jsp                 ← MODIFICADO (BS5 + padronização)
@@ -704,7 +657,6 @@ Copy-Item "src\main\webapp\view\admin\arquivo.jsp" `
           <li>Ir em <strong>Configuração → Classificação</strong> para cadastrar tipos de alimento</li>
           <li>Ir em <strong>Produção → Alimento</strong> para cadastrar os alimentos</li>
           <li>Ir em <strong>Produção → Área de Produção</strong> para cadastrar as fazendas/áreas</li>
-          <li>Ir em <strong>Produção → Talão</strong> para vincular alimento + área e dados de safra</li>
           <li>Ir em <strong>RH → Funcionários</strong> para cadastrar colaboradores</li>
           <li>Ir em <strong>RH → Registro de Ponto</strong> para registrar presenças</li>
           <li>Ir em <strong>RH → Folha de Pagamento</strong> para gerar a folha do mês</li>
