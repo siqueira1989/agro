@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <!-- Pagina Alimento.jsp -->
 <%@ page contentType="text/html;charset=UTF-8" language="java"%>
 <html>
@@ -8,44 +8,6 @@
 <%@ include file="../../pagina/importacao.html"%>
 
 
-        <script>
-            $(document).ready(function () {
-     const msg = sessionStorage.getItem("mensagemAlerta");
-    const tipo = sessionStorage.getItem("tipoAlerta");
-
-    if (msg && window.location.pathname.includes("alimento.jsp")) {
-        mostrarAlerta(msg, tipo || 'info', '#alerta', 4000);
-        sessionStorage.removeItem("mensagemAlerta");
-        sessionStorage.removeItem("tipoAlerta");
-    }
-           //Carregando os dados da tabela
-                            
-                            CarregarAlimento();
-                                 setInterval(function () {
-                    CarregarAlimento();
-                }, 10000);
-                // Carrega opções do select de classificação sempre que abrir o modal
-                $('#modalFormulario').on('show.bs.modal', function () {
-                    CarregarClassificacaoModal();
-                });
-                
-                // Submit do formulário com AJAX
-                $('#formAlimento').on('submit', function (event) {
-                    event.preventDefault();
-
-                    // Bootstrap validation
-                    if (!this.checkValidity()) {
-                        event.stopPropagation();
-                        this.classList.add('was-validated');
-                        return;
-                    }
-
-                    salvarAlimento();
-                });
-            });
-
-         
-        </script>
     </head>
     <body>
         <header>
@@ -54,14 +16,14 @@
 
         <div class="container-fluid content mt-3">
             <div class="bg-success text-white p-3 rounded mb-4">
-                <h2 class="m-0"> <i class="fa-solid fa-leaf mr-1"></i>Alimento</h2>  
+                <h2 class="m-0"> <i class="fa-solid fa-leaf me-1"></i>Alimento</h2>  
             </div>
           
             <div id="alerta" class="alert d-none" role="alert"></div>
 
             <!-- Botão para abrir o modal -->
-            <button type="button" class="btn btn-primary mt-4 mb-3" data-toggle="modal" data-target="#modalFormulario">
-                <i class="fas fa-plus-circle mr-1"></i> Novo registro
+            <button type="button" class="btn btn-primary mt-4 mb-3" data-bs-toggle="modal" data-bs-target="#modalFormulario">
+                <i class="fas fa-plus-circle me-1"></i> Novo registro
             </button>
             <!-- Tabela de alimentos -->
             <div class="table-responsive rounded shadow-custom m-2 p-2">
@@ -87,10 +49,8 @@
             <div class="modal-dialog" role="document">
                 <form id="formAlimento" class="modal-content needs-validation" novalidate>
                     <div class="modal-header bg-primary text-white">
-                        <h5 class="modal-title" id="tituloModal"><i class="fas fa-leaf mr-1"></i> Cadastro de Alimento</h5>
-                        <button type="button" class="close text-white" data-dismiss="modal" aria-label="Fechar">
-                            <span aria-hidden="true">&times;</span>
-                        </button>
+                        <h5 class="modal-title" id="tituloModal"><i class="fas fa-leaf me-1"></i> Cadastro de Alimento</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
                     </div>
 
                     <div class="modal-body">
@@ -98,22 +58,20 @@
                            <!-- NOVO: contêiner de alerta do modal -->
                             <div id="ModalCadastroAlimento"></div>
                         
-                        <div class="form-group">
+                        <div class="mb-3">
                             <label for="alimento">Alimento</label>
                             <div class="input-group">
-                                <div class="input-group-prepend">
-                                    <span class="input-group-text"><i class="fas fa-carrot"></i></span>
+                                <span class="input-group-text"><i class="fas fa-carrot"></i></span>
                                 </div>
                                 <input type="text" class="form-control" id="alimento" name="alimento" required>
                                 <div class="invalid-feedback">Informe o alimento.</div>
                             </div>
                         </div>
 
-                        <div class="form-group">
+                        <div class="mb-3">
                             <label for="variedade">Variedade</label>
                             <div class="input-group">
-                                <div class="input-group-prepend">
-                                    <span class="input-group-text"><i class="fas fa-seedling"></i></span>
+                                <span class="input-group-text"><i class="fas fa-seedling"></i></span>
                                 </div>
                                 <input type="text" class="form-control" id="variedade" name="variedade" required>
                                 <input type="hidden" class="form-control" id="tipo" name="tipo" value="Alimento">
@@ -121,11 +79,10 @@
                             </div>
                         </div>
 
-                        <div class="form-group">
+                        <div class="mb-3">
                             <label for="classificacao">Classificação</label>
                             <div class="input-group">
-                                <div class="input-group-prepend">
-                                    <span class="input-group-text"><i class="fas fa-tags"></i></span>
+                                <span class="input-group-text"><i class="fas fa-tags"></i></span>
                                 </div>
                                 <select id="SelectClassificacao" name="classificacoes" class="form-control" multiple required>
                                     <option disabled value="">Selecione uma ou mais classificações...</option>
@@ -138,7 +95,7 @@
 
                     <div class="modal-footer">
                         <button type="submit" class="btn btn-success"><i class="fas fa-save"></i> Salvar</button>
-                        <button type="button" class="btn btn-secondary" data-dismiss="modal"><i class="fas fa-times"></i> Cancelar</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="fas fa-times"></i> Cancelar</button>
                     </div>
                 </form>
             </div>

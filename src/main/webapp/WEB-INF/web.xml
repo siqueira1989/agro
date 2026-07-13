@@ -24,6 +24,58 @@
         <servlet-name>ControllerParceiro</servlet-name>
         <servlet-class>Controller.ControllerParceiro</servlet-class>
     </servlet>
+    <servlet>
+        <servlet-name>ControleColaborador</servlet-name>
+        <servlet-class>Controller.ControleColaborador</servlet-class>
+    </servlet>
+    <servlet>
+        <servlet-name>ControllerFuncionario</servlet-name>
+        <servlet-class>Controller.ControllerFuncionario</servlet-class>
+    </servlet>
+    <servlet>
+        <servlet-name>ControllerAreaProducao</servlet-name>
+        <servlet-class>Controller.ControllerAreaProducao</servlet-class>
+    </servlet>
+    <servlet>
+        <servlet-name>LoginServlet</servlet-name>
+        <servlet-class>Controller.LoginServlet</servlet-class>
+    </servlet>
+    <servlet>
+        <servlet-name>LogoutServlet</servlet-name>
+        <servlet-class>Controller.LogoutServlet</servlet-class>
+    </servlet>
+    <servlet>
+        <servlet-name>RelatorioExportServlet</servlet-name>
+        <servlet-class>Controller.RelatorioExportServlet</servlet-class>
+    </servlet>
+    <servlet>
+        <servlet-name>ControllerCLT</servlet-name>
+        <servlet-class>Controller.ControllerCLT</servlet-class>
+    </servlet>
+    <servlet>
+        <servlet-name>ControllerDiarista</servlet-name>
+        <servlet-class>Controller.ControllerDiarista</servlet-class>
+    </servlet>
+    <servlet>
+        <servlet-name>ControllerEmpreita</servlet-name>
+        <servlet-class>Controller.ControllerEmpreita</servlet-class>
+    </servlet>
+    <servlet>
+        <servlet-name>ControllerProducao</servlet-name>
+        <servlet-class>Controller.ControllerProducao</servlet-class>
+    </servlet>
+    <servlet>
+        <servlet-name>ControllerPagamento</servlet-name>
+        <servlet-class>Controller.ControllerPagamento</servlet-class>
+    </servlet>
+    <servlet>
+        <servlet-name>ControllerInsumo</servlet-name>
+        <servlet-class>Controller.ControllerInsumo</servlet-class>
+    </servlet>
+    <servlet>
+        <servlet-name>ControllerEstoque</servlet-name>
+        <servlet-class>Controller.ControllerEstoque</servlet-class>
+    </servlet>
     <servlet-mapping>
         <servlet-name>ClassificacaoServlet</servlet-name>
         <url-pattern>/ClassificacaoServlet</url-pattern>
@@ -39,6 +91,58 @@
     <servlet-mapping>
         <servlet-name>ControllerParceiro</servlet-name>
         <url-pattern>/ControllerParceiro</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>ControleColaborador</servlet-name>
+        <url-pattern>/ControleColaborador</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>ControllerFuncionario</servlet-name>
+        <url-pattern>/ControllerFuncionario</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>ControllerAreaProducao</servlet-name>
+        <url-pattern>/ControllerAreaProducao</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>LoginServlet</servlet-name>
+        <url-pattern>/LoginServlet</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>LogoutServlet</servlet-name>
+        <url-pattern>/LogoutServlet</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>RelatorioExportServlet</servlet-name>
+        <url-pattern>/RelatorioExportServlet</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>ControllerCLT</servlet-name>
+        <url-pattern>/ControllerCLT</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>ControllerDiarista</servlet-name>
+        <url-pattern>/ControllerDiarista</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>ControllerEmpreita</servlet-name>
+        <url-pattern>/ControllerEmpreita</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>ControllerProducao</servlet-name>
+        <url-pattern>/ControllerProducao</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>ControllerPagamento</servlet-name>
+        <url-pattern>/ControllerPagamento</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>ControllerInsumo</servlet-name>
+        <url-pattern>/ControllerInsumo</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>ControllerEstoque</servlet-name>
+        <url-pattern>/ControllerEstoque</url-pattern>
     </servlet-mapping>
     <session-config>
         <session-timeout>

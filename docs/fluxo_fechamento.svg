@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 790" font-family="Calibri, Arial, sans-serif">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="6" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#1f5c1f"/>
+    </marker>
+  </defs>
+
+  <!-- INPUT -->
+  <rect x="90" y="14" width="580" height="64" rx="8" fill="#1f5c1f"/>
+  <text x="380" y="40" text-anchor="middle" fill="#ffffff" font-size="15" font-weight="bold">ENTRADA</text>
+  <text x="380" y="62" text-anchor="middle" fill="#ffffff" font-size="12">Pontos do mês • Faltas • Vales • Funcionário (salário, jornada, atividade)</text>
+  <line x1="380" y1="78" x2="380" y2="104" stroke="#1f5c1f" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- STEP 1 -->
+  <rect x="90" y="106" width="580" height="60" rx="8" fill="#eaf4ea" stroke="#1f5c1f" stroke-width="1.5"/>
+  <text x="380" y="130" text-anchor="middle" fill="#1a1a1a" font-size="13" font-weight="bold">1) Cálculo por DIA — CalculoPontoRural</text>
+  <text x="380" y="150" text-anchor="middle" fill="#333333" font-size="11.5">total • extra • minutos noturnos (60min reais) • tolerância 10 min/dia</text>
+  <line x1="380" y1="166" x2="380" y2="192" stroke="#1f5c1f" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- STEP 2 -->
+  <rect x="90" y="194" width="580" height="56" rx="8" fill="#eaf4ea" stroke="#1f5c1f" stroke-width="1.5"/>
+  <text x="380" y="216" text-anchor="middle" fill="#1a1a1a" font-size="13" font-weight="bold">2) Agrupar por SEMANA (segunda a domingo)</text>
+  <text x="380" y="236" text-anchor="middle" fill="#333333" font-size="11.5">FolhaCalculoRuralService</text>
+  <line x1="380" y1="250" x2="380" y2="276" stroke="#1f5c1f" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- STEP 3 - three rules -->
+  <rect x="90" y="278" width="580" height="118" rx="8" fill="#fff6e0" stroke="#e0a800" stroke-width="1.5"/>
+  <text x="380" y="300" text-anchor="middle" fill="#1a1a1a" font-size="13" font-weight="bold">3) Regras por semana</text>
+  <text x="110" y="324" fill="#333333" font-size="11.5">• Folga compensatória = dia útil (seg–sáb) sem ponto e sem falta.</text>
+  <text x="110" y="346" fill="#333333" font-size="11.5">• Domingo SEM folga → todas as horas viram EXTRA 100%.</text>
+  <text x="110" y="368" fill="#333333" font-size="11.5">• Domingo COM folga → conta como jornada normal.</text>
+  <text x="110" y="390" fill="#333333" font-size="11.5">• Semana com falta injustificada → desconta 1 DSR.</text>
+  <line x1="380" y1="396" x2="380" y2="422" stroke="#1f5c1f" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- STEP 4 -->
+  <rect x="90" y="424" width="580" height="56" rx="8" fill="#eaf4ea" stroke="#1f5c1f" stroke-width="1.5"/>
+  <text x="380" y="446" text-anchor="middle" fill="#1a1a1a" font-size="13" font-weight="bold">4) Agregar o mês</text>
+  <text x="380" y="466" text-anchor="middle" fill="#333333" font-size="11.5">extra normal • extra 100% • minutos noturnos • faltas • semanas com falta</text>
+  <line x1="380" y1="480" x2="380" y2="506" stroke="#1f5c1f" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- STEP 5 - formulas -->
+  <rect x="90" y="508" width="580" height="130" rx="8" fill="#eaf4ea" stroke="#1f5c1f" stroke-width="1.5"/>
+  <text x="380" y="530" text-anchor="middle" fill="#1a1a1a" font-size="13" font-weight="bold">5) Calcular valores</text>
+  <text x="110" y="553" fill="#333333" font-size="11">valorDia = salário ÷ diasÚteis    |    valorHora = valorDia ÷ jornada</text>
+  <text x="110" y="573" fill="#333333" font-size="11">extra normal = horas × valorHoraExtra (cadastrado ou hora × 1,5)</text>
+  <text x="110" y="593" fill="#333333" font-size="11">extra 100% = horas × valorHora × 2,0    |    noturno = horas × valorHora × 0,25</text>
+  <text x="110" y="613" fill="#333333" font-size="11">bruto = salário + extras + noturno    líquido = bruto − faltas − DSR − vales</text>
+  <line x1="380" y1="638" x2="380" y2="664" stroke="#1f5c1f" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- OUTPUT -->
+  <rect x="90" y="666" width="580" height="70" rx="8" fill="#1f5c1f"/>
+  <text x="380" y="692" text-anchor="middle" fill="#ffffff" font-size="14" font-weight="bold">SAÍDA → fechamento_folha_ponto</text>
+  <text x="380" y="714" text-anchor="middle" fill="#ffffff" font-size="11.5">Fonte canônica consultada por outros módulos (idpessoa + periodo)</text>
+</svg>

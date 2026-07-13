@@ -1,16 +1,10 @@
-<%@ page contentType="text/html;charset=UTF-8" language="java"%>
+﻿<%@ page contentType="text/html;charset=UTF-8" language="java"%>
 <html>
     <head>
         <title>Agro - Classificações</title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
          <%@ include file="../../pagina/importacao.html"%>
 
-        <script>
-            $(document).ready(function () {
-                CarregarClassificacao();
-                setInterval(CarregarClassificacao, 20000);
-            });
-        </script>
     </head>
     <body>
         <header>
@@ -27,14 +21,14 @@
             <div id="alerta" class="alert d-none" role="alert"></div>
 
             <div class="mb-3">
-                <button id="btnCadastro" class="btn btn-primary" data-toggle="modal" data-target="#modalCadastro">
+                <button id="btnCadastro" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalCadastro">
                     <i class="fas fa-plus"></i> Nova Classificação
                 </button>
             </div>
 
-            <div class="table-responsive mb-4">
-                <table id="tabelaClassificacao" class="table table-bordered table-striped table-hover">
-                    <thead class="thead-dark">
+            <div class="table-responsive rounded shadow-custom m-2 p-2">
+                <table id="tabelaClassificacao" class="table table-bordered table-striped">
+                    <thead class="thead-green">
                         <tr>
                             <th>ID</th>
                             <th>Classificação</th>
@@ -51,8 +45,8 @@
             <div class="modal-dialog" role="document">
                 <div class="modal-content">
                     <div class="modal-header bg-primary text-white">
-                        <h5 class="modal-title"> <i class="fas fa-plus-circle mr-2"></i>Cadastrar Classificação</h5>
-                        <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
+                        <h5 class="modal-title"> <i class="fas fa-plus-circle me-2"></i>Cadastrar Classificação</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
                     </div>
                     <form id="formCadastro" class="needs-validation" novalidate>
                         <div class="modal-body">
@@ -61,11 +55,10 @@
 
                             <div id="modalClassificacaoCadastro" class="alert d-none" role="alert"></div>
 
-                            <div class="form-group mb-3">
+                            <div class="mb-3">
                                 <label for="classificacao">Classificação</label>
                                 <div class="input-group">
-                                    <div class="input-group-prepend">
-                                        <span class="input-group-text"><i class="fas fa-list-alt text-info"></i></span>
+                                    <span class="input-group-text"><i class="fas fa-list-alt text-info"></i></span>
                                     </div>
                                     <input type="text" id="classificacao" name="classificacao" class="form-control" required>
                                     <div class="invalid-feedback">Informe a classificação.</div>
@@ -74,10 +67,10 @@
                             <div id="modalClassificacaoCadastro" class="mt-2"></div>
                         </div>
                         <div class="modal-footer">
-                            <button type="button" class="btn btn-primary mr-2" onclick="salvarClassificacao()">
+                            <button type="button" class="btn btn-primary me-2" onclick="salvarClassificacao()">
                                 <i class="fas fa-save"></i> Salvar
                             </button>
-                            <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
                                 <i class="fas fa-times"></i> Cancelar
                             </button>
                         </div>
@@ -91,8 +84,8 @@
             <div class="modal-dialog" role="document">
                 <div class="modal-content">
                     <div class="modal-header bg-warning text-white">
-                        <h5 class="modal-title"><i class="fas fa-edit mr-2"></i>Atualizar Classificação</h5>
-                        <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
+                        <h5 class="modal-title"><i class="fas fa-edit me-2"></i>Atualizar Classificação</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
                     </div>
                     <form id="formAtualizacao" class="needs-validation" novalidate>
                         <div class="modal-body">
@@ -102,7 +95,7 @@
                             <div id="modalClassificacaoAtualizar" class="alert d-none" role="alert"></div>
                             
                             <input type="hidden" id="atualizacaoId" name="atualizacaoId">
-                            <div class="form-group mb-3">
+                            <div class="mb-3">
                                 <label for="atualizacaoClassificacao">Classificação</label>
                                 <input type="text" id="atualizacaoClassificacao" name="atualizacaoClassificacao" class="form-control" required>
                                 <div class="invalid-feedback">Informe a classificação.</div>
@@ -110,10 +103,10 @@
                             <div id="modalClassificacaoAtualizar" class="mt-2"></div>
                         </div>
                         <div class="modal-footer">
-                            <button type="button" class="btn btn-primary mr-2" onclick="atualizarClassificacao()">
+                            <button type="button" class="btn btn-primary me-2" onclick="atualizarClassificacao()">
                                 <i class="fas fa-sync-alt"></i> Atualizar
                             </button>
-                            <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
                                 <i class="fas fa-times"></i> Cancelar
                             </button>
                         </div>
@@ -130,7 +123,7 @@
                     <div class="modal-header bg-danger text-white">
                            
                         <h5 class="modal-title">Confirmar Exclusão</h5>
-                        <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
                     </div>
                     <div class="modal-body p-3">
                           <!--  Alert Modal Cadastro -->
@@ -143,10 +136,10 @@
                         <div id="modalClassificacaoExcluir" class="mt-2"></div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-danger mr-2" onclick="excluirClassificacao()">
+                        <button type="button" class="btn btn-danger me-2" onclick="excluirClassificacao()">
                             <i class="fas fa-trash"></i> Excluir
                         </button>
-                        <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
                             <i class="fas fa-times"></i> Cancelar
                         </button>
                     </div>

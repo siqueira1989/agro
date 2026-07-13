@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Documentação Técnica — Agro Tech One</title>
+<style>
+  :root {
+    --verde: #28a745;
+    --verde-escuro: #1e7e34;
+    --cinza-claro: #f8f9fa;
+    --cinza: #6c757d;
+    --borda: #dee2e6;
+    --fonte: 'Segoe UI', Arial, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--fonte); font-size: 14px; color: #212529; background: #fff; }
+
+  /* CAPA */
+  .capa {
+    background: linear-gradient(135deg, var(--verde) 0%, var(--verde-escuro) 100%);
+    color: white;
+    padding: 60px 40px 50px;
+    text-align: center;
+    page-break-after: always;
+  }
+  .capa h1 { font-size: 32px; font-weight: 700; margin-bottom: 8px; }
+  .capa h2 { font-size: 18px; font-weight: 400; opacity: 0.9; margin-bottom: 40px; }
+  .capa .meta { display: inline-block; background: rgba(255,255,255,0.15); border-radius: 8px; padding: 20px 40px; }
+  .capa .meta p { margin: 4px 0; font-size: 13px; }
+  .capa .meta strong { font-size: 15px; }
+  .logo-icon { font-size: 64px; margin-bottom: 20px; }
+
+  /* LAYOUT */
+  .container { max-width: 960px; margin: 0 auto; padding: 30px 40px; }
+
+  /* SUMÁRIO */
+  .sumario { background: var(--cinza-claro); border-left: 4px solid var(--verde); padding: 24px 30px; margin-bottom: 40px; border-radius: 0 8px 8px 0; }
+  .sumario h3 { color: var(--verde-escuro); margin-bottom: 14px; font-size: 16px; }
+  .sumario ol { padding-left: 20px; line-height: 2; }
+  .sumario a { color: #333; text-decoration: none; }
+  .sumario a:hover { color: var(--verde); }
+
+  /* SEÇÕES */
+  .secao { margin-bottom: 48px; }
+  .secao-header {
+    background: var(--verde);
+    color: white;
+    padding: 12px 20px;
+    border-radius: 6px 6px 0 0;
+    font-size: 17px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .secao-body { border: 1px solid var(--borda); border-top: none; border-radius: 0 0 6px 6px; padding: 24px; }
+
+  /* SUB-SEÇÃO */
+  .sub { margin-bottom: 24px; }
+  .sub h4 { font-size: 14px; font-weight: 600; color: var(--verde-escuro); border-bottom: 1px solid #e9ecef; padding-bottom: 6px; margin-bottom: 12px; }
+  .sub h5 { font-size: 13px; font-weight: 600; color: #495057; margin: 12px 0 6px; }
+
+  /* TABELAS */
+  table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 13px; }
+  th { background: var(--verde); color: white; padding: 8px 12px; text-align: left; }
+  td { padding: 7px 12px; border-bottom: 1px solid var(--borda); vertical-align: top; }
+  tr:nth-child(even) td { background: var(--cinza-claro); }
+
+  /* CÓDIGO */
+  pre { background: #1e1e2e; color: #cdd6f4; padding: 16px; border-radius: 6px; font-size: 12px; overflow-x: auto; margin: 10px 0; line-height: 1.6; }
+  code { background: #e8f5e9; color: #1b5e20; padding: 2px 5px; border-radius: 3px; font-size: 12px; font-family: 'Consolas', monospace; }
+
+  /* BADGES */
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .badge-novo    { background: #d4edda; color: #155724; }
+  .badge-fix     { background: #fff3cd; color: #856404; }
+  .badge-refator { background: #cce5ff; color: #004085; }
+  .badge-migracao { background: #f8d7da; color: #721c24; }
+
+  /* ALERTAS */
+  .alerta { border-radius: 6px; padding: 12px 16px; margin: 12px 0; font-size: 13px; }
+  .alerta-info    { background: #e8f4f8; border-left: 4px solid #17a2b8; }
+  .alerta-success { background: #d4edda; border-left: 4px solid var(--verde); }
+  .alerta-warning { background: #fff3cd; border-left: 4px solid #ffc107; }
+
+  /* RODAPÉ */
+  footer { border-top: 2px solid var(--verde); padding: 20px 40px; text-align: center; color: var(--cinza); font-size: 12px; margin-top: 60px; }
+
+  /* IMPRESSÃO */
+  @media print {
+    .secao { page-break-inside: avoid; }
+    .capa  { page-break-after: always; }
+    a { color: inherit; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== CAPA ===== -->
+<div class="capa">
+  <div class="logo-icon">🌿</div>
+  <h1>Agro Tech One</h1>
+  <h2>Documentação Técnica de Alterações do Sistema</h2>
+  <div class="meta">
+    <p><strong>Sistema:</strong> Agro Tech One — Gestão Agrícola</p>
+    <p><strong>Data:</strong> 15 de junho de 2026</p>
+    <p><strong>Responsável:</strong> siqueira1989</p>
+    <p><strong>Versão:</strong> 1.1.0</p>
+    <p><strong>Stack:</strong> Jakarta EE 10 · PostgreSQL · Bootstrap 5 · jQuery · DataTables</p>
+  </div>
+</div>
+
+<!-- ===== CONTEÚDO ===== -->
+<div class="container">
+
+  <!-- SUMÁRIO -->
+  <div class="sumario">
+    <h3>📋 Sumário</h3>
+    <ol>
+      <li><a href="#s1">Visão Geral do Sistema</a></li>
+      <li><a href="#s2">Módulo de Colaboradores (Funcionários)</a></li>
+      <li><a href="#s3">Módulo de Área de Produção</a></li>
+      <li><a href="#s4">Módulo de Talão</a></li>
+      <li><a href="#s5">Módulo de Registro de Ponto</a></li>
+      <li><a href="#s6">Módulo de Folha de Pagamento</a></li>
+      <li><a href="#s7">Migração Bootstrap 4 → Bootstrap 5</a></li>
+      <li><a href="#s8">Correções de Bugs</a></li>
+      <li><a href="#s9">Arquitetura e Stack Técnica</a></li>
+      <li><a href="#s10">Estrutura de Arquivos Alterados</a></li>
+      <li><a href="#s11">Instruções de Build e Deploy</a></li>
+    </ol>
+  </div>
+
+  <!-- ===== SEÇÃO 1 ===== -->
+  <div class="secao" id="s1">
+    <div class="secao-header">1. Visão Geral do Sistema</div>
+    <div class="secao-body">
+      <p>O <strong>Agro Tech One</strong> é um sistema web de gestão agrícola desenvolvido com Jakarta EE 10, seguindo o padrão MVC clássico com Servlets, JSP e JDBC manual para PostgreSQL. Esta versão incorpora novos módulos de RH, produção, migração para Bootstrap 5 e correções críticas de bugs.</p>
+      <br>
+      <table>
+        <tr><th>Módulo</th><th>Status</th><th>Descrição</th></tr>
+        <tr><td>Autenticação / Sessão</td><td><span class="badge badge-fix">Aprimorado</span></td><td>LoginServlet com sessão real, AuthFilter protegendo /view/admin/*</td></tr>
+        <tr><td>Colaboradores (Funcionários)</td><td><span class="badge badge-novo">Novo</span></td><td>CRUD completo, cadastro, edição, ativação/desativação</td></tr>
+        <tr><td>Área de Produção</td><td><span class="badge badge-novo">Novo</span></td><td>CRUD completo com CEP/endereço automático</td></tr>
+        <tr><td>Talão</td><td><span class="badge badge-novo">Novo</span></td><td>CRUD + dados financeiros (safra, custos, vendas)</td></tr>
+        <tr><td>Registro de Ponto</td><td><span class="badge badge-novo">Novo</span></td><td>Controle de presença diária por funcionário</td></tr>
+        <tr><td>Folha de Pagamento</td><td><span class="badge badge-novo">Novo</span></td><td>Geração automática por período, cálculo por tipo de contrato</td></tr>
+        <tr><td>Parceiros</td><td><span class="badge badge-refator">Refatorado</span></td><td>AJAX, DataTable, modal de ativação/desativação</td></tr>
+        <tr><td>Alimentos / Classificação</td><td><span class="badge badge-refator">Refatorado</span></td><td>Padronizado com cabeçalho verde e DataTables</td></tr>
+        <tr><td>Frontend</td><td><span class="badge badge-migracao">Migração</span></td><td>Bootstrap 4.5 → Bootstrap 5.3.3 em todos os arquivos</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- ===== SEÇÃO 2 ===== -->
+  <div class="secao" id="s2">
+    <div class="secao-header">2. Módulo de Colaboradores (Funcionários)</div>
+    <div class="secao-body">
+
+      <div class="sub">
+        <h4>2.1 Arquivos Criados / Modificados</h4>
+        <table>
+          <tr><th>Arquivo</th><th>Tipo</th><th>Alteração</th></tr>
+          <tr><td><code>Controller/ControllerFuncionario.java</code></td><td><span class="badge badge-novo">Novo</span></td><td>Servlet REST para CRUD de funcionários. Gson com adapter LocalDate.</td></tr>
+          <tr><td><code>Model/Dao/FuncionarioDAO.java</code></td><td><span class="badge badge-novo">Novo</span></td><td>Operações JDBC: inserir, atualizar, listar, buscar por ID, alterar situação.</td></tr>
+          <tr><td><code>Model/Model/Funcionario.java</code></td><td><span class="badge badge-novo">Novo</span></td><td>Entidade com herança de PessoaFisica. Campos: matrícula, cargo, tipo, situação.</td></tr>
+          <tr><td><code>view/admin/Colaboradores.jsp</code></td><td><span class="badge badge-novo">Novo</span></td><td>Listagem com DataTable, filtros por tipo/situação, modais de edição e ativação.</td></tr>
+          <tr><td><code>view/admin/ColaboCadastro.jsp</code></td><td><span class="badge badge-novo">Novo</span></td><td>Formulário de cadastro e edição com endereço automático via CEP.</td></tr>
+          <tr><td><code>JS/main.js</code></td><td><span class="badge badge-fix">Modificado</span></td><td>Funções: initFuncionarioCadastro(), preencherFormularioEdicao(), converterDataParaISO(), converterDataParaBR().</td></tr>
+        </table>
+      </div>
+
+      <div class="sub">
+        <h4>2.2 Tipos de Funcionário Suportados</h4>
+        <table>
+          <tr><th>Tipo</th><th>Cálculo Folha</th><th>Tabela BD</th></tr>
+          <tr><td>CLT</td><td>Salário mensal fixo</td><td>funcionarioclt</td></tr>
+          <tr><td>DIARIA</td><td>Dias presentes × valor/dia</td><td>funcionariodiarista</td></tr>
+          <tr><td>EMPREITA</td><td>Valor fixo acordado</td><td>funcionarioempreita</td></tr>
+          <tr><td>PRODUCAO</td><td>Quantidade produzida × valor/unidade</td><td>funcionarioproducao</td></tr>
+        </table>
+      </div>
+
+      <div class="sub">
+        <h4>2.3 Adaptador Gson para LocalDate</h4>
+        <p>Problema: Gson não serializa <code>java.time.LocalDate</code> por padrão, quebrando a resposta JSON. Solução implementada em <code>ControllerFuncionario.java</code>:</p>
+        <pre>private final Gson gson = new GsonBuilder()
+    .registerTypeAdapter(LocalDate.class, new JsonSerializer&lt;LocalDate&gt;() {
+        @Override
+        public JsonElement serialize(LocalDate src, Type typeOfSrc, JsonSerializationContext ctx) {
+            return new JsonPrimitive(src.toString()); // retorna "yyyy-MM-dd"
+        }
+    })
+    .create();</pre>
+      </div>
+
+      <div class="sub">
+        <h4>2.4 Conversão de Data no Frontend</h4>
+        <p>O datepicker retorna <code>dd/mm/aaaa</code>; o backend espera ISO <code>yyyy-MM-dd</code>. Funções adicionadas em <code>main.js</code>:</p>
+        <pre>function converterDataParaISO(valor) {
+  if (!valor) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(valor)) return valor;
+  const partes = valor.split('/');
+  if (partes.length === 3) return partes[2] + '-' + partes[1] + '-' + partes[0];
+  return null;
+}
+
+function converterDataParaBR(isoDate) {
+  if (!isoDate) return '';
+  if (typeof isoDate === 'object') {
+    // Gson serializa LocalDate como objeto {year, monthValue, dayOfMonth}
+    var y = isoDate.year;
+    var m = String(isoDate.monthValue).padStart(2, '0');
+    var d = String(isoDate.dayOfMonth).padStart(2, '0');
+    return d + '/' + m + '/' + y;
+  }
+  var partes = String(isoDate).split('-');
+  if (partes.length === 3) return partes[2] + '/' + partes[1] + '/' + partes[0];
+  return isoDate;
+}</pre>
+      </div>
+
+      <div class="sub">
+        <h4>2.5 Passagem do Context Path para JS externo</h4>
+        <p>JSP EL <code>${}</code> conflita com template literals JS. Solução: injetar o contexto via variável global no <code>&lt;head&gt;</code>:</p>
+        <pre>&lt;script&gt;window.__ctxPath = '&lt;%=request.getContextPath()%&gt;';&lt;/script&gt;</pre>
+        <p>Uso no <code>main.js</code>: <code>(window.__ctxPath || '') + '/ControllerFuncionario'</code></p>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===== SEÇÃO 3 ===== -->
+  <div class="secao" id="s3">
+    <div class="secao-header">3. Módulo de Área de Produção</div>
+    <div class="secao-body">
+
+      <div class="sub">
+        <h4>3.1 Arquivos</h4>
+        <table>
+          <tr><th>Arquivo</th><th>Tipo</th><th>Alteração</th></tr>
+          <tr><td><code>Controller/ControllerAreaProducao.java</code></td><td><span class="badge badge-novo">Novo</span></td><td>CRUD REST. GET lista todas / POST ações: create, update, delete.</td></tr>
+          <tr><td><code>Model/Dao/AreaProducaoDAO.java</code> (planejado)</td><td><span class="badge badge-novo">Novo</span></td><td>JDBC: insert, update, delete, listAll, getById.</td></tr>
+          <tr><td><code>view/admin/areaproducao.jsp</code></td><td><span class="badge badge-refator">Refatorado</span></td><td>DataTable com modais de cadastro e edição. Cabeçalho verde padronizado.</td></tr>
+        </table>
+      </div>
+
+      <div class="sub">
+        <h4>3.2 Correção de Serialização Gson (nomes de campos)</h4>
+        <div class="alerta alerta-warning">
+          <strong>Problema:</strong> Gson serializa pela <em>nome do campo Java</em> (com letra maiúscula inicial), não pelo getter. O JSP lia nomes em minúsculas causando colunas vazias na tabela.
+        </div>
+        <table>
+          <tr><th>Campo Java</th><th>JSON Gson (correto)</th><th>Antes (errado)</th></tr>
+          <tr><td><code>PropriedadeAreaProducao</code></td><td><code>a.PropriedadeAreaProducao</code></td><td><code>a.propriedadeAreaProducao</code></td></tr>
+          <tr><td><code>ProprietarioAreaProducao</code></td><td><code>a.ProprietarioAreaProducao</code></td><td><code>a.proprietarioAreaProducao</code></td></tr>
+          <tr><td><code>SiglasAreaProducao</code></td><td><code>a.SiglasAreaProducao</code></td><td><code>a.siglasAreaProducao</code></td></tr>
+          <tr><td><code>QuantidadeTotalPlantasAreaProducao</code></td><td><code>a.QuantidadeTotalPlantasAreaProducao</code></td><td><code>a.quantidadeTotalPlantasAreaProducao</code></td></tr>
+        </table>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===== SEÇÃO 4 ===== -->
+  <div class="secao" id="s4">
+    <div class="secao-header">4. Módulo de Talão</div>
+    <div class="secao-body">
+
+      <div class="sub">
+        <h4>4.1 Arquivos</h4>
+        <table>
+          <tr><th>Arquivo</th><th>Tipo</th></tr>
+          <tr><td><code>Controller/ControllerTalao.java</code></td><td><span class="badge badge-novo">Novo</span></td></tr>
+          <tr><td><code>Model/Dao/TalaoDAO.java</code> (planejado)</td><td><span class="badge badge-novo">Novo</span></td></tr>
+          <tr><td><code>view/admin/talao.jsp</code></td><td><span class="badge badge-refator">Refatorado</span></td></tr>
+        </table>
+      </div>
+
+      <div class="sub">
+        <h4>4.2 Funcionalidades</h4>
+        <ul style="padding-left:18px;line-height:2">
+          <li>CRUD de talões (descrição, alimento, área de produção, qtd. plantas)</li>
+          <li>Dados financeiros por talão: safra, início/término, custos, despesas, venda bruta, venda líquida</li>
+          <li>Modal financeiro separado do modal de edição principal</li>
+          <li>Ações: <code>create</code>, <code>update</code>, <code>delete</code>, <code>criarfinanceiro</code>, <code>atualizarfinanceiro</code></li>
+        </ul>
+      </div>
+
+      <div class="sub">
+        <h4>4.3 Campos — talaofinanceiro</h4>
+        <table>
+          <tr><th>Campo</th><th>Tipo</th><th>Descrição</th></tr>
+          <tr><td>safratalaofinanceiro</td><td>VARCHAR(50)</td><td>Identificador da safra</td></tr>
+          <tr><td>iniciosafratalaofinanceiro</td><td>DATE</td><td>Início do período de safra</td></tr>
+          <tr><td>terminosafratalaofinanceiro</td><td>DATE</td><td>Término do período de safra</td></tr>
+          <tr><td>custosafratalaofinanceiro</td><td>NUMERIC(12,2)</td><td>Custos totais da safra</td></tr>
+          <tr><td>despesassafratalaofinanceiro</td><td>NUMERIC(12,2)</td><td>Despesas totais da safra</td></tr>
+          <tr><td>vendabrutasafratalaofinanceiro</td><td>NUMERIC(12,2)</td><td>Receita bruta da safra</td></tr>
+          <tr><td>vendaliquidasafratalaofinanceiro</td><td>NUMERIC(12,2)</td><td>Receita líquida da safra</td></tr>
+        </table>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===== SEÇÃO 5 ===== -->
+  <div class="secao" id="s5">
+    <div class="secao-header">5. Módulo de Registro de Ponto</div>
+    <div class="secao-body">
+
+      <div class="sub">
+        <h4>5.1 Arquivos</h4>
+        <table>
+          <tr><th>Arquivo</th><th>Tipo</th></tr>
+          <tr><td><code>Controller/ControllerRegistroPonto.java</code></td><td><span class="badge badge-novo">Novo</span></td></tr>
+          <tr><td><code>view/admin/registroponto.jsp</code></td><td><span class="badge badge-novo">Novo</span></td></tr>
+        </table>
+      </div>
+
+      <div class="sub">
+        <h4>5.2 Funcionalidades</h4>
+        <ul style="padding-left:18px;line-height:2">
+          <li>Registrar presença/ausência de funcionário por data</li>
+          <li>Filtro por funcionário + período (De/Até)</li>
+          <li>Badge verde (Presente) / vermelho (Ausente) na tabela</li>
+          <li>Ações: <code>registrar</code>, <code>delete</code></li>
+        </ul>
+      </div>
+
+      <div class="sub">
+        <h4>5.3 SQL — Tabela registroponto</h4>
+        <pre>CREATE TABLE registroponto (
+  idregistroponto SERIAL PRIMARY KEY,
+  idfuncionario   INT NOT NULL REFERENCES pessoafisica(idpessoa),
+  dataregistro    DATE NOT NULL,
+  presente        BOOLEAN NOT NULL DEFAULT TRUE
+);</pre>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===== SEÇÃO 6 ===== -->
+  <div class="secao" id="s6">
+    <div class="secao-header">6. Módulo de Folha de Pagamento</div>
+    <div class="secao-body">
+
+      <div class="sub">
+        <h4>6.1 Arquivos</h4>
+        <table>
+          <tr><th>Arquivo</th><th>Tipo</th></tr>
+          <tr><td><code>Controller/ControleColaborador.java</code></td><td><span class="badge badge-novo">Novo</span></td></tr>
+          <tr><td><code>view/admin/folhapagamento.jsp</code></td><td><span class="badge badge-novo">Novo</span></td></tr>
+        </table>
+      </div>
+
+      <div class="sub">
+        <h4>6.2 Lógica de Cálculo por Tipo</h4>
+        <table>
+          <tr><th>Tipo</th><th>Lógica de Cálculo</th></tr>
+          <tr><td>CLT</td><td>Salário mensal fixo cadastrado no sistema</td></tr>
+          <tr><td>DIARIA</td><td>Contagem de dias com <code>presente = true</code> no período × <code>valorpordia</code></td></tr>
+          <tr><td>EMPREITA</td><td>Valor fixo acordado (<code>valorfixoacordado</code>)</td></tr>
+          <tr><td>PRODUCAO</td><td>Quantidade produzida no período × <code>valorporunidade</code></td></tr>
+        </table>
+      </div>
+
+      <div class="sub">
+        <h4>6.3 SQL — Tabela folha_pagamento</h4>
+        <pre>CREATE TABLE folha_pagamento (
+  idfolha          SERIAL PRIMARY KEY,
+  idfuncionario    INT NOT NULL REFERENCES funcionario(idpessoa),
+  periodo          VARCHAR(7) NOT NULL,  -- formato YYYY-MM
+  tipofuncionario  tipo_funcionario NOT NULL,
+  valorcalculado   NUMERIC(12,2) NOT NULL,
+  datageracao      TIMESTAMP NOT NULL DEFAULT NOW()
+);</pre>
+      </div>
+
+      <div class="sub">
+        <h4>6.4 Exportação</h4>
+        <p><code>RelatorioExportServlet.java</code> — URL: <code>/RelatorioExportServlet</code></p>
+        <ul style="padding-left:18px;line-height:2">
+          <li>Parâmetros: <code>tipo=excel|pdf</code> + <code>modulo=funcionario|areaproducao|folhapagamento</code> + <code>periodo=YYYY-MM</code></li>
+          <li>Excel gerado com Apache POI (XSSF), cabeçalho verde, colunas auto-dimensionadas</li>
+          <li>PDF gerado com JasperReports</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===== SEÇÃO 7 ===== -->
+  <div class="secao" id="s7">
+    <div class="secao-header">7. Migração Bootstrap 4 → Bootstrap 5</div>
+    <div class="secao-body">
+
+      <div class="sub">
+        <h4>7.1 Escopo — Arquivos Migrados</h4>
+        <p>16 arquivos foram atualizados (via substituição em massa automatizada + revisão manual):</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:13px;margin:8px 0">
+          <code>pagina/importacao.html</code><code>pagina/menu.jsp</code>
+          <code>view/admin/alimento.jsp</code><code>view/admin/areaproducao.jsp</code>
+          <code>view/admin/AtualizacaoAlimento.jsp</code><code>view/admin/AtualizarParceiro.jsp</code>
+          <code>view/admin/CadastroParceiro.jsp</code><code>view/admin/classificacao.jsp</code>
+          <code>view/admin/ColaboCadastro.jsp</code><code>view/admin/Colaboradores.jsp</code>
+          <code>view/admin/despesascustos.jsp</code><code>view/admin/folhapagamento.jsp</code>
+          <code>view/admin/parceiro.jsp</code><code>view/admin/registroponto.jsp</code>
+          <code>view/admin/talao.jsp</code><code>login.jsp</code>
+        </div>
+      </div>
+
+      <div class="sub">
+        <h4>7.2 Tabela de Substituições</h4>
+        <table>
+          <tr><th>Bootstrap 4</th><th>Bootstrap 5</th><th>Descrição</th></tr>
+          <tr><td><code>data-toggle="..."</code></td><td><code>data-bs-toggle="..."</code></td><td>Atributos de componentes JS</td></tr>
+          <tr><td><code>data-dismiss="..."</code></td><td><code>data-bs-dismiss="..."</code></td><td>Fechar modais/alertas</td></tr>
+          <tr><td><code>data-target="..."</code></td><td><code>data-bs-target="..."</code></td><td>Alvo de collapse/modal</td></tr>
+          <tr><td><code>ml-* / mr-*</code></td><td><code>ms-* / me-*</code></td><td>Margens lógicas (start/end)</td></tr>
+          <tr><td><code>pl-* / pr-*</code></td><td><code>ps-* / pe-*</code></td><td>Paddings lógicos</td></tr>
+          <tr><td><code>font-weight-bold</code></td><td><code>fw-bold</code></td><td>Classe de negrito</td></tr>
+          <tr><td><code>text-right / float-right</code></td><td><code>text-end / float-end</code></td><td>Alinhamento RTL-safe</td></tr>
+          <tr><td><code>custom-select</code></td><td><code>form-select</code></td><td>Selects estilizados</td></tr>
+          <tr><td><code>form-row</code></td><td><code>row g-2</code></td><td>Grid de formulários</td></tr>
+          <tr><td><code>form-group</code></td><td><code>mb-3</code></td><td>Espaçamento de campo</td></tr>
+          <tr><td><code>badge-success</code></td><td><code>text-bg-success</code></td><td>Badges coloridas</td></tr>
+          <tr><td><code>badge-secondary</code></td><td><code>text-bg-secondary</code></td><td>Badges coloridas</td></tr>
+          <tr><td><code>btn-block</code></td><td><code>w-100</code></td><td>Botão largura total</td></tr>
+          <tr><td><code>input-group-prepend/append</code></td><td><em>(removido)</em></td><td>Input-group-text direto no grupo</td></tr>
+          <tr><td><code>class="close"</code> com <code>&times;</code></td><td><code>class="btn-close [btn-close-white]"</code></td><td>Botão fechar modais</td></tr>
+          <tr><td><code>custom-control custom-switch</code></td><td><code>form-check form-switch</code></td><td>Switches/checkboxes</td></tr>
+        </table>
+      </div>
+
+      <div class="sub">
+        <h4>7.3 CDN Atualizado — importacao.html</h4>
+        <pre>&lt;!-- Bootstrap 5.3.3 --&gt;
+&lt;link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"&gt;
+&lt;!-- DataTables 1.13.8 + Bootstrap 5 --&gt;
+&lt;link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css"&gt;
+&lt;!-- Font Awesome 6.5.0 --&gt;
+&lt;link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"&gt;
+&lt;!-- Bootstrap Datepicker 1.10.0 --&gt;
+&lt;link rel="stylesheet" href="...bootstrap-datepicker3.min.css"&gt;
+
+&lt;script src="https://code.jquery.com/jquery-3.7.1.min.js"&gt;&lt;/script&gt;
+&lt;script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"&gt;&lt;/script&gt;
+&lt;script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"&gt;&lt;/script&gt;
+&lt;script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"&gt;&lt;/script&gt;
+&lt;script src="...bootstrap-datepicker.min.js"&gt;&lt;/script&gt;
+&lt;script src="../../JS/main.js?&lt;%= System.currentTimeMillis()%&gt;"&gt;&lt;/script&gt;</pre>
+        <div class="alerta alerta-info">
+          <strong>Nota:</strong> O Popper.js foi <em>removido</em> — já está embutido no <code>bootstrap.bundle.min.js</code> do Bootstrap 5.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===== SEÇÃO 8 ===== -->
+  <div class="secao" id="s8">
+    <div class="secao-header">8. Correções de Bugs</div>
+    <div class="secao-body">
+
+      <table>
+        <tr><th>#</th><th>Bug</th><th>Causa Raiz</th><th>Solução</th></tr>
+        <tr>
+          <td>1</td>
+          <td>Erro NOT NULL em <code>datanascimentopf</code> ao cadastrar funcionário</td>
+          <td>Datepicker retorna <code>dd/mm/aaaa</code>; <code>LocalDate.parse()</code> exige ISO <code>yyyy-MM-dd</code></td>
+          <td>Função <code>converterDataParaISO()</code> no JS converte o formato antes do POST</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td>Tabela de funcionários não carregava após cadastro bem-sucedido</td>
+          <td>Gson não serializa <code>LocalDate</code> por padrão → JSON quebrado → DataTables recebia <code>null</code></td>
+          <td>Adicionado adapter <code>JsonSerializer&lt;LocalDate&gt;</code> no <code>GsonBuilder</code></td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td>Campo data de nascimento vazio ao abrir modal de edição</td>
+          <td>Bootstrap-datepicker JS não estava carregado em <code>importacao.html</code>; uso incorreto de <code>$.datepicker.parseDate</code> (API jQuery UI)</td>
+          <td>Adicionados CDNs do datepicker em <code>importacao.html</code>; substituído por <code>$('#campo').datepicker('update', valor)</code></td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td>Tabela Área de Produção vazia (colunas em branco)</td>
+          <td>Gson serializa pelo nome do campo Java (com maiúscula inicial); JSP lia nomes com minúscula inicial</td>
+          <td>Corrigidos todos os acessos de propriedade no JSP para usar a caixa correta</td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td>Cabeçalhos de tabela sem estilo verde (<code>.thead-green</code> ausente)</td>
+          <td>Classe CSS utilizada em múltiplas páginas mas nunca definida em <code>estilo.css</code></td>
+          <td>Adicionado bloco CSS em <code>estilo.css</code></td>
+        </tr>
+        <tr>
+          <td>6</td>
+          <td>Erro 404 no AJAX de cadastro de funcionário</td>
+          <td>URL hardcoded <code>/agro/FuncionarioServlet</code> (servlet inexistente)</td>
+          <td>Corrigido para <code>(window.__ctxPath || '') + '/ControllerFuncionario'</code></td>
+        </tr>
+        <tr>
+          <td>7</td>
+          <td>Campos do POST enviados com nomes errados (camelCase vs. lowercase)</td>
+          <td>JS enviava <code>nomePessoa</code>, <code>cpfPf</code> mas controller esperava <code>nomepessoa</code>, <code>cpfpf</code></td>
+          <td>Padronizados todos os campos do payload JS para lowercase, conforme o controller</td>
+        </tr>
+        <tr>
+          <td>8</td>
+          <td>Modais BS5 não abriam/fechavam</td>
+          <td>Atributos <code>data-toggle</code>/<code>data-dismiss</code> do Bootstrap 4 não funcionam no BS5</td>
+          <td>Migração global para <code>data-bs-toggle</code>/<code>data-bs-dismiss</code></td>
+        </tr>
+      </table>
+
+    </div>
+  </div>
+
+  <!-- ===== SEÇÃO 9 ===== -->
+  <div class="secao" id="s9">
+    <div class="secao-header">9. Arquitetura e Stack Técnica</div>
+    <div class="secao-body">
+
+      <div class="sub">
+        <h4>9.1 Stack</h4>
+        <table>
+          <tr><th>Camada</th><th>Tecnologia</th><th>Versão</th></tr>
+          <tr><td>Backend</td><td>Jakarta EE (Servlets + JSP)</td><td>10</td></tr>
+          <tr><td>Banco de Dados</td><td>PostgreSQL</td><td>15+</td></tr>
+          <tr><td>ORM</td><td>JDBC Manual (sem JPA/Hibernate)</td><td>—</td></tr>
+          <tr><td>JSON</td><td>Gson (Google)</td><td>2.x</td></tr>
+          <tr><td>Build</td><td>Maven Wrapper (<code>mvnw.cmd</code>)</td><td>3.x</td></tr>
+          <tr><td>Servidor</td><td>Apache Tomcat</td><td>10.x</td></tr>
+          <tr><td>CSS Framework</td><td>Bootstrap</td><td>5.3.3</td></tr>
+          <tr><td>JS</td><td>jQuery</td><td>3.7.1</td></tr>
+          <tr><td>Tabelas</td><td>DataTables + Bootstrap 5 integration</td><td>1.13.8</td></tr>
+          <tr><td>Ícones</td><td>Font Awesome</td><td>6.5.0</td></tr>
+          <tr><td>Datepicker</td><td>Bootstrap Datepicker</td><td>1.10.0</td></tr>
+          <tr><td>Máscaras</td><td>jQuery Mask Plugin</td><td>1.14.16</td></tr>
+          <tr><td>Excel</td><td>Apache POI XSSF</td><td>5.2.5</td></tr>
+          <tr><td>PDF</td><td>JasperReports</td><td>6.21.0</td></tr>
+        </table>
+      </div>
+
+      <div class="sub">
+        <h4>9.2 Padrão MVC</h4>
+        <table>
+          <tr><th>Camada</th><th>Responsabilidade</th><th>Localização</th></tr>
+          <tr><td>Model</td><td>Entidades Java e DAOs JDBC</td><td><code>src/main/java/Model/</code></td></tr>
+          <tr><td>View</td><td>JSPs com HTML + AJAX jQuery</td><td><code>src/main/webapp/view/admin/</code></td></tr>
+          <tr><td>Controller</td><td>Servlets REST (GET/POST JSON)</td><td><code>src/main/java/Controller/</code></td></tr>
+          <tr><td>Filter</td><td>Autenticação (AuthFilter)</td><td><code>src/main/java/Filter/</code></td></tr>
+          <tr><td>Util</td><td>TransacaoUtil, helpers</td><td><code>src/main/java/Util/</code></td></tr>
+        </table>
+      </div>
+
+      <div class="sub">
+        <h4>9.3 Padrão de Resposta JSON dos Controllers</h4>
+        <pre>// GET — retorna lista ou objeto
+response.getWriter().write(gson.toJson(lista));
+
+// POST — retorna envelope padronizado
+{ "ok": true,  "msg": "Operação realizada com sucesso." }
+{ "ok": false, "msg": "Descrição do erro." }</pre>
+      </div>
+
+      <div class="sub">
+        <h4>9.4 Padrão de Alerta no Frontend (main.js)</h4>
+        <pre>// Exibe alerta em um container
+mostrarAlerta(mensagem, tipo, '#seletor', duracao_ms);
+
+// Exemplo
+mostrarAlerta('Funcionário salvo!', 'success', '#alerta', 4000);
+mostrarAlerta('CPF inválido.',       'danger',  '#alertModal', 6000);</pre>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===== SEÇÃO 10 ===== -->
+  <div class="secao" id="s10">
+    <div class="secao-header">10. Estrutura de Arquivos Alterados</div>
+    <div class="secao-body">
+      <pre>src/main/java/
+├── Controller/
+│   ├── ControllerFuncionario.java   ← NOVO (CRUD funcionário, adapter LocalDate)
+│   ├── ControllerAreaProducao.java  ← NOVO (CRUD área de produção)
+│   ├── ControllerTalao.java         ← NOVO (CRUD talão + dados financeiros)
+│   ├── ControllerRegistroPonto.java ← NOVO (registro de presença)
+│   ├── ControleColaborador.java     ← NOVO (geração de folha de pagamento)
+│   ├── RelatorioExportServlet.java  ← NOVO (exportação Excel/PDF)
+│   ├── LoginServlet.java            ← NOVO (autenticação com sessão)
+│   └── LogoutServlet.java           ← NOVO (invalidar sessão)
+├── Filter/
+│   └── AuthFilter.java              ← NOVO (proteção das páginas /view/admin/*)
+├── Model/
+│   ├── Dao/
+│   │   ├── FuncionarioDAO.java      ← NOVO
+│   │   ├── FuncionarioCLTDAO.java   ← NOVO
+│   │   └── AreaProducaoDAO.java     ← NOVO
+│   └── Model/
+│       ├── Funcionario.java         ← NOVO
+│       ├── FuncionarioCLT.java      ← NOVO
+│       ├── FuncionarioDiarista.java ← NOVO
+│       ├── AreaProducao.java        ← MODIFICADO (campo setter corrigido)
+│       ├── Alimento.java            ← MODIFICADO
+│       ├── PessoaFisica.java        ← MODIFICADO
+│       └── Talao.java               ← MODIFICADO
+└── Util/
+    └── TransacaoUtil.java           ← NOVO (wrapper de transação JDBC)
+
+src/main/webapp/
+├── JS/
+│   └── main.js                      ← MODIFICADO (múltiplas funções novas)
+├── CSS/
+│   └── estilo.css                   ← MODIFICADO (.thead-green adicionado)
+├── pagina/
+│   ├── importacao.html              ← MODIFICADO (migração BS5, CDNs atualizados)
+│   ├── menu.jsp                     ← MODIFICADO (migração BS5)
+│   └── footer.jsp                   ← MODIFICADO
+├── view/admin/
+│   ├── Colaboradores.jsp            ← NOVO (listagem funcionários)
+│   ├── ColaboCadastro.jsp           ← NOVO (cadastro/edição funcionário)
+│   ├── areaproducao.jsp             ← MODIFICADO (corrigido + BS5)
+│   ├── talao.jsp                    ← MODIFICADO (BS5)
+│   ├── registroponto.jsp            ← NOVO
+│   ├── folhapagamento.jsp           ← NOVO
+│   ├── parceiro.jsp                 ← MODIFICADO (BS5 + padronização)
+│   ├── alimento.jsp                 ← MODIFICADO (BS5 + padronização)
+│   ├── classificacao.jsp            ← MODIFICADO (BS5 + padronização)
+│   ├── despesascustos.jsp           ← MODIFICADO (BS5 + padronização)
+│   ├── AtualizacaoAlimento.jsp      ← MODIFICADO (BS5)
+│   └── AtualizarParceiro.jsp        ← MODIFICADO (BS5)
+└── login.jsp                        ← MODIFICADO (BS5)
+
+Consultassql/
+├── registroponto.sql                ← NOVO
+└── folha_pagamento.sql              ← NOVO</pre>
+    </div>
+  </div>
+
+  <!-- ===== SEÇÃO 11 ===== -->
+  <div class="secao" id="s11">
+    <div class="secao-header">11. Instruções de Build e Deploy</div>
+    <div class="secao-body">
+
+      <div class="sub">
+        <h4>11.1 Build Completo</h4>
+        <div class="alerta alerta-warning">
+          <strong>Atenção:</strong> O Maven global (<code>mvn</code>) está com problema de configuração neste ambiente. Use sempre o wrapper local.
+        </div>
+        <pre># Na pasta raiz do projeto
+.\mvnw.cmd clean package
+
+# O WAR é gerado em:
+target\agro-1.0-SNAPSHOT.war</pre>
+      </div>
+
+      <div class="sub">
+        <h4>11.2 Hot-Copy (sem rebuild — para desenvolvimento)</h4>
+        <p>Copiar arquivos JSP/HTML/JS diretamente para o diretório explodido do Tomcat, sem recompilar:</p>
+        <pre># Exemplo PowerShell
+Copy-Item "src\main\webapp\view\admin\arquivo.jsp" `
+          "target\agro-1.0-SNAPSHOT\view\admin\arquivo.jsp" -Force
+
+# O Tomcat detecta a mudança e recarrega automaticamente.</pre>
+        <div class="alerta alerta-info">
+          <strong>Nota:</strong> Hot-copy funciona apenas para arquivos estáticos (JSP, HTML, CSS, JS). Alterações em Java requerem rebuild completo.
+        </div>
+      </div>
+
+      <div class="sub">
+        <h4>11.3 Configuração do Banco</h4>
+        <pre># persistence.xml — datasource
+&lt;persistence-unit name="agro"&gt;
+  &lt;provider&gt;...&lt;/provider&gt;
+  &lt;!-- Conexão configurada via datasource JNDI ou direto JDBC --&gt;
+  &lt;properties&gt;
+    &lt;property name="jakarta.persistence.jdbc.url"
+              value="jdbc:postgresql://localhost:5432/agro"/&gt;
+    &lt;property name="jakarta.persistence.jdbc.user" value="postgres"/&gt;
+    &lt;property name="jakarta.persistence.jdbc.password" value="..."/&gt;
+  &lt;/properties&gt;
+&lt;/persistence-unit&gt;</pre>
+      </div>
+
+      <div class="sub">
+        <h4>11.4 Scripts SQL a Executar</h4>
+        <table>
+          <tr><th>Script</th><th>Descrição</th><th>Quando executar</th></tr>
+          <tr><td><code>Consultassql/registroponto.sql</code></td><td>Cria tabela <code>registroponto</code></td><td>Primeira vez que usar o módulo de ponto</td></tr>
+          <tr><td><code>Consultassql/folha_pagamento.sql</code></td><td>Cria tabela <code>folha_pagamento</code></td><td>Primeira vez que gerar folha</td></tr>
+        </table>
+      </div>
+
+      <div class="sub">
+        <h4>11.5 Ordem de Acesso Recomendada</h4>
+        <ol style="padding-left:18px;line-height:2.2">
+          <li>Acessar <code>/login.jsp</code> → fazer login com usuário cadastrado</li>
+          <li>Ir em <strong>Configuração → Classificação</strong> para cadastrar tipos de alimento</li>
+          <li>Ir em <strong>Produção → Alimento</strong> para cadastrar os alimentos</li>
+          <li>Ir em <strong>Produção → Área de Produção</strong> para cadastrar as fazendas/áreas</li>
+          <li>Ir em <strong>Produção → Talão</strong> para vincular alimento + área e dados de safra</li>
+          <li>Ir em <strong>RH → Funcionários</strong> para cadastrar colaboradores</li>
+          <li>Ir em <strong>RH → Registro de Ponto</strong> para registrar presenças</li>
+          <li>Ir em <strong>RH → Folha de Pagamento</strong> para gerar a folha do mês</li>
+        </ol>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<!-- RODAPÉ -->
+<footer>
+  <strong>Agro Tech One</strong> · Documentação Técnica v1.1.0 · Gerada em 15/06/2026<br>
+  Sistema de Gestão Agrícola · Jakarta EE 10 · Bootstrap 5 · PostgreSQL
+</footer>
+
+</body>
+</html>
