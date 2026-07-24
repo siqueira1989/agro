@@ -1,8 +1,12 @@
 package Controller;
 
 import Model.Dao.AreaProducaoDAO;
+import Model.Dao.QuadraDAO;
 import Model.Model.AreaProducao;
+import Model.Model.Quadra;
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
@@ -14,6 +18,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,11 +28,13 @@ public class ControllerAreaProducao extends HttpServlet {
     private static final long serialVersionUID = 1L;
 
     private AreaProducaoDAO dao;
+    private QuadraDAO quadraDAO;
     private final Gson gson = new Gson();
 
     @Override
     public void init() {
         dao = new AreaProducaoDAO();
+        quadraDAO = new QuadraDAO();
     }
 
     private void writeJson(HttpServletResponse resp, int status, boolean ok, String msg, String target) throws IOException {
@@ -50,10 +57,18 @@ public class ControllerAreaProducao extends HttpServlet {
         resp.setCharacterEncoding(StandardCharsets.UTF_8.name());
         try (PrintWriter out = resp.getWriter()) {
             String id = req.getParameter("id");
-            if (id != null && !id.isBlank()) {
+            String quadras = req.getParameter("quadras");
+            String alimentos = req.getParameter("alimentos");
+
+            if (alimentos != null) {                       // select de tipo de planta
+                out.print(gson.toJson(dao.listarAlimentos()));
+            } else if (quadras != null && !quadras.isBlank()) {  // quadras de uma área
+                boolean somenteAtivas = !"false".equalsIgnoreCase(req.getParameter("ativas"));  // default: só ativas
+                out.print(gson.toJson(quadraDAO.listarPorArea(Integer.parseInt(quadras), somenteAtivas)));
+            } else if (id != null && !id.isBlank()) {      // uma área
                 AreaProducao area = dao.getById(Integer.parseInt(id));
                 out.print(gson.toJson(area));
-            } else {
+            } else {                                        // lista completa
                 List<AreaProducao> lista = dao.listAll();
                 out.print(gson.toJson(lista));
             }
@@ -80,7 +95,10 @@ public class ControllerAreaProducao extends HttpServlet {
         switch (jo.get("acao").getAsString().toLowerCase()) {
             case "create": handleCreate(jo, resp); break;
             case "update": handleUpdate(jo, resp); break;
-            case "delete": handleDelete(jo, resp); break;
+            case "desativar": handleDesativar(jo, resp); break;
+            case "delete": handleDesativar(jo, resp); break;   // compat.: exclusão agora é soft delete
+            case "addquadra": handleAddQuadra(jo, resp); break;
+            case "desativarquadra": handleDesativarQuadra(jo, resp); break;
             default: writeJson(resp, HttpServletResponse.SC_BAD_REQUEST, false, "Ação inválida.", "page");
         }
     }
@@ -107,7 +125,13 @@ public class ControllerAreaProducao extends HttpServlet {
         try {
             if (dao.existeSigla(sigla)) {
                 writeJson(resp, HttpServletResponse.SC_BAD_REQUEST, false,
-                        "Já existe uma área com essa sigla.", "modal");
+                        "Já existe uma área com essa sigla.", "page");
+                return;
+            }
+            List<Quadra> quadras = parseQuadras(jo);
+            if (quadras.isEmpty()) {
+                writeJson(resp, HttpServletResponse.SC_BAD_REQUEST, false,
+                        "Cadastre ao menos uma quadra de produção.", "page");
                 return;
             }
             AreaProducao area = new AreaProducao();
@@ -117,13 +141,32 @@ public class ControllerAreaProducao extends HttpServlet {
             area.setCep(cep != null ? cep : "");
             area.setComplemento(complemento != null ? complemento : "");
             area.setNumero(numero != null ? numero : 0);
-            area.setQuantidadeTotalPlantasAreaProducao(qtd != null ? qtd : 0);
-            dao.insert(area);
+            dao.inserirComQuadras(area, quadras);   // qtd = soma das quadras
             writeJson(resp, HttpServletResponse.SC_OK, true, "Área cadastrada com sucesso!", "page");
         } catch (SQLException e) {
             writeJson(resp, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
-                    "Erro ao cadastrar: " + e.getMessage(), "modal");
+                    "Erro ao cadastrar: " + e.getMessage(), "page");
         }
+    }
+
+    /** Lê o array 'quadras' do JSON (nome, numeroPlantas, idAlimento). */
+    private List<Quadra> parseQuadras(JsonObject jo) {
+        List<Quadra> lista = new ArrayList<>();
+        if (!jo.has("quadras") || !jo.get("quadras").isJsonArray()) return lista;
+        JsonArray arr = jo.getAsJsonArray("quadras");
+        for (JsonElement el : arr) {
+            if (!el.isJsonObject()) continue;
+            JsonObject q = el.getAsJsonObject();
+            String nome = getStr(q, "nomeQuadra");
+            if (isBlank(nome)) continue;
+            Quadra quadra = new Quadra();
+            quadra.setNomeQuadra(nome.trim());
+            Integer plantas = getInt(q, "numeroPlantas");
+            quadra.setNumeroPlantas(plantas != null ? plantas : 0);
+            quadra.setIdAlimento(getInt(q, "idAlimento"));
+            lista.add(quadra);
+        }
+        return lista;
     }
 
     private void handleUpdate(JsonObject jo, HttpServletResponse resp) throws IOException {
@@ -138,13 +181,13 @@ public class ControllerAreaProducao extends HttpServlet {
 
         if (id == null || isBlank(propriedade) || isBlank(proprietario) || isBlank(sigla)) {
             writeJson(resp, HttpServletResponse.SC_BAD_REQUEST, false,
-                    "Dados obrigatórios não informados.", "modal");
+                    "Dados obrigatórios não informados.", "page");
             return;
         }
         try {
             if (dao.existeSiglaOutro(sigla, id)) {
                 writeJson(resp, HttpServletResponse.SC_BAD_REQUEST, false,
-                        "Já existe outra área com essa sigla.", "modal");
+                        "Já existe outra área com essa sigla.", "page");
                 return;
             }
             AreaProducao area = new AreaProducao();
@@ -157,25 +200,73 @@ public class ControllerAreaProducao extends HttpServlet {
             area.setNumero(numero != null ? numero : 0);
             area.setQuantidadeTotalPlantasAreaProducao(qtd != null ? qtd : 0);
             dao.update(area);
+            dao.recomputarQtdPlantas(id);   // qtd sempre = soma das quadras ativas
             writeJson(resp, HttpServletResponse.SC_OK, true, "Área atualizada com sucesso!", "page");
         } catch (SQLException e) {
             writeJson(resp, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
-                    "Erro ao atualizar: " + e.getMessage(), "modal");
+                    "Erro ao atualizar: " + e.getMessage(), "page");
         }
     }
 
-    private void handleDelete(JsonObject jo, HttpServletResponse resp) throws IOException {
+    /** Ativa/desativa a área (soft delete). Recebe 'situacao' atual e inverte. */
+    private void handleDesativar(JsonObject jo, HttpServletResponse resp) throws IOException {
         Integer id = getInt(jo, "idareaproducao");
         if (id == null) {
             writeJson(resp, HttpServletResponse.SC_BAD_REQUEST, false, "ID não informado.", "page");
             return;
         }
         try {
-            dao.delete(id);
-            writeJson(resp, HttpServletResponse.SC_OK, true, "Área excluída com sucesso!", "page");
+            boolean novaSituacao = jo.has("situacao") && !jo.get("situacao").getAsBoolean();
+            dao.definirSituacao(id, novaSituacao);
+            writeJson(resp, HttpServletResponse.SC_OK, true,
+                    novaSituacao ? "Área ativada com sucesso!" : "Área desativada com sucesso!", "page");
         } catch (SQLException e) {
             writeJson(resp, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
-                    "Erro ao excluir (verifique se há talões vinculados): " + e.getMessage(), "page");
+                    "Erro ao alterar situação: " + e.getMessage(), "page");
+        }
+    }
+
+    /** Adiciona uma quadra a uma área existente e recomputa a soma de plantas. */
+    private void handleAddQuadra(JsonObject jo, HttpServletResponse resp) throws IOException {
+        Integer idArea = getInt(jo, "idareaproducao");
+        String nome = getStr(jo, "nomeQuadra");
+        Integer plantas = getInt(jo, "numeroPlantas");
+        Integer idAlimento = getInt(jo, "idAlimento");
+        if (idArea == null || isBlank(nome)) {
+            writeJson(resp, HttpServletResponse.SC_BAD_REQUEST, false,
+                    "Nome da quadra é obrigatório.", "page");
+            return;
+        }
+        try {
+            Quadra q = new Quadra();
+            q.setIdAreaProducao(idArea);
+            q.setNomeQuadra(nome.trim());
+            q.setNumeroPlantas(plantas != null ? plantas : 0);
+            q.setIdAlimento(idAlimento);
+            quadraDAO.inserir(q);
+            dao.recomputarQtdPlantas(idArea);
+            writeJson(resp, HttpServletResponse.SC_OK, true, "Quadra adicionada!", "page");
+        } catch (SQLException e) {
+            writeJson(resp, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
+                    "Erro ao adicionar quadra: " + e.getMessage(), "page");
+        }
+    }
+
+    /** Desativa uma quadra e recomputa a soma de plantas da área. */
+    private void handleDesativarQuadra(JsonObject jo, HttpServletResponse resp) throws IOException {
+        Integer idQuadra = getInt(jo, "idquadra");
+        if (idQuadra == null) {
+            writeJson(resp, HttpServletResponse.SC_BAD_REQUEST, false, "ID da quadra não informado.", "page");
+            return;
+        }
+        try {
+            Integer idArea = quadraDAO.areaDaQuadra(idQuadra);
+            quadraDAO.desativar(idQuadra);
+            if (idArea != null) dao.recomputarQtdPlantas(idArea);
+            writeJson(resp, HttpServletResponse.SC_OK, true, "Quadra desativada!", "page");
+        } catch (SQLException e) {
+            writeJson(resp, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
+                    "Erro ao desativar quadra: " + e.getMessage(), "page");
         }
     }
 

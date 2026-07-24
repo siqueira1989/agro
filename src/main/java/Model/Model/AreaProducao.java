@@ -11,6 +11,7 @@ public class AreaProducao {
     private String cep;
     private int numero;
     private String complemento;
+    private boolean situacao = true;
 
     public int getIdAreaProducao() {
         return idAreaProducao;
@@ -76,5 +77,13 @@ public class AreaProducao {
 
     public void setComplemento(String complemento) {
         this.complemento = complemento;
+    }
+
+    public boolean isSituacao() {
+        return situacao;
+    }
+
+    public void setSituacao(boolean situacao) {
+        this.situacao = situacao;
     }
 }

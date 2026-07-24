@@ -2,8 +2,7 @@
 -- AGRO TECH ONE — BANCO DE DADOS COMPLETO (schema consolidado)
 --
 -- Arquivo único com TODAS as alterações/versões já aplicadas ao banco.
--- Reflete o estado atual (todas as migrações V2..V12 aplicadas e o
--- módulo Talão removido). Serve para recriar o banco do zero em outro PC.
+-- Reflete o estado atual. Serve para recriar o banco do zero em outro PC.
 --
 -- Como usar (PostgreSQL):
 --   createdb agro
@@ -11,22 +10,21 @@
 --
 -- ---------------------------------------------------------------------
 -- HISTÓRICO DE VERSÕES (migrações em src/main/resources/db/migration)
---   V1  (base)  BancoAgro.sql — tabelas iniciais (pessoa, funcionário,
---               parceiro, produto, alimento, área de produção, etc.)
+--   V1  (base)  BancoAgro.sql — tabelas iniciais
 --   V2  triggers de integridade de funcionário (herança sem FK)
 --   V3  CLT rural (atividade, jornada, ponto eletrônico, fechamento)
 --   V4  vínculo empregatício (múltiplos períodos por pessoa)
 --   V5  id_vinculo nas tabelas operacionais
 --   V6  lançamento de empreita (dia + valor)
---   V7  produção por caixas + histórico de preços (preco_caixa)
---   V8  CLT multi-modo (valor_producao/valor_empreita no fechamento)
---   V9  pagamentos (forma PIX/transferência + dados bancários)
+--   V7  produção por caixas + histórico de preços
+--   V8  CLT multi-modo (valor_producao/valor_empreita)
+--   V9  pagamentos (forma + dados bancários)
 --   V10 tipo_parceiro (Parceiro/Fornecedor/Insumo) + site opcional
 --   V11 estoque de insumos (insumo + estoque_movimento)
---   V12 remoção do módulo Talão (duplicava a Área de Produção)
+--   V12 remoção do módulo Talão
+--   V13 quadras da área de produção + situacao (soft delete)
 --
--- Observação: este arquivo é o SCHEMA (estrutura). Não inclui dados.
--- Gerado a partir do banco vivo via pg_dump --schema-only.
+-- Observação: SCHEMA (estrutura), sem dados. Gerado via pg_dump.
 -- =====================================================================
 
 
@@ -200,7 +198,8 @@ CREATE TABLE public.areaproducao (
     siglasareaproducao character varying(4) NOT NULL,
     cep character varying(10) NOT NULL,
     complemento character varying(50) NOT NULL,
-    numero integer NOT NULL
+    numero integer NOT NULL,
+    situacao boolean DEFAULT true NOT NULL
 );
 
 
@@ -888,6 +887,41 @@ ALTER SEQUENCE public.produto_idproduto_seq OWNED BY public.produto.idproduto;
 
 
 --
+-- Name: quadra; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.quadra (
+    idquadra integer NOT NULL,
+    idareaproducao integer NOT NULL,
+    nome_quadra character varying(60) NOT NULL,
+    numero_plantas integer DEFAULT 0 NOT NULL,
+    id_alimento integer,
+    ativa boolean DEFAULT true NOT NULL,
+    criado_em timestamp without time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: quadra_idquadra_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.quadra_idquadra_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: quadra_idquadra_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.quadra_idquadra_seq OWNED BY public.quadra.idquadra;
+
+
+--
 -- Name: registroponto; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1192,6 +1226,13 @@ ALTER TABLE ONLY public.produto ALTER COLUMN idproduto SET DEFAULT nextval('publ
 
 
 --
+-- Name: quadra idquadra; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.quadra ALTER COLUMN idquadra SET DEFAULT nextval('public.quadra_idquadra_seq'::regclass);
+
+
+--
 -- Name: registroponto idregistroponto; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1453,6 +1494,14 @@ ALTER TABLE ONLY public.produto
 
 
 --
+-- Name: quadra quadra_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.quadra
+    ADD CONSTRAINT quadra_pkey PRIMARY KEY (idquadra);
+
+
+--
 -- Name: registroponto registroponto_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1575,6 +1624,13 @@ CREATE INDEX idx_ponto_vinculo ON public.ponto_eletronico USING btree (id_vincul
 --
 
 CREATE INDEX idx_producao_caixa_pessoa ON public.producao_caixa USING btree (idpessoa);
+
+
+--
+-- Name: idx_quadra_area; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_quadra_area ON public.quadra USING btree (idareaproducao);
 
 
 --
@@ -1761,6 +1817,22 @@ ALTER TABLE ONLY public.alimentoclassificacao
 
 ALTER TABLE ONLY public.lancamento_producao
     ADD CONSTRAINT lancamento_producao_idfuncionario_fkey FOREIGN KEY (idfuncionario) REFERENCES public.funcionarioproducao(idpessoa) ON DELETE CASCADE;
+
+
+--
+-- Name: quadra quadra_id_alimento_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.quadra
+    ADD CONSTRAINT quadra_id_alimento_fkey FOREIGN KEY (id_alimento) REFERENCES public.alimento(idproduto);
+
+
+--
+-- Name: quadra quadra_idareaproducao_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.quadra
+    ADD CONSTRAINT quadra_idareaproducao_fkey FOREIGN KEY (idareaproducao) REFERENCES public.areaproducao(idareaproducao) ON DELETE CASCADE;
 
 
 --

@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <%@ page contentType="text/html;charset=UTF-8" language="java" %>
 <html>
 <head>
@@ -20,9 +20,9 @@
          class="btn btn-light btn-sm me-2">
         <i class="fas fa-file-pdf me-1 text-danger"></i>PDF
       </a>
-      <button class="btn btn-light btn-sm" data-bs-toggle="modal" data-bs-target="#modalCadastro">
+      <a href="${pageContext.request.contextPath}/view/admin/CadastroAreaProducao.jsp" class="btn btn-light btn-sm">
         <i class="fas fa-plus me-1"></i>Nova Área
-      </button>
+      </a>
     </div>
   </div>
 
@@ -36,127 +36,35 @@
             <th>Proprietário</th>
             <th>Sigla</th>
             <th>Qtd. Plantas</th>
+            <th>Situação</th>
             <th>CEP</th>
             <th>Ações</th>
           </tr>
         </thead>
-        <tbody id="corpoTabela"></tbody>
+        <tbody></tbody>
       </table>
   </div>
 </div>
 
-<!-- Modal Cadastro -->
-<div class="modal fade" id="modalCadastro" tabindex="-1">
-  <div class="modal-dialog modal-lg">
-    <div class="modal-content">
-      <div class="modal-header bg-success text-white">
-        <h5 class="modal-title"><i class="fas fa-plus me-2"></i>Nova Área de Produção</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
-      </div>
-      <div class="modal-body">
-        <div id="alertModalCadastro" class="alert d-none" role="alert"></div>
-        <form id="formCadastro">
-          <div class="row">
-            <div class="col-md-6 form-group">
-              <label>Propriedade *</label>
-              <input type="text" class="form-control" id="propriedadeareaproducao" maxlength="50" required>
-            </div>
-            <div class="col-md-6 form-group">
-              <label>Proprietário *</label>
-              <input type="text" class="form-control" id="proprietarioareaproducao" maxlength="50" required>
-            </div>
-          </div>
-          <div class="row">
-            <div class="col-md-3 form-group">
-              <label>Sigla * (máx. 4 chars)</label>
-              <input type="text" class="form-control" id="siglasareaproducao" maxlength="4" required>
-            </div>
-            <div class="col-md-3 form-group">
-              <label>Qtd. Total Plantas</label>
-              <input type="number" class="form-control" id="quantidadetotalplantasareaproducao" min="0" value="0">
-            </div>
-            <div class="col-md-3 form-group">
-              <label>CEP</label>
-              <input type="text" class="form-control" id="cep" placeholder="00000-000">
-            </div>
-            <div class="col-md-3 form-group">
-              <label>Número</label>
-              <input type="number" class="form-control" id="numero" min="0" value="0">
-            </div>
-          </div>
-          <div class="mb-3">
-            <label>Complemento</label>
-            <input type="text" class="form-control" id="complemento" maxlength="50">
-          </div>
-        </form>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-        <button type="button" class="btn btn-success" id="btnSalvar">
-          <i class="fas fa-save me-1"></i>Salvar
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Modal Edição -->
-<div class="modal fade" id="modalEdicao" tabindex="-1">
-  <div class="modal-dialog modal-lg">
+<!-- Modal Desativar/Ativar -->
+<div class="modal fade" id="modalDesativarArea" tabindex="-1">
+  <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header bg-primary text-white">
-        <h5 class="modal-title"><i class="fas fa-edit me-2"></i>Editar Área de Produção</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        <h5 class="modal-title" id="modalDesativarAreaLabel">Confirmar Ação</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <div id="alertModalEdicao" class="alert d-none" role="alert"></div>
-        <input type="hidden" id="editId">
-        <form id="formEdicao">
-          <div class="row">
-            <div class="col-md-6 form-group">
-              <label>Propriedade *</label>
-              <input type="text" class="form-control" id="editPropriedade" maxlength="50" required>
-            </div>
-            <div class="col-md-6 form-group">
-              <label>Proprietário *</label>
-              <input type="text" class="form-control" id="editProprietario" maxlength="50" required>
-            </div>
-          </div>
-          <div class="row">
-            <div class="col-md-3 form-group">
-              <label>Sigla *</label>
-              <input type="text" class="form-control" id="editSigla" maxlength="4" required>
-            </div>
-            <div class="col-md-3 form-group">
-              <label>Qtd. Plantas</label>
-              <input type="number" class="form-control" id="editQtdPlantas" min="0">
-            </div>
-            <div class="col-md-3 form-group">
-              <label>CEP</label>
-              <input type="text" class="form-control" id="editCep">
-            </div>
-            <div class="col-md-3 form-group">
-              <label>Número</label>
-              <input type="number" class="form-control" id="editNumero" min="0">
-            </div>
-          </div>
-          <div class="mb-3">
-            <label>Complemento</label>
-            <input type="text" class="form-control" id="editComplemento" maxlength="50">
-          </div>
-        </form>
+        <p id="mensagemDesativarArea" class="mb-0">Alterar a situação desta área?</p>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-        <button type="button" class="btn btn-primary" id="btnAtualizar">
-          <i class="fas fa-save me-1"></i>Atualizar
-        </button>
+        <button type="button" class="btn btn-danger" id="btnConfirmarDesativarArea">Confirmar</button>
       </div>
     </div>
   </div>
 </div>
 
 <%@ include file="../../pagina/footer.jsp"%>
-
 </body>
 </html>

@@ -3595,116 +3595,255 @@ function diasUteisDoMes(periodo) {
 }
 
 /******************************************************************************************************/
-/* MÓDULO ÁREA DE PRODUÇÃO — areaproducao.jsp                                                         */
+/* MÓDULO ÁREA DE PRODUÇÃO — lista, cadastro (com quadras), atualização e detalhe                     */
 /******************************************************************************************************/
-var tabelaAreas; // DataTable da página areaproducao.jsp
+
+/** Lê um parâmetro da query string da URL. */
+function apGetParam(nome) { return new URLSearchParams(window.location.search).get(nome); }
+
+/** Cache dos alimentos (tipo de planta) para os selects de quadra. */
+if (typeof apAlimentosCache === 'undefined') { var apAlimentosCache = []; }
+function apOptionsAlimento() {
+    var s = '<option value="">Selecione</option>';
+    apAlimentosCache.forEach(function (a) { s += '<option value="' + a.id + '">' + a.nome + '</option>'; });
+    return s;
+}
+
+/* ---------------- LISTA (areaproducao.jsp) ---------------- */
+if (typeof areaParaDesativar === 'undefined') { var areaParaDesativar = null; var areaSituacaoAtual = null; }
 
 $(document).ready(function () {
     if (!$('#tabelaAreas').length) return;
 
-    $('#cep').mask('00000-000');
-    tabelaAreas = $('#tabelaAreas').DataTable({ language: { url: 'https://cdn.datatables.net/plug-ins/1.11.5/i18n/pt_BR.json' } });
-    areaProducaoCarregarTabela();
-
-    $('#btnSalvar').on('click', areaProducaoSalvar);
-    $('#btnAtualizar').on('click', areaProducaoAtualizar);
-    $('#modalCadastro').on('hidden.bs.modal', function () {
-        $('#formCadastro')[0].reset();
-        limparAlerta('#alertModalCadastro');
-    });
-    $('#modalEdicao').on('hidden.bs.modal', function () { limparAlerta('#alertModalEdicao'); });
+    var msg = sessionStorage.getItem('mensagemAlerta');
+    if (msg) {
+        mostrarAlerta(msg, sessionStorage.getItem('tipoAlerta') || 'success', '#alertPage');
+        sessionStorage.removeItem('mensagemAlerta'); sessionStorage.removeItem('tipoAlerta');
+    }
+    $('#tabelaAreas').DataTable({ language: { url: 'https://cdn.datatables.net/plug-ins/1.11.5/i18n/pt_BR.json' } });
+    apCarregarLista();
 });
 
-/** Busca todas as áreas de produção e repopula o DataTable #tabelaAreas. Usado em: areaproducao.jsp */
-function areaProducaoCarregarTabela() {
+function apCarregarLista() {
+    var tabela = $('#tabelaAreas').DataTable();
     $.get(CTX + '/ControllerAreaProducao', function (dados) {
-        tabelaAreas.clear();
+        tabela.clear();
         dados.forEach(function (a) {
-            tabelaAreas.row.add([
-                a.PropriedadeAreaProducao,
-                a.ProprietarioAreaProducao,
-                a.SiglasAreaProducao,
-                a.QuantidadeTotalPlantasAreaProducao,
-                a.cep || '',
-                '<button class="btn-acao btn-acao-editar" title="Editar" onclick="areaProducaoAbrirEdicao(' + JSON.stringify(a).replace(/"/g, '&quot;') + ')"><i class="fas fa-pen-to-square"></i></button> ' +
-                '<button class="btn-acao btn-acao-excluir" title="Excluir" onclick="areaProducaoExcluir(' + a.idAreaProducao + ')"><i class="fas fa-trash"></i></button>'
+            var badge = a.situacao ? '<span class="badge bg-success">Ativa</span>' : '<span class="badge bg-secondary">Inativa</span>';
+            var nome = (a.PropriedadeAreaProducao || '').replace(/'/g, "\\'");
+            var acoes =
+                '<a class="btn-acao btn-acao-editar" title="Atualizar" href="' + CTX + '/view/admin/AtualizarAreaProducao.jsp?id=' + a.idAreaProducao + '"><i class="fas fa-pen-to-square"></i></a> ' +
+                '<button class="btn-acao ' + (a.situacao ? 'btn-acao-desativar' : 'btn-acao-ativar') + '" title="' + (a.situacao ? 'Desativar' : 'Ativar') + '" onclick="apAbrirDesativar(' + a.idAreaProducao + ',' + a.situacao + ',\'' + nome + '\')"><i class="fas ' + (a.situacao ? 'fa-ban' : 'fa-circle-check') + '"></i></button> ' +
+                '<a class="btn-acao" title="Área (detalhe)" href="' + CTX + '/view/admin/DetalheAreaProducao.jsp?id=' + a.idAreaProducao + '"><i class="fas fa-map-location-dot"></i></a>';
+            tabela.row.add([
+                a.PropriedadeAreaProducao, a.ProprietarioAreaProducao, a.SiglasAreaProducao,
+                a.QuantidadeTotalPlantasAreaProducao, badge, a.cep || '', acoes
             ]).draw(false);
         });
     });
 }
 
-/** Coleta os dados do modal de cadastro e chama areaProducaoEnviar com ação 'create'. Usado em: areaproducao.jsp */
-function areaProducaoSalvar() {
-    let payload = {
+function apAbrirDesativar(id, situacao, nome) {
+    areaParaDesativar = id; areaSituacaoAtual = situacao;
+    var desativar = (situacao === true || situacao === 'true');
+    $('#modalDesativarAreaLabel').text(desativar ? 'Confirmar Desativação' : 'Confirmar Ativação');
+    $('#mensagemDesativarArea').text((desativar ? 'Desativar' : 'Ativar') + ' a área "' + nome + '"?');
+    $('#btnConfirmarDesativarArea').removeClass('btn-danger btn-success').addClass(desativar ? 'btn-danger' : 'btn-success').text(desativar ? 'Desativar' : 'Ativar');
+    $('#modalDesativarArea').modal('show');
+}
+
+$(document).on('click', '#btnConfirmarDesativarArea', function () {
+    if (areaParaDesativar == null) return;
+    $.ajax({
+        url: CTX + '/ControllerAreaProducao', method: 'POST', contentType: 'application/json',
+        data: JSON.stringify({ acao: 'desativar', idareaproducao: areaParaDesativar, situacao: areaSituacaoAtual }),
+        success: function (res) {
+            $('#modalDesativarArea').modal('hide');
+            mostrarAlerta(res.msg, res.ok ? 'info' : 'danger', '#alertPage');
+            apCarregarLista();
+        },
+        error: function () { $('#modalDesativarArea').modal('hide'); mostrarAlerta('Erro ao alterar situação.', 'danger', '#alertPage'); }
+    });
+});
+
+/* ---------------- CADASTRO (CadastroAreaProducao.jsp) ---------------- */
+$(document).ready(function () {
+    if (!$('#formCadastroArea').length) return;
+    $('#cepArea').mask('00000-000');
+    $('#cepArea').on('blur', function () { preencherEnderecoViaCep($(this).val()); });
+
+    $.getJSON(CTX + '/ControllerAreaProducao?alimentos=1', function (lista) {
+        apAlimentosCache = lista;
+        apAddQuadraRow();  // começa com uma linha
+    });
+    $('#btnAddQuadraRow').on('click', apAddQuadraRow);
+    $('#btnSalvarArea').on('click', apSalvarCadastro);
+    $('#quadrasBody').on('input', '.q-plantas', apAtualizarSoma);
+    $('#quadrasBody').on('click', '.q-remove', function () { $(this).closest('tr').remove(); apAtualizarSoma(); });
+});
+
+function apAddQuadraRow() {
+    var tr = '<tr>' +
+        '<td><input type="text" class="form-control form-control-sm q-nome" maxlength="60" placeholder="Ex.: Quadra 1"></td>' +
+        '<td><input type="number" class="form-control form-control-sm q-plantas" min="0" value="0"></td>' +
+        '<td><select class="form-select form-select-sm q-alimento">' + apOptionsAlimento() + '</select></td>' +
+        '<td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger q-remove"><i class="fas fa-trash"></i></button></td>' +
+        '</tr>';
+    $('#quadrasBody').append(tr);
+}
+function apAtualizarSoma() {
+    var soma = 0;
+    $('#quadrasBody .q-plantas').each(function () { soma += parseInt($(this).val()) || 0; });
+    $('#quantidadetotalplantasareaproducao').val(soma);
+}
+function apSalvarCadastro() {
+    var quadras = [];
+    $('#quadrasBody tr').each(function () {
+        var nome = $(this).find('.q-nome').val().trim();
+        if (!nome) return;
+        quadras.push({
+            nomeQuadra: nome,
+            numeroPlantas: parseInt($(this).find('.q-plantas').val()) || 0,
+            idAlimento: parseInt($(this).find('.q-alimento').val()) || 0
+        });
+    });
+    var payload = {
         acao: 'create',
         propriedadeareaproducao: $('#propriedadeareaproducao').val().trim(),
         proprietarioareaproducao: $('#proprietarioareaproducao').val().trim(),
         siglasareaproducao: $('#siglasareaproducao').val().trim(),
-        quantidadetotalplantasareaproducao: parseInt($('#quantidadetotalplantasareaproducao').val()) || 0,
-        cep: $('#cep').val().trim(),
-        numero: parseInt($('#numero').val()) || 0,
-        complemento: $('#complemento').val().trim()
+        cep: $('#cepArea').val().trim(),
+        numero: parseInt($('#numeroArea').val()) || 0,
+        complemento: $('#complementoArea').val().trim(),
+        quadras: quadras
     };
-    areaProducaoEnviar(payload, '#alertModalCadastro', '#modalCadastro');
-}
-
-/** Preenche e abre o modal #modalEdicao com os dados da área selecionada. Usado em: areaproducao.jsp */
-function areaProducaoAbrirEdicao(a) {
-    $('#editId').val(a.idAreaProducao);
-    $('#editPropriedade').val(a.PropriedadeAreaProducao);
-    $('#editProprietario').val(a.ProprietarioAreaProducao);
-    $('#editSigla').val(a.SiglasAreaProducao);
-    $('#editQtdPlantas').val(a.QuantidadeTotalPlantasAreaProducao);
-    $('#editCep').val(a.cep);
-    $('#editNumero').val(a.numero);
-    $('#editComplemento').val(a.complemento);
-    $('#modalEdicao').modal('show');
-}
-
-/** Coleta os dados do modal de edição e chama areaProducaoEnviar com ação 'update'. Usado em: areaproducao.jsp */
-function areaProducaoAtualizar() {
-    let payload = {
-        acao: 'update',
-        idareaproducao: parseInt($('#editId').val()),
-        propriedadeareaproducao: $('#editPropriedade').val().trim(),
-        proprietarioareaproducao: $('#editProprietario').val().trim(),
-        siglasareaproducao: $('#editSigla').val().trim(),
-        quantidadetotalplantasareaproducao: parseInt($('#editQtdPlantas').val()) || 0,
-        cep: $('#editCep').val().trim(),
-        numero: parseInt($('#editNumero').val()) || 0,
-        complemento: $('#editComplemento').val().trim()
-    };
-    areaProducaoEnviar(payload, '#alertModalEdicao', '#modalEdicao');
-}
-
-/** Solicita confirmação e envia POST para excluir a área de produção. Usado em: areaproducao.jsp */
-function areaProducaoExcluir(id) {
-    if (!confirm('Excluir esta área? Talões vinculados serão afetados.')) return;
-    areaProducaoEnviar({ acao: 'delete', idareaproducao: id }, '#alertPage', null);
-}
-
-/**
- * Função base AJAX para criar, editar e excluir áreas de produção.
- * Fecha o modal, exibe alerta e recarrega a tabela após sucesso.
- * Usado em: areaproducao.jsp — chamada por areaProducaoSalvar, areaProducaoAtualizar, areaProducaoExcluir
- */
-function areaProducaoEnviar(payload, alertSelector, modalId) {
+    if (!payload.propriedadeareaproducao || !payload.proprietarioareaproducao || !payload.siglasareaproducao) {
+        mostrarAlerta('Propriedade, proprietário e sigla são obrigatórios.', 'danger', '#alertFormArea'); return;
+    }
+    if (quadras.length === 0) { mostrarAlerta('Cadastre ao menos uma quadra (com nome).', 'danger', '#alertFormArea'); return; }
     $.ajax({
-        url: CTX + '/ControllerAreaProducao',
-        method: 'POST', contentType: 'application/json',
+        url: CTX + '/ControllerAreaProducao', method: 'POST', contentType: 'application/json',
         data: JSON.stringify(payload),
         success: function (res) {
             if (res.ok) {
-                if (modalId) $(modalId).modal('hide');
-                mostrarAlerta(res.msg, 'success', '#alertPage');
-                areaProducaoCarregarTabela();
-            } else {
-                mostrarAlerta(res.msg, 'danger', alertSelector);
-            }
+                sessionStorage.setItem('mensagemAlerta', res.msg); sessionStorage.setItem('tipoAlerta', 'success');
+                window.location.href = CTX + '/view/admin/areaproducao.jsp';
+            } else { mostrarAlerta(res.msg, 'danger', '#alertFormArea'); }
         },
-        error: function () { mostrarAlerta('Erro na requisição.', 'danger', alertSelector); }
+        error: function (xhr) { var m = 'Erro ao cadastrar.'; try { m = JSON.parse(xhr.responseText).msg || m; } catch (e) {} mostrarAlerta(m, 'danger', '#alertFormArea'); }
     });
 }
+
+/* ---------------- ATUALIZAÇÃO (AtualizarAreaProducao.jsp) ---------------- */
+$(document).ready(function () {
+    if (!$('#formAtualizarArea').length) return;
+    var id = apGetParam('id');
+    $('#areaId').val(id);
+    $('#cepAreaEdit').mask('00000-000');
+    $('#cepAreaEdit').on('blur', function () { preencherEnderecoViaCep($(this).val()); });
+
+    $.getJSON(CTX + '/ControllerAreaProducao?id=' + id, function (a) {
+        $('#propEdit').val(a.PropriedadeAreaProducao);
+        $('#proprietEdit').val(a.ProprietarioAreaProducao);
+        $('#siglaEdit').val(a.SiglasAreaProducao);
+        $('#qtdEdit').val(a.QuantidadeTotalPlantasAreaProducao);
+        $('#cepAreaEdit').val(a.cep);
+        preencherEnderecoViaCep(a.cep);
+        $('#numeroAreaEdit').val(a.numero);
+        $('#complementoAreaEdit').val(a.complemento);
+    });
+    apCarregarAlimentos($('#addQuadraAlimento'));
+    apCarregarQuadrasEdit(id);
+
+    $('#btnAtualizarArea').on('click', apAtualizarArea);
+    $('#btnAddQuadraEdit').on('click', apAddQuadraEdit);
+});
+
+/** Popula um select de tipo de planta (mantém a 1ª opção). */
+function apCarregarAlimentos($sel) {
+    $.getJSON(CTX + '/ControllerAreaProducao?alimentos=1', function (lista) {
+        $sel.find('option:not(:first)').remove();
+        lista.forEach(function (a) { $sel.append('<option value="' + a.id + '">' + a.nome + '</option>'); });
+    });
+}
+function apCarregarQuadrasEdit(id) {
+    $.getJSON(CTX + '/ControllerAreaProducao?quadras=' + id, function (lista) {
+        var $b = $('#quadrasEditBody').empty();
+        if (!lista.length) { $b.append('<tr><td colspan="4" class="text-center text-muted py-2">Sem quadras ativas.</td></tr>'); return; }
+        lista.forEach(function (q) {
+            $b.append('<tr><td>' + q.nomeQuadra + '</td><td class="text-end">' + q.numeroPlantas + '</td><td>' + (q.alimentoNome || '—') +
+                '</td><td class="text-center"><button class="btn btn-sm btn-outline-danger" onclick="apDesativarQuadra(' + q.idQuadra + ')"><i class="fas fa-ban me-1"></i>Desativar</button></td></tr>');
+        });
+    });
+}
+function apAtualizarArea() {
+    var payload = {
+        acao: 'update', idareaproducao: parseInt($('#areaId').val()),
+        propriedadeareaproducao: $('#propEdit').val().trim(),
+        proprietarioareaproducao: $('#proprietEdit').val().trim(),
+        siglasareaproducao: $('#siglaEdit').val().trim(),
+        cep: $('#cepAreaEdit').val().trim(),
+        numero: parseInt($('#numeroAreaEdit').val()) || 0,
+        complemento: $('#complementoAreaEdit').val().trim()
+    };
+    if (!payload.propriedadeareaproducao || !payload.proprietarioareaproducao || !payload.siglasareaproducao) {
+        mostrarAlerta('Propriedade, proprietário e sigla são obrigatórios.', 'danger', '#alertFormAreaEdit'); return;
+    }
+    $.ajax({
+        url: CTX + '/ControllerAreaProducao', method: 'POST', contentType: 'application/json', data: JSON.stringify(payload),
+        success: function (res) {
+            if (res.ok) {
+                sessionStorage.setItem('mensagemAlerta', res.msg); sessionStorage.setItem('tipoAlerta', 'success');
+                window.location.href = CTX + '/view/admin/areaproducao.jsp';
+            } else { mostrarAlerta(res.msg, 'danger', '#alertFormAreaEdit'); }
+        },
+        error: function (xhr) { var m = 'Erro ao atualizar.'; try { m = JSON.parse(xhr.responseText).msg || m; } catch (e) {} mostrarAlerta(m, 'danger', '#alertFormAreaEdit'); }
+    });
+}
+function apAddQuadraEdit() {
+    var id = parseInt($('#areaId').val());
+    var nome = $('#addQuadraNome').val().trim();
+    if (!nome) { mostrarAlerta('Informe o nome da quadra.', 'danger', '#alertQuadra'); return; }
+    var payload = { acao: 'addquadra', idareaproducao: id, nomeQuadra: nome, numeroPlantas: parseInt($('#addQuadraPlantas').val()) || 0, idAlimento: parseInt($('#addQuadraAlimento').val()) || 0 };
+    $.ajax({
+        url: CTX + '/ControllerAreaProducao', method: 'POST', contentType: 'application/json', data: JSON.stringify(payload),
+        success: function (res) { if (res.ok) { window.location.reload(); } else { mostrarAlerta(res.msg, 'danger', '#alertQuadra'); } },
+        error: function () { mostrarAlerta('Erro ao adicionar quadra.', 'danger', '#alertQuadra'); }
+    });
+}
+function apDesativarQuadra(idQuadra) {
+    if (!confirm('Desativar esta quadra?')) return;
+    $.ajax({
+        url: CTX + '/ControllerAreaProducao', method: 'POST', contentType: 'application/json',
+        data: JSON.stringify({ acao: 'desativarquadra', idquadra: idQuadra }),
+        success: function () { window.location.reload(); },
+        error: function () { mostrarAlerta('Erro ao desativar quadra.', 'danger', '#alertQuadra'); }
+    });
+}
+
+/* ---------------- DETALHE (DetalheAreaProducao.jsp) ---------------- */
+$(document).ready(function () {
+    if (!$('#detalheArea').length) return;
+    var id = apGetParam('id');
+    $.getJSON(CTX + '/ControllerAreaProducao?id=' + id, function (a) {
+        $('#detProp').text(a.PropriedadeAreaProducao);
+        $('#detPropriet').text(a.ProprietarioAreaProducao);
+        $('#detSigla').text(a.SiglasAreaProducao);
+        $('#detQtd').text(a.QuantidadeTotalPlantasAreaProducao);
+        $('#detCep').text(a.cep || '—');
+        $('#detNumero').text(a.numero || '—');
+        $('#detComplemento').text(a.complemento || '—');
+        $('#detSituacao').html(a.situacao ? '<span class="badge bg-success">Ativa</span>' : '<span class="badge bg-secondary">Inativa</span>');
+    });
+    $.getJSON(CTX + '/ControllerAreaProducao?quadras=' + id + '&ativas=false', function (lista) {
+        var $b = $('#detQuadrasBody').empty();
+        if (!lista.length) { $b.append('<tr><td colspan="4" class="text-center text-muted py-2">Sem quadras.</td></tr>'); return; }
+        lista.forEach(function (q) {
+            $b.append('<tr><td>' + q.nomeQuadra + '</td><td class="text-end">' + q.numeroPlantas + '</td><td>' + (q.alimentoNome || '—') + '</td><td>' +
+                (q.ativa ? '<span class="badge bg-success">Ativa</span>' : '<span class="badge bg-secondary">Inativa</span>') + '</td></tr>');
+        });
+    });
+});
 
 /** Oculta e limpa o conteúdo de um container de alerta. Usado em: areaproducao.jsp */
 function limparAlerta(sel) { $(sel).removeClass().addClass('alert d-none').empty(); }
