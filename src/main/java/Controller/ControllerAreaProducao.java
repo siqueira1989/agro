@@ -98,7 +98,8 @@ public class ControllerAreaProducao extends HttpServlet {
             case "desativar": handleDesativar(jo, resp); break;
             case "delete": handleDesativar(jo, resp); break;   // compat.: exclusão agora é soft delete
             case "addquadra": handleAddQuadra(jo, resp); break;
-            case "desativarquadra": handleDesativarQuadra(jo, resp); break;
+            case "desativarquadra": handleAtivarDesativarQuadra(jo, resp, false); break;
+            case "ativarquadra": handleAtivarDesativarQuadra(jo, resp, true); break;
             default: writeJson(resp, HttpServletResponse.SC_BAD_REQUEST, false, "Ação inválida.", "page");
         }
     }
@@ -252,8 +253,11 @@ public class ControllerAreaProducao extends HttpServlet {
         }
     }
 
-    /** Desativa uma quadra e recomputa a soma de plantas da área. */
-    private void handleDesativarQuadra(JsonObject jo, HttpServletResponse resp) throws IOException {
+    /**
+     * Ativa/desativa uma quadra (soft delete: a quadra e seus dados são
+     * preservados no banco) e recomputa a soma de plantas da área.
+     */
+    private void handleAtivarDesativarQuadra(JsonObject jo, HttpServletResponse resp, boolean ativar) throws IOException {
         Integer idQuadra = getInt(jo, "idquadra");
         if (idQuadra == null) {
             writeJson(resp, HttpServletResponse.SC_BAD_REQUEST, false, "ID da quadra não informado.", "page");
@@ -261,12 +265,13 @@ public class ControllerAreaProducao extends HttpServlet {
         }
         try {
             Integer idArea = quadraDAO.areaDaQuadra(idQuadra);
-            quadraDAO.desativar(idQuadra);
+            quadraDAO.definirAtiva(idQuadra, ativar);
             if (idArea != null) dao.recomputarQtdPlantas(idArea);
-            writeJson(resp, HttpServletResponse.SC_OK, true, "Quadra desativada!", "page");
+            writeJson(resp, HttpServletResponse.SC_OK, true,
+                    ativar ? "Quadra reativada!" : "Quadra desativada!", "page");
         } catch (SQLException e) {
             writeJson(resp, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
-                    "Erro ao desativar quadra: " + e.getMessage(), "page");
+                    "Erro ao alterar a quadra: " + e.getMessage(), "page");
         }
     }
 

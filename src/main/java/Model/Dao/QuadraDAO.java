@@ -60,11 +60,12 @@ public class QuadraDAO {
         return lista;
     }
 
-    /** Desativa uma quadra (soft delete). */
-    public void desativar(int idQuadra) throws SQLException {
+    /** Ativa/desativa uma quadra (soft delete — a linha e seus dados são preservados). */
+    public void definirAtiva(int idQuadra, boolean ativa) throws SQLException {
         try (Connection conn = new PostgresConnection().getConnection();
-             PreparedStatement st = conn.prepareStatement("UPDATE quadra SET ativa=false WHERE idquadra=?")) {
-            st.setInt(1, idQuadra);
+             PreparedStatement st = conn.prepareStatement("UPDATE quadra SET ativa=? WHERE idquadra=?")) {
+            st.setBoolean(1, ativa);
+            st.setInt(2, idQuadra);
             st.executeUpdate();
         }
     }

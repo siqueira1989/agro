@@ -69,7 +69,7 @@
       <div id="alertQuadra" class="alert d-none" role="alert"></div>
       <div class="table-responsive mb-3">
         <table class="table table-sm table-hover align-middle mb-0">
-          <thead class="table-light"><tr><th>Nome</th><th class="text-end">Nº Plantas</th><th>Tipo de Planta</th><th style="width:130px;"></th></tr></thead>
+          <thead class="table-light"><tr><th>Nome</th><th class="text-end">Nº Plantas</th><th>Tipo de Planta</th><th>Situação</th><th style="width:130px;"></th></tr></thead>
           <tbody id="quadrasEditBody"></tbody>
         </table>
       </div>

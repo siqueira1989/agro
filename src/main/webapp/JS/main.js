@@ -3767,12 +3767,19 @@ function apCarregarAlimentos($sel) {
     });
 }
 function apCarregarQuadrasEdit(id) {
-    $.getJSON(CTX + '/ControllerAreaProducao?quadras=' + id, function (lista) {
+    // Carrega TODAS as quadras (ativas e inativas) — a quadra desativada não é
+    // excluída; permanece visível com o status e pode ser reativada.
+    $.getJSON(CTX + '/ControllerAreaProducao?quadras=' + id + '&ativas=false', function (lista) {
         var $b = $('#quadrasEditBody').empty();
-        if (!lista.length) { $b.append('<tr><td colspan="4" class="text-center text-muted py-2">Sem quadras ativas.</td></tr>'); return; }
+        if (!lista.length) { $b.append('<tr><td colspan="5" class="text-center text-muted py-2">Sem quadras.</td></tr>'); return; }
         lista.forEach(function (q) {
-            $b.append('<tr><td>' + q.nomeQuadra + '</td><td class="text-end">' + q.numeroPlantas + '</td><td>' + (q.alimentoNome || '—') +
-                '</td><td class="text-center"><button class="btn btn-sm btn-outline-danger" onclick="apDesativarQuadra(' + q.idQuadra + ')"><i class="fas fa-ban me-1"></i>Desativar</button></td></tr>');
+            var badge = q.ativa ? '<span class="badge bg-success">Ativa</span>' : '<span class="badge bg-secondary">Inativa</span>';
+            var acao = q.ativa
+                ? '<button class="btn btn-sm btn-outline-danger" onclick="apDesativarQuadra(' + q.idQuadra + ')"><i class="fas fa-ban me-1"></i>Desativar</button>'
+                : '<button class="btn btn-sm btn-outline-success" onclick="apAtivarQuadra(' + q.idQuadra + ')"><i class="fas fa-circle-check me-1"></i>Reativar</button>';
+            $b.append('<tr class="' + (q.ativa ? '' : 'table-light text-muted') + '"><td>' + q.nomeQuadra +
+                '</td><td class="text-end">' + q.numeroPlantas + '</td><td>' + (q.alimentoNome || '—') +
+                '</td><td>' + badge + '</td><td class="text-center">' + acao + '</td></tr>');
         });
     });
 }
@@ -3812,12 +3819,20 @@ function apAddQuadraEdit() {
     });
 }
 function apDesativarQuadra(idQuadra) {
-    if (!confirm('Desativar esta quadra?')) return;
+    if (!confirm('Desativar esta quadra? Os dados são preservados e a quadra pode ser reativada.')) return;
     $.ajax({
         url: CTX + '/ControllerAreaProducao', method: 'POST', contentType: 'application/json',
         data: JSON.stringify({ acao: 'desativarquadra', idquadra: idQuadra }),
         success: function () { window.location.reload(); },
         error: function () { mostrarAlerta('Erro ao desativar quadra.', 'danger', '#alertQuadra'); }
+    });
+}
+function apAtivarQuadra(idQuadra) {
+    $.ajax({
+        url: CTX + '/ControllerAreaProducao', method: 'POST', contentType: 'application/json',
+        data: JSON.stringify({ acao: 'ativarquadra', idquadra: idQuadra }),
+        success: function () { window.location.reload(); },
+        error: function () { mostrarAlerta('Erro ao reativar quadra.', 'danger', '#alertQuadra'); }
     });
 }
 
