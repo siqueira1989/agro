@@ -3842,6 +3842,7 @@ $(document).ready(function () {
     var id = apGetParam('id');
     $.getJSON(CTX + '/ControllerAreaProducao?id=' + id, function (a) {
         $('#detProp').text(a.PropriedadeAreaProducao);
+        $('#detProp2').text(a.PropriedadeAreaProducao || '');
         $('#detPropriet').text(a.ProprietarioAreaProducao);
         $('#detSigla').text(a.SiglasAreaProducao);
         $('#detQtd').text(a.QuantidadeTotalPlantasAreaProducao);
@@ -3858,7 +3859,245 @@ $(document).ready(function () {
                 (q.ativa ? '<span class="badge bg-success">Ativa</span>' : '<span class="badge bg-secondary">Inativa</span>') + '</td></tr>');
         });
     });
+    dcInit(id);   // Diário de Campo escopado a esta área
 });
+
+/******************************************************************************************************/
+/* DIÁRIO DE CAMPO — dentro do Perfil da Área (DetalheAreaProducao.jsp)                               */
+/******************************************************************************************************/
+var dcAreaId = null, dcCacheFunc = [], dcCacheIns = [], dcOptTalhao = '', dcOptCultura = '', dcOptTipo = '', dcOptFunc = '';
+
+function dcMoney(v) { return 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function dcBadgeStatus(s) {
+    var map = { PLANEJADA: 'bg-secondary', EM_ANDAMENTO: 'bg-info text-dark', CONCLUIDA: 'bg-success', CANCELADA: 'bg-danger' };
+    return '<span class="badge ' + (map[s] || 'bg-secondary') + '">' + (s || '') + '</span>';
+}
+
+function dcInit(areaId) {
+    dcAreaId = areaId;
+    $('#dcData').val(new Date().toISOString().slice(0, 10));
+
+    // Talhões desta área
+    $.getJSON(CTX + '/ControllerAreaProducao?quadras=' + areaId, function (qs) {
+        dcOptTalhao = '';
+        qs.forEach(function (q) { dcOptTalhao += '<option value="' + q.idQuadra + '">' + q.nomeQuadra + '</option>'; });
+        $('#dcTalhao').html(dcOptTalhao || '<option value="">(sem talhões)</option>');
+    });
+    // Culturas
+    $.getJSON(CTX + '/ControllerAreaProducao?alimentos=1', function (as) {
+        dcOptCultura = '<option value="">—</option>';
+        as.forEach(function (a) { dcOptCultura += '<option value="' + a.id + '">' + a.nome + '</option>'; });
+        $('#dcCultura').html(dcOptCultura);
+    });
+    // Tipos de atividade
+    dcCarregarTipos();
+    // Funcionários
+    $.getJSON(CTX + '/ControllerDiarioCampo?funcionarios=1', function (fs) {
+        dcCacheFunc = fs; dcOptFunc = '<option value="">Selecione</option>';
+        fs.forEach(function (f) { dcOptFunc += '<option value="' + f.idPessoa + '" data-tipo="' + f.tipo + '">' + f.nome + ' (' + f.tipo + ')</option>'; });
+        $('#dcResponsavel').html(dcOptFunc);
+    });
+    // Insumos
+    $.getJSON(CTX + '/ControllerInsumo', function (is) { dcCacheIns = is.filter(function (i) { return i.situacao; }); });
+
+    dcCarregarLista();
+
+    $('#dcFiltroStatus').off('change').on('change', dcCarregarLista);
+    $('#btnNovoDiario').off('click').on('click', dcAbrirNovo);
+    $('#btnAddFunc').off('click').on('click', dcAddFuncRow);
+    $('#btnAddMaq').off('click').on('click', dcAddMaqRow);
+    $('#btnAddIns').off('click').on('click', dcAddInsRow);
+    $('#btnAddTipo').off('click').on('click', dcAddTipo);
+    $('#btnSalvarDiario').off('click').on('click', dcSalvar);
+    // auto-preenche o tipo do funcionário na linha
+    $('#dcFuncBody').off('change', '.dc-fpessoa').on('change', '.dc-fpessoa', function () {
+        $(this).closest('tr').find('.dc-ftipo').val($(this).find(':selected').data('tipo') || '');
+    });
+    $('#dcInsBody').off('click', '.dc-rm').on('click', '.dc-rm', function () { $(this).closest('tr').remove(); });
+    $('#dcFuncBody, #dcMaqBody').off('click', '.dc-rm').on('click', '.dc-rm', function () { $(this).closest('tr').remove(); });
+}
+
+function dcCarregarTipos() {
+    $.getJSON(CTX + '/ControllerDiarioCampo?tiposatividade=1', function (ts) {
+        dcOptTipo = '';
+        ts.forEach(function (t) { dcOptTipo += '<option value="' + t.idTipo + '">' + t.nome + '</option>'; });
+        $('#dcTipo').html(dcOptTipo);
+    });
+}
+
+function dcCarregarLista() {
+    var st = $('#dcFiltroStatus').val();
+    var url = CTX + '/ControllerDiarioCampo?area=' + dcAreaId + (st ? '&status=' + st : '');
+    $.getJSON(url, function (lista) {
+        var $b = $('#dcTabelaBody').empty();
+        var pend = 0, concl = 0, custo = 0;
+        if (!lista.length) { $b.append('<tr><td colspan="8" class="text-center text-muted py-3">Nenhum diário nesta área.</td></tr>'); }
+        lista.forEach(function (d) {
+            if (d.status === 'CONCLUIDA') { concl++; custo += Number(d.custoTotal || 0); }
+            else if (d.status === 'PLANEJADA' || d.status === 'EM_ANDAMENTO') pend++;
+            $b.append('<tr>' +
+                '<td>' + (d.numeroDiario || '') + '</td>' +
+                '<td>' + (d.data || '') + '</td>' +
+                '<td>' + (d.quadraNome || '—') + '</td>' +
+                '<td>' + (d.culturaNome || '—') + '</td>' +
+                '<td>' + (d.tipoAtividadeNome || '—') + '</td>' +
+                '<td>' + dcBadgeStatus(d.status) + '</td>' +
+                '<td class="text-end">' + dcMoney(d.custoTotal) + '</td>' +
+                '<td class="text-end"><button class="btn btn-sm btn-outline-dark" onclick="dcVerDetalhe(' + d.idDiario + ')"><i class="fas fa-eye"></i></button></td>' +
+                '</tr>');
+        });
+        $('#dcCardAtividades').text(lista.length);
+        $('#dcCardPendentes').text(pend);
+        $('#dcCardConcluidas').text(concl);
+        $('#dcCardCusto').text(dcMoney(custo));
+    });
+}
+
+function dcAbrirNovo() {
+    $('#alertDiario').addClass('d-none').text('');
+    $('#dcTalhao').html(dcOptTalhao); $('#dcCultura').html(dcOptCultura);
+    $('#dcResponsavel').html(dcOptFunc); $('#dcTipo').html(dcOptTipo);
+    $('#dcDescricao,#dcObs,#dcDataPrev,#dcHoraIni,#dcHoraFim').val('');
+    $('#dcData').val(new Date().toISOString().slice(0, 10));
+    $('#dcFuncBody,#dcMaqBody,#dcInsBody').empty();
+    dcAddFuncRow();
+    $('#modalNovoDiario').modal('show');
+}
+
+function dcAddFuncRow() {
+    $('#dcFuncBody').append('<tr>' +
+        '<td><select class="form-select form-select-sm dc-fpessoa">' + dcOptFunc + '</select></td>' +
+        '<td><input class="form-control form-control-sm dc-ftipo" readonly placeholder="—" style="width:90px"></td>' +
+        '<td><input class="form-control form-control-sm dc-ffuncao" maxlength="60"></td>' +
+        '<td><input type="number" class="form-control form-control-sm dc-fhoras" min="0" step="0.5" value="0"></td>' +
+        '<td><input type="number" class="form-control form-control-sm dc-fvalor" min="0" step="0.01" value="0"></td>' +
+        '<td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger dc-rm"><i class="fas fa-trash"></i></button></td></tr>');
+}
+function dcAddMaqRow() {
+    $('#dcMaqBody').append('<tr>' +
+        '<td><select class="form-select form-select-sm dc-mcat"><option value="TRATOR">Trator</option><option value="IMPLEMENTO">Implemento</option><option value="VEICULO">Veículo</option></select></td>' +
+        '<td><input class="form-control form-control-sm dc-mnome" maxlength="80"></td>' +
+        '<td><input type="number" class="form-control form-control-sm dc-mhi" step="0.1" value="0"></td>' +
+        '<td><input type="number" class="form-control form-control-sm dc-mhf" step="0.1" value="0"></td>' +
+        '<td><input type="number" class="form-control form-control-sm dc-mhoras" step="0.1" value="0"></td>' +
+        '<td><input type="number" class="form-control form-control-sm dc-mvalor" step="0.01" value="0"></td>' +
+        '<td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger dc-rm"><i class="fas fa-trash"></i></button></td></tr>');
+}
+function dcAddInsRow() {
+    var opt = '<option value="">Selecione</option>';
+    dcCacheIns.forEach(function (i) { opt += '<option value="' + i.idInsumo + '">' + i.nome + ' (' + i.unidade + ')</option>'; });
+    $('#dcInsBody').append('<tr>' +
+        '<td><select class="form-select form-select-sm dc-ipro">' + opt + '</select></td>' +
+        '<td><input type="number" class="form-control form-control-sm dc-iqtd" min="0" step="0.001" value="0"></td>' +
+        '<td><input class="form-control form-control-sm dc-idose" maxlength="60"></td>' +
+        '<td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger dc-rm"><i class="fas fa-trash"></i></button></td></tr>');
+}
+
+function dcSalvar() {
+    var funcionarios = [];
+    $('#dcFuncBody tr').each(function () {
+        var id = $(this).find('.dc-fpessoa').val();
+        if (!id) return;
+        funcionarios.push({ idPessoa: parseInt(id), tipoFuncionario: $(this).find('.dc-ftipo').val(),
+            funcaoExercida: $(this).find('.dc-ffuncao').val(), horasTrabalhadas: parseFloat($(this).find('.dc-fhoras').val()) || 0,
+            valorContratado: parseFloat($(this).find('.dc-fvalor').val()) || 0 });
+    });
+    var maquinas = [];
+    $('#dcMaqBody tr').each(function () {
+        var nome = $(this).find('.dc-mnome').val().trim();
+        if (!nome) return;
+        maquinas.push({ categoria: $(this).find('.dc-mcat').val(), nome: nome,
+            horimetroInicial: parseFloat($(this).find('.dc-mhi').val()) || 0, horimetroFinal: parseFloat($(this).find('.dc-mhf').val()) || 0,
+            horasTrabalhadas: parseFloat($(this).find('.dc-mhoras').val()) || 0, valorHora: parseFloat($(this).find('.dc-mvalor').val()) || 0 });
+    });
+    var insumos = [];
+    var insumoInvalido = false;
+    $('#dcInsBody tr').each(function () {
+        var id = $(this).find('.dc-ipro').val(); var qtd = parseFloat($(this).find('.dc-iqtd').val()) || 0;
+        if (!id && qtd === 0) return;
+        if (!id || qtd <= 0) { insumoInvalido = true; return; }
+        insumos.push({ idInsumo: parseInt(id), quantidade: qtd, doseAplicada: $(this).find('.dc-idose').val() });
+    });
+    if (insumoInvalido) { $('#alertDiario').removeClass('d-none').addClass('alert-danger').text('Cada insumo precisa de produto e quantidade > 0.'); return; }
+
+    var payload = {
+        acao: 'create', data: $('#dcData').val(), idArea: dcAreaId,
+        idQuadra: parseInt($('#dcTalhao').val()) || null,
+        idCultura: $('#dcCultura').val() ? parseInt($('#dcCultura').val()) : null,
+        idResponsavel: parseInt($('#dcResponsavel').val()) || null,
+        idTipoAtividade: parseInt($('#dcTipo').val()) || 0,
+        descricao: $('#dcDescricao').val(), dataPrevista: $('#dcDataPrev').val() || null,
+        horaInicio: $('#dcHoraIni').val() || null, horaFim: $('#dcHoraFim').val() || null,
+        observacoes: $('#dcObs').val(), funcionarios: funcionarios, maquinas: maquinas, insumos: insumos
+    };
+    if (!payload.idQuadra || !payload.idResponsavel || !payload.idTipoAtividade) {
+        $('#alertDiario').removeClass('d-none').addClass('alert-danger').text('Talhão, responsável e tipo de atividade são obrigatórios.'); return;
+    }
+    $.ajax({
+        url: CTX + '/ControllerDiarioCampo', method: 'POST', contentType: 'application/json; charset=utf-8',
+        data: JSON.stringify(payload),
+        success: function (res) {
+            if (res.ok) { $('#modalNovoDiario').modal('hide'); mostrarAlerta(res.msg + ' (' + (res.numeroDiario || '') + ')', 'success', '#alertPerfil'); dcCarregarLista(); }
+            else $('#alertDiario').removeClass('d-none').addClass('alert-danger').text(res.msg);
+        },
+        error: function (xhr) { var m = 'Erro ao salvar diário.'; try { m = JSON.parse(xhr.responseText).msg || m; } catch (e) {} $('#alertDiario').removeClass('d-none').addClass('alert-danger').text(m); }
+    });
+}
+
+function dcVerDetalhe(id) {
+    $.getJSON(CTX + '/ControllerDiarioCampo?id=' + id, function (d) {
+        $('#ddNumero').text(d.numeroDiario || '');
+        var h = '<div class="row g-2 mb-2">' +
+            '<div class="col-4"><small class="text-muted">Data</small><div>' + (d.data || '—') + '</div></div>' +
+            '<div class="col-4"><small class="text-muted">Talhão</small><div>' + (d.quadraNome || '—') + '</div></div>' +
+            '<div class="col-4"><small class="text-muted">Cultura</small><div>' + (d.culturaNome || '—') + '</div></div>' +
+            '<div class="col-4"><small class="text-muted">Atividade</small><div>' + (d.tipoAtividadeNome || '—') + '</div></div>' +
+            '<div class="col-4"><small class="text-muted">Responsável</small><div>' + (d.responsavelNome || '—') + '</div></div>' +
+            '<div class="col-4"><small class="text-muted">Status</small><div>' + dcBadgeStatus(d.status) + '</div></div></div>';
+        h += '<table class="table table-sm"><tr><th>Mão de obra</th><td class="text-end">' + dcMoney(d.custoMaoObra) + '</td>' +
+            '<th>Insumos</th><td class="text-end">' + dcMoney(d.custoInsumos) + '</td></tr>' +
+            '<tr><th>Máquinas</th><td class="text-end">' + dcMoney(d.custoMaquinas) + '</td>' +
+            '<th>Custo Total</th><td class="text-end fw-bold">' + dcMoney(d.custoTotal) + '</td></tr></table>';
+        function bloco(titulo, arr, cols) {
+            if (!arr || !arr.length) return '';
+            var s = '<h6 class="fw-bold mt-2">' + titulo + '</h6><table class="table table-sm"><thead><tr>';
+            cols.forEach(function (c) { s += '<th>' + c[0] + '</th>'; }); s += '</tr></thead><tbody>';
+            arr.forEach(function (o) { s += '<tr>'; cols.forEach(function (c) { s += '<td>' + (c[1](o)) + '</td>'; }); s += '</tr>'; });
+            return s + '</tbody></table>';
+        }
+        h += bloco('Funcionários', d.funcionarios, [['Nome', function (o) { return o.nomePessoa || o.idPessoa; }], ['Tipo', function (o) { return o.tipoFuncionario || ''; }], ['Função', function (o) { return o.funcaoExercida || ''; }], ['Horas', function (o) { return o.horasTrabalhadas; }], ['Custo', function (o) { return dcMoney(o.custo); }]]);
+        h += bloco('Máquinas', d.maquinas, [['Categoria', function (o) { return o.categoria || ''; }], ['Nome', function (o) { return o.nome || ''; }], ['Horas', function (o) { return o.horasTrabalhadas; }], ['Valor/h', function (o) { return dcMoney(o.valorHora); }], ['Custo', function (o) { return dcMoney(o.custo); }]]);
+        h += bloco('Insumos', d.insumos, [['Insumo', function (o) { return o.insumoNome || o.idInsumo; }], ['Qtd', function (o) { return o.quantidade + ' ' + (o.unidade || ''); }], ['Custo', function (o) { return dcMoney(o.custo); }], ['Baixado', function (o) { return o.baixado ? 'Sim' : 'Não'; }]]);
+        $('#ddCorpo').html(h);
+        var podeFinalizar = (d.status === 'PLANEJADA' || d.status === 'EM_ANDAMENTO');
+        $('#btnFinalizarDiario').toggleClass('d-none', !podeFinalizar).off('click').on('click', function () { dcFinalizar(d.idDiario); });
+        $('#modalDetalheDiario').modal('show');
+    });
+}
+
+function dcFinalizar(id) {
+    if (!confirm('Finalizar a atividade? Isso calcula os custos e dá baixa no estoque dos insumos.')) return;
+    $.ajax({
+        url: CTX + '/ControllerDiarioCampo', method: 'POST', contentType: 'application/json',
+        data: JSON.stringify({ acao: 'finalizar', iddiario: id }),
+        success: function (res) {
+            $('#modalDetalheDiario').modal('hide');
+            mostrarAlerta(res.msg, res.ok ? 'success' : 'danger', '#alertPerfil');
+            dcCarregarLista();
+        },
+        error: function (xhr) { var m = 'Erro ao finalizar.'; try { m = JSON.parse(xhr.responseText).msg || m; } catch (e) {} mostrarAlerta(m, 'danger', '#alertPerfil'); $('#modalDetalheDiario').modal('hide'); }
+    });
+}
+
+function dcAddTipo() {
+    var nome = prompt('Nome do novo tipo de atividade:');
+    if (!nome || !nome.trim()) return;
+    $.ajax({
+        url: CTX + '/ControllerDiarioCampo', method: 'POST', contentType: 'application/json; charset=utf-8',
+        data: JSON.stringify({ acao: 'addtipoatividade', nome: nome.trim() }),
+        success: function () { dcCarregarTipos(); }
+    });
+}
 
 /** Oculta e limpa o conteúdo de um container de alerta. Usado em: areaproducao.jsp */
 function limparAlerta(sel) { $(sel).removeClass().addClass('alert d-none').empty(); }
