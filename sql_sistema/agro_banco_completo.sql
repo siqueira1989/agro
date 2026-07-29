@@ -3,30 +3,17 @@
 --
 -- Arquivo único com TODAS as alterações/versões já aplicadas ao banco.
 -- Reflete o estado atual. Serve para recriar o banco do zero em outro PC.
---
--- Como usar (PostgreSQL):
 --   createdb agro
 --   psql -U postgres -d agro -f agro_banco_completo.sql
 --
--- ---------------------------------------------------------------------
 -- HISTÓRICO DE VERSÕES (migrações em src/main/resources/db/migration)
---   V1  (base)  BancoAgro.sql — tabelas iniciais
---   V2  triggers de integridade de funcionário (herança sem FK)
---   V3  CLT rural (atividade, jornada, ponto eletrônico, fechamento)
---   V4  vínculo empregatício (múltiplos períodos por pessoa)
---   V5  id_vinculo nas tabelas operacionais
---   V6  lançamento de empreita (dia + valor)
---   V7  produção por caixas + histórico de preços
---   V8  CLT multi-modo (valor_producao/valor_empreita)
---   V9  pagamentos (forma + dados bancários)
---   V10 tipo_parceiro (Parceiro/Fornecedor/Insumo) + site opcional
---   V11 estoque de insumos (insumo + estoque_movimento)
---   V12 remoção do módulo Talão
---   V13 quadras da área de produção + situacao (soft delete)
---   V14 Diário de Campo (operações por talhão: funcionários, máquinas,
---       insumos, custos e baixa de estoque)
+--   V1 base · V2 triggers · V3 CLT rural · V4 vínculo · V5 id_vinculo
+--   V6 empreita · V7 produção/caixas · V8 CLT multi-modo · V9 pagamentos
+--   V10 tipo_parceiro · V11 estoque insumos · V12 remove talão
+--   V13 quadras + situacao · V14 Diário de Campo
+--   V15 Maquinário (trator/implemento custo/hora, veículo custo/km) + km no diário
 --
--- Observação: SCHEMA (estrutura), sem dados. Gerado via pg_dump.
+-- SCHEMA (estrutura), sem dados. Gerado via pg_dump.
 -- =====================================================================
 
 
@@ -424,7 +411,8 @@ CREATE TABLE public.diario_maquina (
     horimetro_final numeric(10,2) DEFAULT 0 NOT NULL,
     horas_trabalhadas numeric(10,2) DEFAULT 0 NOT NULL,
     valor_hora numeric(12,2) DEFAULT 0 NOT NULL,
-    custo numeric(12,2) DEFAULT 0 NOT NULL
+    custo numeric(12,2) DEFAULT 0 NOT NULL,
+    km numeric(10,2) DEFAULT 0 NOT NULL
 );
 
 
@@ -846,6 +834,46 @@ CREATE SEQUENCE public.lancamento_producao_idlancamento_seq
 --
 
 ALTER SEQUENCE public.lancamento_producao_idlancamento_seq OWNED BY public.lancamento_producao.idlancamento;
+
+
+--
+-- Name: maquina; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.maquina (
+    idmaquina integer NOT NULL,
+    nome character varying(80) NOT NULL,
+    tipo character varying(12) NOT NULL,
+    marca character varying(60),
+    identificacao character varying(40),
+    custo_hora numeric(12,2) DEFAULT 0 NOT NULL,
+    custo_km numeric(12,2) DEFAULT 0 NOT NULL,
+    combustivel_hora numeric(12,2) DEFAULT 0 NOT NULL,
+    manutencao_hora numeric(12,2) DEFAULT 0 NOT NULL,
+    depreciacao_hora numeric(12,2) DEFAULT 0 NOT NULL,
+    situacao boolean DEFAULT true NOT NULL,
+    criado_em timestamp without time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: maquina_idmaquina_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.maquina_idmaquina_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: maquina_idmaquina_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.maquina_idmaquina_seq OWNED BY public.maquina.idmaquina;
 
 
 --
@@ -1391,6 +1419,13 @@ ALTER TABLE ONLY public.lancamento_producao ALTER COLUMN idlancamento SET DEFAUL
 
 
 --
+-- Name: maquina idmaquina; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.maquina ALTER COLUMN idmaquina SET DEFAULT nextval('public.maquina_idmaquina_seq'::regclass);
+
+
+--
 -- Name: pagamento idpagamento; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1687,6 +1722,14 @@ ALTER TABLE ONLY public.lancamento_producao
 
 ALTER TABLE ONLY public.lancamento_producao
     ADD CONSTRAINT lancamento_producao_pkey PRIMARY KEY (idlancamento);
+
+
+--
+-- Name: maquina maquina_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.maquina
+    ADD CONSTRAINT maquina_pkey PRIMARY KEY (idmaquina);
 
 
 --

@@ -141,9 +141,8 @@ public class ControllerDiarioCampo extends HttpServlet {
         }
 
         if (update) {
-            // Atualização de cabeçalho simples (as coleções são geridas na tela de detalhe/edição futura)
             if (d.getIdDiario() == 0) { writeJson(resp, 400, false, "ID do diário obrigatório."); return; }
-            atualizarCabecalho(d);
+            dao.atualizarCompleto(d);   // substitui cabeçalho + filhas e recalcula custos
             writeJson(resp, 200, true, "Diário atualizado com sucesso!");
         } else {
             int id = dao.inserirCompleto(d);
@@ -188,27 +187,6 @@ public class ControllerDiarioCampo extends HttpServlet {
              PreparedStatement st = c.prepareStatement("SELECT 1 FROM quadra WHERE idquadra=? AND idareaproducao=?")) {
             st.setInt(1, idQuadra); st.setInt(2, idArea);
             try (ResultSet rs = st.executeQuery()) { return rs.next(); }
-        }
-    }
-
-    private void atualizarCabecalho(DiarioCampo d) throws Exception {
-        String sql = "UPDATE diario_campo SET data=?, id_area=?, id_quadra=?, id_cultura=?, id_responsavel=?, "
-                + "id_tipo_atividade=?, descricao=?, data_prevista=?, hora_inicio=?, hora_fim=?, observacoes=? "
-                + "WHERE iddiario=?";
-        try (Connection c = new Util.PostgresConnection().getConnection();
-             PreparedStatement st = c.prepareStatement(sql)) {
-            st.setDate(1, java.sql.Date.valueOf(d.getData() != null ? d.getData() : LocalDate.now()));
-            st.setInt(2, d.getIdArea()); st.setInt(3, d.getIdQuadra());
-            if (d.getIdCultura() != null) st.setInt(4, d.getIdCultura()); else st.setNull(4, java.sql.Types.INTEGER);
-            st.setInt(5, d.getIdResponsavel());
-            st.setInt(6, d.getIdTipoAtividade());
-            st.setString(7, d.getDescricao());
-            if (d.getDataPrevista() != null) st.setDate(8, java.sql.Date.valueOf(d.getDataPrevista())); else st.setNull(8, java.sql.Types.DATE);
-            if (d.getHoraInicio() != null) st.setTime(9, java.sql.Time.valueOf(d.getHoraInicio())); else st.setNull(9, java.sql.Types.TIME);
-            if (d.getHoraFim() != null) st.setTime(10, java.sql.Time.valueOf(d.getHoraFim())); else st.setNull(10, java.sql.Types.TIME);
-            st.setString(11, d.getObservacoes());
-            st.setInt(12, d.getIdDiario());
-            st.executeUpdate();
         }
     }
 

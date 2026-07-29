@@ -34,6 +34,9 @@
                     <a class="dropdown-item" href="<%=request.getContextPath()%>/view/admin/estoque.jsp">
                         <i class="fas fa-warehouse me-1"></i>Estoque de Insumos
                     </a>
+                    <a class="dropdown-item" href="<%=request.getContextPath()%>/view/admin/maquina.jsp">
+                        <i class="fas fa-tractor me-1"></i>Maquinário
+                    </a>
                 </div>
             </li>
 

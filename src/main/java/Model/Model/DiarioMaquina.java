@@ -13,7 +13,8 @@ public class DiarioMaquina {
     private BigDecimal horimetroInicial = BigDecimal.ZERO;
     private BigDecimal horimetroFinal = BigDecimal.ZERO;
     private BigDecimal horasTrabalhadas = BigDecimal.ZERO;
-    private BigDecimal valorHora = BigDecimal.ZERO;
+    private BigDecimal km = BigDecimal.ZERO;
+    private BigDecimal valorHora = BigDecimal.ZERO;   // custo unitário aplicado (hora ou km)
     private BigDecimal custo = BigDecimal.ZERO;
 
     public int getId() { return id; }
@@ -32,6 +33,8 @@ public class DiarioMaquina {
     public void setHorimetroFinal(BigDecimal v) { this.horimetroFinal = v; }
     public BigDecimal getHorasTrabalhadas() { return horasTrabalhadas; }
     public void setHorasTrabalhadas(BigDecimal v) { this.horasTrabalhadas = v; }
+    public BigDecimal getKm() { return km; }
+    public void setKm(BigDecimal km) { this.km = km; }
     public BigDecimal getValorHora() { return valorHora; }
     public void setValorHora(BigDecimal v) { this.valorHora = v; }
     public BigDecimal getCusto() { return custo; }

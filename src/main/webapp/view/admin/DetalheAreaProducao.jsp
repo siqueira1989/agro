@@ -97,11 +97,14 @@
 <div class="modal fade" id="modalNovoDiario" tabindex="-1">
   <div class="modal-dialog modal-xl"><div class="modal-content">
     <div class="modal-header bg-success text-white">
-      <h5 class="modal-title"><i class="fas fa-book me-2"></i>Novo Diário de Campo</h5>
+      <h5 class="modal-title"><i class="fas fa-book me-2"></i><span id="dcModalTitulo">Novo Diário de Campo</span></h5>
       <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
     </div>
     <div class="modal-body">
       <div id="alertDiario" class="alert d-none"></div>
+      <input type="hidden" id="dcId">
+      <input type="hidden" id="dcStatus">
+      <input type="hidden" id="dcNumero">
 
       <div class="row g-2">
         <div class="col-md-3"><label class="form-label">Data *</label><input type="date" class="form-control" id="dcData"></div>
@@ -140,7 +143,7 @@
         <button class="btn btn-outline-secondary btn-sm" type="button" id="btnAddMaq"><i class="fas fa-plus me-1"></i>Adicionar</button>
       </div>
       <div class="table-responsive"><table class="table table-sm align-middle mb-2">
-        <thead class="table-light"><tr><th>Categoria</th><th>Nome</th><th>Horím. ini</th><th>Horím. fim</th><th>Horas</th><th>Valor/hora</th><th></th></tr></thead>
+        <thead class="table-light"><tr><th style="width:40%">Maquinário</th><th>Uso (Horas/KM)</th><th class="text-end">Custo</th><th></th></tr></thead>
         <tbody id="dcMaqBody"></tbody></table></div>
 
       <!-- Insumos -->
@@ -151,11 +154,14 @@
       <div class="table-responsive"><table class="table table-sm align-middle mb-0">
         <thead class="table-light"><tr><th style="width:34%">Insumo</th><th>Quantidade</th><th>Dose aplicada</th><th></th></tr></thead>
         <tbody id="dcInsBody"></tbody></table></div>
-      <small class="text-muted">Os custos e a baixa de estoque são calculados ao <strong>finalizar</strong> a atividade.</small>
+      <small class="text-muted">A baixa de estoque ocorre ao <strong>finalizar</strong> a atividade. O custo total é calculado e salvo automaticamente.</small>
     </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-      <button class="btn btn-success" id="btnSalvarDiario"><i class="fas fa-save me-1"></i>Salvar Diário</button>
+    <div class="modal-footer justify-content-between">
+      <div class="fw-bold">Custo estimado: <span id="dcTotalPreview" class="text-success">R$ 0,00</span></div>
+      <div>
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-success" id="btnSalvarDiario"><i class="fas fa-save me-1"></i>Salvar Diário</button>
+      </div>
     </div>
   </div></div>
 </div>

@@ -3865,64 +3865,102 @@ $(document).ready(function () {
 /******************************************************************************************************/
 /* DIÁRIO DE CAMPO — dentro do Perfil da Área (DetalheAreaProducao.jsp)                               */
 /******************************************************************************************************/
-var dcAreaId = null, dcCacheFunc = [], dcCacheIns = [], dcOptTalhao = '', dcOptCultura = '', dcOptTipo = '', dcOptFunc = '';
+var dcAreaId = null, dcCacheFunc = [], dcCacheIns = [], dcCacheMaq = [], dcCacheTalhao = [], dcCacheTipos = [];
+var dcOptTalhao = '', dcOptCultura = '', dcOptTipo = '', dcOptFunc = '';
 
 function dcMoney(v) { return 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function dcBadgeStatus(s) {
     var map = { PLANEJADA: 'bg-secondary', EM_ANDAMENTO: 'bg-info text-dark', CONCLUIDA: 'bg-success', CANCELADA: 'bg-danger' };
     return '<span class="badge ' + (map[s] || 'bg-secondary') + '">' + (s || '') + '</span>';
 }
+/** Categoria de insumo esperada pelo tipo de atividade selecionado (filtro dinâmico). */
+function dcCategoriaPorTipo() {
+    var idt = parseInt($('#dcTipo').val()) || 0;
+    var t = dcCacheTipos.filter(function (x) { return x.idTipo === idt; })[0];
+    var nome = (t ? t.nome : '').toLowerCase();
+    if (nome.indexOf('aduba') === 0 || nome.indexOf('aduba') > -1) return 'ADUBO';        // Adubação
+    if (nome.indexOf('pulveriz') > -1) return 'DEFENSIVO';                                 // Pulverização
+    return null;   // demais: todos os insumos
+}
 
 function dcInit(areaId) {
     dcAreaId = areaId;
     $('#dcData').val(new Date().toISOString().slice(0, 10));
 
-    // Talhões desta área
     $.getJSON(CTX + '/ControllerAreaProducao?quadras=' + areaId, function (qs) {
-        dcOptTalhao = '';
+        dcCacheTalhao = qs; dcOptTalhao = '';
         qs.forEach(function (q) { dcOptTalhao += '<option value="' + q.idQuadra + '">' + q.nomeQuadra + '</option>'; });
         $('#dcTalhao').html(dcOptTalhao || '<option value="">(sem talhões)</option>');
     });
-    // Culturas
     $.getJSON(CTX + '/ControllerAreaProducao?alimentos=1', function (as) {
         dcOptCultura = '<option value="">—</option>';
         as.forEach(function (a) { dcOptCultura += '<option value="' + a.id + '">' + a.nome + '</option>'; });
         $('#dcCultura').html(dcOptCultura);
     });
-    // Tipos de atividade
     dcCarregarTipos();
-    // Funcionários
     $.getJSON(CTX + '/ControllerDiarioCampo?funcionarios=1', function (fs) {
         dcCacheFunc = fs; dcOptFunc = '<option value="">Selecione</option>';
-        fs.forEach(function (f) { dcOptFunc += '<option value="' + f.idPessoa + '" data-tipo="' + f.tipo + '">' + f.nome + ' (' + f.tipo + ')</option>'; });
+        fs.forEach(function (f) { dcOptFunc += '<option value="' + f.idPessoa + '" data-tipo="' + f.tipo + '" data-ref="' + (f.custoRef || 0) + '">' + f.nome + ' (' + f.tipo + ')</option>'; });
         $('#dcResponsavel').html(dcOptFunc);
     });
-    // Insumos
     $.getJSON(CTX + '/ControllerInsumo', function (is) { dcCacheIns = is.filter(function (i) { return i.situacao; }); });
+    $.getJSON(CTX + '/ControllerMaquina?ativas=true', function (ms) { dcCacheMaq = ms; });
 
     dcCarregarLista();
 
     $('#dcFiltroStatus').off('change').on('change', dcCarregarLista);
     $('#btnNovoDiario').off('click').on('click', dcAbrirNovo);
-    $('#btnAddFunc').off('click').on('click', dcAddFuncRow);
-    $('#btnAddMaq').off('click').on('click', dcAddMaqRow);
-    $('#btnAddIns').off('click').on('click', dcAddInsRow);
+    $('#btnAddFunc').off('click').on('click', function () { dcAddFuncRow(); });
+    $('#btnAddMaq').off('click').on('click', function () { dcAddMaqRow(); });
+    $('#btnAddIns').off('click').on('click', function () { dcAddInsRow(); });
     $('#btnAddTipo').off('click').on('click', dcAddTipo);
     $('#btnSalvarDiario').off('click').on('click', dcSalvar);
-    // auto-preenche o tipo do funcionário na linha
-    $('#dcFuncBody').off('change', '.dc-fpessoa').on('change', '.dc-fpessoa', function () {
-        $(this).closest('tr').find('.dc-ftipo').val($(this).find(':selected').data('tipo') || '');
+
+    // Talhão -> preenche cultura automaticamente (do cadastro do talhão)
+    $('#dcTalhao').off('change.dc').on('change.dc', dcAplicarCulturaDoTalhao);
+    // Tipo de atividade -> filtra insumos (Adubação=adubo, Pulverização=defensivo)
+    $('#dcTipo').off('change.dc').on('change.dc', dcRefiltrarInsumos);
+
+    // recálculo do custo estimado ao vivo
+    var body = '#modalNovoDiario';
+    $(body).off('input.dc change.dc', '.dc-fpessoa,.dc-fhoras,.dc-fvalor,.dc-mmaq,.dc-muso,.dc-ipro,.dc-iqtd')
+        .on('input.dc change.dc', '.dc-fpessoa,.dc-fhoras,.dc-fvalor,.dc-mmaq,.dc-muso,.dc-ipro,.dc-iqtd', dcRecalcPreview);
+    $('#dcFuncBody').off('change.dc', '.dc-fpessoa').on('change.dc', '.dc-fpessoa', function () {
+        var opt = $(this).find(':selected');
+        $(this).closest('tr').find('.dc-ftipo').val(opt.data('tipo') || '');
     });
-    $('#dcInsBody').off('click', '.dc-rm').on('click', '.dc-rm', function () { $(this).closest('tr').remove(); });
-    $('#dcFuncBody, #dcMaqBody').off('click', '.dc-rm').on('click', '.dc-rm', function () { $(this).closest('tr').remove(); });
+    $('#dcMaqBody').off('change.dc', '.dc-mmaq').on('change.dc', '.dc-mmaq', function () { dcAtualizarLinhaMaquina($(this).closest('tr')); });
+    $('#dcMaqBody').off('input.dc', '.dc-muso').on('input.dc', '.dc-muso', function () { dcAtualizarLinhaMaquina($(this).closest('tr')); });
+    $('#modalNovoDiario').off('click.dc', '.dc-rm').on('click.dc', '.dc-rm', function () { $(this).closest('tr').remove(); dcRecalcPreview(); });
 }
 
 function dcCarregarTipos() {
     $.getJSON(CTX + '/ControllerDiarioCampo?tiposatividade=1', function (ts) {
-        dcOptTipo = '';
+        dcCacheTipos = ts; dcOptTipo = '';
         ts.forEach(function (t) { dcOptTipo += '<option value="' + t.idTipo + '">' + t.nome + '</option>'; });
         $('#dcTipo').html(dcOptTipo);
     });
+}
+
+function dcAplicarCulturaDoTalhao() {
+    var idq = parseInt($('#dcTalhao').val()) || 0;
+    var q = dcCacheTalhao.filter(function (x) { return x.idQuadra === idq; })[0];
+    if (q && q.idAlimento) $('#dcCultura').val(String(q.idAlimento));
+}
+
+function dcInsumoOpts() {
+    var cat = dcCategoriaPorTipo();
+    var opt = '<option value="">Selecione</option>';
+    dcCacheIns.filter(function (i) { return !cat || i.categoria === cat; })
+        .forEach(function (i) { opt += '<option value="' + i.idInsumo + '" data-preco="' + (i.precoMedio || 0) + '">' + i.nome + ' (' + i.unidade + ')</option>'; });
+    return opt;
+}
+function dcRefiltrarInsumos() {
+    $('#dcInsBody tr').each(function () {
+        var sel = $(this).find('.dc-ipro'); var atual = sel.val();
+        sel.html(dcInsumoOpts()); sel.val(atual);
+    });
+    dcRecalcPreview();
 }
 
 function dcCarregarLista() {
@@ -3931,40 +3969,40 @@ function dcCarregarLista() {
     $.getJSON(url, function (lista) {
         var $b = $('#dcTabelaBody').empty();
         var pend = 0, concl = 0, custo = 0;
-        if (!lista.length) { $b.append('<tr><td colspan="8" class="text-center text-muted py-3">Nenhum diário nesta área.</td></tr>'); }
+        if (!lista.length) $b.append('<tr><td colspan="8" class="text-center text-muted py-3">Nenhum diário nesta área.</td></tr>');
         lista.forEach(function (d) {
             if (d.status === 'CONCLUIDA') { concl++; custo += Number(d.custoTotal || 0); }
             else if (d.status === 'PLANEJADA' || d.status === 'EM_ANDAMENTO') pend++;
-            $b.append('<tr>' +
-                '<td>' + (d.numeroDiario || '') + '</td>' +
-                '<td>' + (d.data || '') + '</td>' +
-                '<td>' + (d.quadraNome || '—') + '</td>' +
-                '<td>' + (d.culturaNome || '—') + '</td>' +
-                '<td>' + (d.tipoAtividadeNome || '—') + '</td>' +
-                '<td>' + dcBadgeStatus(d.status) + '</td>' +
-                '<td class="text-end">' + dcMoney(d.custoTotal) + '</td>' +
-                '<td class="text-end"><button class="btn btn-sm btn-outline-dark" onclick="dcVerDetalhe(' + d.idDiario + ')"><i class="fas fa-eye"></i></button></td>' +
-                '</tr>');
+            var acoes = '<button class="btn btn-sm btn-outline-dark" title="Ver" onclick="dcVerDetalhe(' + d.idDiario + ')"><i class="fas fa-eye"></i></button>';
+            if (d.status !== 'CONCLUIDA') acoes += ' <button class="btn btn-sm btn-outline-primary" title="Editar" onclick="dcEditar(' + d.idDiario + ')"><i class="fas fa-pen-to-square"></i></button>';
+            $b.append('<tr><td>' + (d.numeroDiario || '') + '</td><td>' + (d.data || '') + '</td><td>' + (d.quadraNome || '—') +
+                '</td><td>' + (d.culturaNome || '—') + '</td><td>' + (d.tipoAtividadeNome || '—') + '</td><td>' + dcBadgeStatus(d.status) +
+                '</td><td class="text-end">' + dcMoney(d.custoTotal) + '</td><td class="text-end">' + acoes + '</td></tr>');
         });
-        $('#dcCardAtividades').text(lista.length);
-        $('#dcCardPendentes').text(pend);
-        $('#dcCardConcluidas').text(concl);
-        $('#dcCardCusto').text(dcMoney(custo));
+        $('#dcCardAtividades').text(lista.length); $('#dcCardPendentes').text(pend);
+        $('#dcCardConcluidas').text(concl); $('#dcCardCusto').text(dcMoney(custo));
     });
 }
 
-function dcAbrirNovo() {
+function dcResetForm() {
     $('#alertDiario').addClass('d-none').text('');
     $('#dcTalhao').html(dcOptTalhao); $('#dcCultura').html(dcOptCultura);
     $('#dcResponsavel').html(dcOptFunc); $('#dcTipo').html(dcOptTipo);
+    $('#dcId,#dcStatus,#dcNumero').val('');
     $('#dcDescricao,#dcObs,#dcDataPrev,#dcHoraIni,#dcHoraFim').val('');
     $('#dcData').val(new Date().toISOString().slice(0, 10));
     $('#dcFuncBody,#dcMaqBody,#dcInsBody').empty();
+    $('#dcTotalPreview').text(dcMoney(0));
+}
+function dcAbrirNovo() {
+    dcResetForm();
+    $('#dcModalTitulo').text('Novo Diário de Campo');
     dcAddFuncRow();
+    dcAplicarCulturaDoTalhao();   // preenche a cultura do talhão pré-selecionado
     $('#modalNovoDiario').modal('show');
 }
 
-function dcAddFuncRow() {
+function dcAddFuncRow(f) {
     $('#dcFuncBody').append('<tr>' +
         '<td><select class="form-select form-select-sm dc-fpessoa">' + dcOptFunc + '</select></td>' +
         '<td><input class="form-control form-control-sm dc-ftipo" readonly placeholder="—" style="width:90px"></td>' +
@@ -3972,46 +4010,91 @@ function dcAddFuncRow() {
         '<td><input type="number" class="form-control form-control-sm dc-fhoras" min="0" step="0.5" value="0"></td>' +
         '<td><input type="number" class="form-control form-control-sm dc-fvalor" min="0" step="0.01" value="0"></td>' +
         '<td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger dc-rm"><i class="fas fa-trash"></i></button></td></tr>');
+    if (f) {
+        var $tr = $('#dcFuncBody tr:last');
+        $tr.find('.dc-fpessoa').val(String(f.idPessoa)); $tr.find('.dc-ftipo').val(f.tipoFuncionario || '');
+        $tr.find('.dc-ffuncao').val(f.funcaoExercida || ''); $tr.find('.dc-fhoras').val(f.horasTrabalhadas || 0);
+        $tr.find('.dc-fvalor').val(f.valorContratado || 0);
+    }
 }
-function dcAddMaqRow() {
-    $('#dcMaqBody').append('<tr>' +
-        '<td><select class="form-select form-select-sm dc-mcat"><option value="TRATOR">Trator</option><option value="IMPLEMENTO">Implemento</option><option value="VEICULO">Veículo</option></select></td>' +
-        '<td><input class="form-control form-control-sm dc-mnome" maxlength="80"></td>' +
-        '<td><input type="number" class="form-control form-control-sm dc-mhi" step="0.1" value="0"></td>' +
-        '<td><input type="number" class="form-control form-control-sm dc-mhf" step="0.1" value="0"></td>' +
-        '<td><input type="number" class="form-control form-control-sm dc-mhoras" step="0.1" value="0"></td>' +
-        '<td><input type="number" class="form-control form-control-sm dc-mvalor" step="0.01" value="0"></td>' +
-        '<td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger dc-rm"><i class="fas fa-trash"></i></button></td></tr>');
-}
-function dcAddInsRow() {
+function dcAddMaqRow(m) {
     var opt = '<option value="">Selecione</option>';
-    dcCacheIns.forEach(function (i) { opt += '<option value="' + i.idInsumo + '">' + i.nome + ' (' + i.unidade + ')</option>'; });
+    dcCacheMaq.forEach(function (mq) { opt += '<option value="' + mq.idMaquina + '" data-tipo="' + mq.tipo + '" data-ch="' + (mq.custoHora || 0) + '" data-ck="' + (mq.custoKm || 0) + '">' + mq.nome + ' (' + mq.tipo + ')</option>'; });
+    $('#dcMaqBody').append('<tr>' +
+        '<td><select class="form-select form-select-sm dc-mmaq">' + opt + '</select></td>' +
+        '<td class="d-flex align-items-center gap-1"><input type="number" class="form-control form-control-sm dc-muso" min="0" step="0.1" value="0"><span class="dc-mun small text-muted">h</span></td>' +
+        '<td class="text-end dc-mcusto">R$ 0,00</td>' +
+        '<td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger dc-rm"><i class="fas fa-trash"></i></button></td></tr>');
+    if (m) {
+        var $tr = $('#dcMaqBody tr:last');
+        if (m.idMaquina) $tr.find('.dc-mmaq').val(String(m.idMaquina));
+        var opt2 = $tr.find('.dc-mmaq :selected');
+        var isVeic = (opt2.data('tipo') === 'VEICULO');
+        $tr.find('.dc-muso').val(isVeic ? (m.km || 0) : (m.horasTrabalhadas || 0));
+        dcAtualizarLinhaMaquina($tr);
+    }
+}
+function dcAtualizarLinhaMaquina($tr) {
+    var opt = $tr.find('.dc-mmaq :selected');
+    var isVeic = (opt.data('tipo') === 'VEICULO');
+    var unit = isVeic ? Number(opt.data('ck') || 0) : Number(opt.data('ch') || 0);
+    $tr.find('.dc-mun').text(isVeic ? 'km' : 'h');
+    var uso = Number($tr.find('.dc-muso').val()) || 0;
+    $tr.find('.dc-mcusto').text(dcMoney(unit * uso));
+    dcRecalcPreview();
+}
+function dcAddInsRow(i) {
     $('#dcInsBody').append('<tr>' +
-        '<td><select class="form-select form-select-sm dc-ipro">' + opt + '</select></td>' +
+        '<td><select class="form-select form-select-sm dc-ipro">' + dcInsumoOpts() + '</select></td>' +
         '<td><input type="number" class="form-control form-control-sm dc-iqtd" min="0" step="0.001" value="0"></td>' +
         '<td><input class="form-control form-control-sm dc-idose" maxlength="60"></td>' +
         '<td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger dc-rm"><i class="fas fa-trash"></i></button></td></tr>');
+    if (i) {
+        var $tr = $('#dcInsBody tr:last');
+        $tr.find('.dc-ipro').val(String(i.idInsumo)); $tr.find('.dc-iqtd').val(i.quantidade || 0); $tr.find('.dc-idose').val(i.doseAplicada || '');
+    }
+}
+
+/** Custo estimado ao vivo (Funcionários + Máquinas + Insumos). */
+function dcRecalcPreview() {
+    var total = 0;
+    $('#dcFuncBody tr').each(function () {
+        var opt = $(this).find('.dc-fpessoa :selected'); if (!opt.val()) return;
+        var tipo = opt.data('tipo'); var ref = Number(opt.data('ref') || 0);
+        var horas = Number($(this).find('.dc-fhoras').val()) || 0;
+        var valor = Number($(this).find('.dc-fvalor').val()) || 0;
+        if (tipo === 'CLT') total += ref * horas;
+        else if (tipo === 'DIARISTA') total += ref;
+        else if (tipo === 'EMPREITA') total += valor;
+    });
+    $('#dcMaqBody tr').each(function () {
+        var opt = $(this).find('.dc-mmaq :selected'); if (!opt.val()) return;
+        var isVeic = (opt.data('tipo') === 'VEICULO');
+        var unit = isVeic ? Number(opt.data('ck') || 0) : Number(opt.data('ch') || 0);
+        total += unit * (Number($(this).find('.dc-muso').val()) || 0);
+    });
+    $('#dcInsBody tr').each(function () {
+        var opt = $(this).find('.dc-ipro :selected'); if (!opt.val()) return;
+        total += Number(opt.data('preco') || 0) * (Number($(this).find('.dc-iqtd').val()) || 0);
+    });
+    $('#dcTotalPreview').text(dcMoney(total));
 }
 
 function dcSalvar() {
     var funcionarios = [];
     $('#dcFuncBody tr').each(function () {
-        var id = $(this).find('.dc-fpessoa').val();
-        if (!id) return;
+        var id = $(this).find('.dc-fpessoa').val(); if (!id) return;
         funcionarios.push({ idPessoa: parseInt(id), tipoFuncionario: $(this).find('.dc-ftipo').val(),
             funcaoExercida: $(this).find('.dc-ffuncao').val(), horasTrabalhadas: parseFloat($(this).find('.dc-fhoras').val()) || 0,
             valorContratado: parseFloat($(this).find('.dc-fvalor').val()) || 0 });
     });
     var maquinas = [];
     $('#dcMaqBody tr').each(function () {
-        var nome = $(this).find('.dc-mnome').val().trim();
-        if (!nome) return;
-        maquinas.push({ categoria: $(this).find('.dc-mcat').val(), nome: nome,
-            horimetroInicial: parseFloat($(this).find('.dc-mhi').val()) || 0, horimetroFinal: parseFloat($(this).find('.dc-mhf').val()) || 0,
-            horasTrabalhadas: parseFloat($(this).find('.dc-mhoras').val()) || 0, valorHora: parseFloat($(this).find('.dc-mvalor').val()) || 0 });
+        var opt = $(this).find('.dc-mmaq :selected'); var idMaq = opt.val(); if (!idMaq) return;
+        var isVeic = (opt.data('tipo') === 'VEICULO'); var uso = parseFloat($(this).find('.dc-muso').val()) || 0;
+        maquinas.push({ idMaquina: parseInt(idMaq), horasTrabalhadas: isVeic ? 0 : uso, km: isVeic ? uso : 0 });
     });
-    var insumos = [];
-    var insumoInvalido = false;
+    var insumos = [], insumoInvalido = false;
     $('#dcInsBody tr').each(function () {
         var id = $(this).find('.dc-ipro').val(); var qtd = parseFloat($(this).find('.dc-iqtd').val()) || 0;
         if (!id && qtd === 0) return;
@@ -4020,8 +4103,11 @@ function dcSalvar() {
     });
     if (insumoInvalido) { $('#alertDiario').removeClass('d-none').addClass('alert-danger').text('Cada insumo precisa de produto e quantidade > 0.'); return; }
 
+    var editId = $('#dcId').val();
     var payload = {
-        acao: 'create', data: $('#dcData').val(), idArea: dcAreaId,
+        acao: editId ? 'update' : 'create', iddiario: editId ? parseInt(editId) : 0,
+        idDiario: editId ? parseInt(editId) : 0,
+        data: $('#dcData').val(), idArea: dcAreaId,
         idQuadra: parseInt($('#dcTalhao').val()) || null,
         idCultura: $('#dcCultura').val() ? parseInt($('#dcCultura').val()) : null,
         idResponsavel: parseInt($('#dcResponsavel').val()) || null,
@@ -4037,10 +4123,31 @@ function dcSalvar() {
         url: CTX + '/ControllerDiarioCampo', method: 'POST', contentType: 'application/json; charset=utf-8',
         data: JSON.stringify(payload),
         success: function (res) {
-            if (res.ok) { $('#modalNovoDiario').modal('hide'); mostrarAlerta(res.msg + ' (' + (res.numeroDiario || '') + ')', 'success', '#alertPerfil'); dcCarregarLista(); }
+            if (res.ok) { $('#modalNovoDiario').modal('hide'); mostrarAlerta(res.msg + (res.numeroDiario ? ' (' + res.numeroDiario + ')' : ''), 'success', '#alertPerfil'); dcCarregarLista(); }
             else $('#alertDiario').removeClass('d-none').addClass('alert-danger').text(res.msg);
         },
         error: function (xhr) { var m = 'Erro ao salvar diário.'; try { m = JSON.parse(xhr.responseText).msg || m; } catch (e) {} $('#alertDiario').removeClass('d-none').addClass('alert-danger').text(m); }
+    });
+}
+
+/** Carrega um diário existente no formulário para edição. */
+function dcEditar(id) {
+    $.getJSON(CTX + '/ControllerDiarioCampo?id=' + id, function (d) {
+        dcResetForm();
+        $('#dcModalTitulo').text('Editar Diário ' + (d.numeroDiario || ''));
+        $('#dcId').val(d.idDiario); $('#dcStatus').val(d.status); $('#dcNumero').val(d.numeroDiario);
+        $('#dcData').val(d.data || ''); $('#dcTalhao').val(d.idQuadra ? String(d.idQuadra) : '');
+        $('#dcCultura').val(d.idCultura ? String(d.idCultura) : '');
+        $('#dcResponsavel').val(d.idResponsavel ? String(d.idResponsavel) : '');
+        $('#dcTipo').val(String(d.idTipoAtividade));
+        $('#dcDescricao').val(d.descricao || ''); $('#dcDataPrev').val(d.dataPrevista || '');
+        $('#dcHoraIni').val(d.horaInicio || ''); $('#dcHoraFim').val(d.horaFim || ''); $('#dcObs').val(d.observacoes || '');
+        (d.funcionarios || []).forEach(function (f) { dcAddFuncRow(f); });
+        (d.maquinas || []).forEach(function (m) { dcAddMaqRow(m); });
+        (d.insumos || []).forEach(function (i) { dcAddInsRow(i); });
+        if (!(d.funcionarios || []).length) dcAddFuncRow();
+        dcRecalcPreview();
+        $('#modalNovoDiario').modal('show');
     });
 }
 
@@ -4058,15 +4165,15 @@ function dcVerDetalhe(id) {
             '<th>Insumos</th><td class="text-end">' + dcMoney(d.custoInsumos) + '</td></tr>' +
             '<tr><th>Máquinas</th><td class="text-end">' + dcMoney(d.custoMaquinas) + '</td>' +
             '<th>Custo Total</th><td class="text-end fw-bold">' + dcMoney(d.custoTotal) + '</td></tr></table>';
-        function bloco(titulo, arr, cols) {
+        function bloco(t, arr, cols) {
             if (!arr || !arr.length) return '';
-            var s = '<h6 class="fw-bold mt-2">' + titulo + '</h6><table class="table table-sm"><thead><tr>';
+            var s = '<h6 class="fw-bold mt-2">' + t + '</h6><table class="table table-sm"><thead><tr>';
             cols.forEach(function (c) { s += '<th>' + c[0] + '</th>'; }); s += '</tr></thead><tbody>';
-            arr.forEach(function (o) { s += '<tr>'; cols.forEach(function (c) { s += '<td>' + (c[1](o)) + '</td>'; }); s += '</tr>'; });
+            arr.forEach(function (o) { s += '<tr>'; cols.forEach(function (c) { s += '<td>' + c[1](o) + '</td>'; }); s += '</tr>'; });
             return s + '</tbody></table>';
         }
         h += bloco('Funcionários', d.funcionarios, [['Nome', function (o) { return o.nomePessoa || o.idPessoa; }], ['Tipo', function (o) { return o.tipoFuncionario || ''; }], ['Função', function (o) { return o.funcaoExercida || ''; }], ['Horas', function (o) { return o.horasTrabalhadas; }], ['Custo', function (o) { return dcMoney(o.custo); }]]);
-        h += bloco('Máquinas', d.maquinas, [['Categoria', function (o) { return o.categoria || ''; }], ['Nome', function (o) { return o.nome || ''; }], ['Horas', function (o) { return o.horasTrabalhadas; }], ['Valor/h', function (o) { return dcMoney(o.valorHora); }], ['Custo', function (o) { return dcMoney(o.custo); }]]);
+        h += bloco('Máquinas', d.maquinas, [['Maquinário', function (o) { return o.nome || ''; }], ['Categoria', function (o) { return o.categoria || ''; }], ['Uso', function (o) { return (o.categoria === 'VEICULO' ? o.km + ' km' : o.horasTrabalhadas + ' h'); }], ['Custo', function (o) { return dcMoney(o.custo); }]]);
         h += bloco('Insumos', d.insumos, [['Insumo', function (o) { return o.insumoNome || o.idInsumo; }], ['Qtd', function (o) { return o.quantidade + ' ' + (o.unidade || ''); }], ['Custo', function (o) { return dcMoney(o.custo); }], ['Baixado', function (o) { return o.baixado ? 'Sim' : 'Não'; }]]);
         $('#ddCorpo').html(h);
         var podeFinalizar = (d.status === 'PLANEJADA' || d.status === 'EM_ANDAMENTO');
@@ -4080,11 +4187,7 @@ function dcFinalizar(id) {
     $.ajax({
         url: CTX + '/ControllerDiarioCampo', method: 'POST', contentType: 'application/json',
         data: JSON.stringify({ acao: 'finalizar', iddiario: id }),
-        success: function (res) {
-            $('#modalDetalheDiario').modal('hide');
-            mostrarAlerta(res.msg, res.ok ? 'success' : 'danger', '#alertPerfil');
-            dcCarregarLista();
-        },
+        success: function (res) { $('#modalDetalheDiario').modal('hide'); mostrarAlerta(res.msg, res.ok ? 'success' : 'danger', '#alertPerfil'); dcCarregarLista(); },
         error: function (xhr) { var m = 'Erro ao finalizar.'; try { m = JSON.parse(xhr.responseText).msg || m; } catch (e) {} mostrarAlerta(m, 'danger', '#alertPerfil'); $('#modalDetalheDiario').modal('hide'); }
     });
 }
@@ -4097,6 +4200,70 @@ function dcAddTipo() {
         data: JSON.stringify({ acao: 'addtipoatividade', nome: nome.trim() }),
         success: function () { dcCarregarTipos(); }
     });
+}
+
+/******************************************************************************************************/
+/* MÓDULO MAQUINÁRIO — maquina.jsp                                                                     */
+/******************************************************************************************************/
+$(document).ready(function () {
+    if (!$('#tabelaMaquinas').length) return;
+    $('#tabelaMaquinas').DataTable({ language: { url: 'https://cdn.datatables.net/plug-ins/1.11.5/i18n/pt_BR.json' } });
+    mqCarregar();
+    $('#mqTipo').on('change', mqToggleBlocos);
+    $('#btnNovoMaquina').on('click', mqNovo);
+    $('#btnSalvarMaquina').on('click', mqSalvar);
+});
+function mqToggleBlocos() {
+    var veic = $('#mqTipo').val() === 'VEICULO';
+    $('#mqBlocoKm').toggleClass('d-none', !veic);
+    $('#mqBlocoHora').toggleClass('d-none', veic);
+}
+function mqCarregar() {
+    var t = $('#tabelaMaquinas').DataTable(); t.clear();
+    $.get(CTX + '/ControllerMaquina', function (lista) {
+        lista.forEach(function (m) {
+            t.row.add([m.nome, m.tipo, m.marca || '—', m.identificacao || '—',
+                'R$ ' + Number(m.custoHora || 0).toLocaleString('pt-BR', {minimumFractionDigits:2}),
+                'R$ ' + Number(m.custoKm || 0).toLocaleString('pt-BR', {minimumFractionDigits:2}),
+                m.situacao ? '<span class="badge bg-success">Ativo</span>' : '<span class="badge bg-secondary">Inativo</span>',
+                '<button class="btn-acao btn-acao-editar" title="Editar" onclick="mqEditar(' + m.idMaquina + ')"><i class="fas fa-pen-to-square"></i></button> ' +
+                '<button class="btn-acao ' + (m.situacao ? 'btn-acao-desativar' : 'btn-acao-ativar') + '" title="' + (m.situacao ? 'Desativar' : 'Ativar') + '" onclick="mqToggle(' + m.idMaquina + ',' + m.situacao + ')"><i class="fas ' + (m.situacao ? 'fa-ban' : 'fa-circle-check') + '"></i></button>'
+            ]).draw(false);
+        });
+    });
+}
+function mqNovo() {
+    $('#alertaMaquina').addClass('d-none').text(''); $('#modalMaquinaTitulo').html('<i class="fas fa-tractor me-2"></i>Novo Maquinário');
+    $('#mqId,#mqNome,#mqMarca,#mqIdent').val(''); $('#mqTipo').val('TRATOR');
+    $('#mqComb,#mqManut,#mqDeprec,#mqCustoHora,#mqCustoKm').val('0');
+    mqToggleBlocos(); $('#modalMaquina').modal('show');
+}
+function mqEditar(id) {
+    $.getJSON(CTX + '/ControllerMaquina?id=' + id, function (m) {
+        $('#alertaMaquina').addClass('d-none').text(''); $('#modalMaquinaTitulo').html('<i class="fas fa-pen-to-square me-2"></i>Editar Maquinário');
+        $('#mqId').val(m.idMaquina); $('#mqNome').val(m.nome); $('#mqTipo').val(m.tipo);
+        $('#mqMarca').val(m.marca || ''); $('#mqIdent').val(m.identificacao || '');
+        $('#mqComb').val(m.combustivelHora || 0); $('#mqManut').val(m.manutencaoHora || 0); $('#mqDeprec').val(m.depreciacaoHora || 0);
+        $('#mqCustoHora').val(m.custoHora || 0); $('#mqCustoKm').val(m.custoKm || 0);
+        mqToggleBlocos(); $('#modalMaquina').modal('show');
+    });
+}
+function mqSalvar() {
+    var id = $('#mqId').val();
+    var data = { acao: id ? 'update' : 'create', idMaquina: id ? parseInt(id) : 0,
+        nome: $('#mqNome').val().trim(), tipo: $('#mqTipo').val(), marca: $('#mqMarca').val(), identificacao: $('#mqIdent').val(),
+        combustivelHora: parseFloat($('#mqComb').val()) || 0, manutencaoHora: parseFloat($('#mqManut').val()) || 0,
+        depreciacaoHora: parseFloat($('#mqDeprec').val()) || 0, custoHora: parseFloat($('#mqCustoHora').val()) || 0,
+        custoKm: parseFloat($('#mqCustoKm').val()) || 0, situacao: true };
+    if (!data.nome) { $('#alertaMaquina').removeClass('d-none').addClass('alert-danger').text('Informe o nome.'); return; }
+    $.ajax({ url: CTX + '/ControllerMaquina', method: 'POST', contentType: 'application/json; charset=utf-8', data: JSON.stringify(data),
+        success: function (res) { if (res.ok) { $('#modalMaquina').modal('hide'); mostrarAlerta(res.msg, 'success', '#alerta'); mqCarregar(); } else $('#alertaMaquina').removeClass('d-none').addClass('alert-danger').text(res.msg); },
+        error: function (xhr) { var m = 'Erro ao salvar.'; try { m = JSON.parse(xhr.responseText).msg || m; } catch (e) {} $('#alertaMaquina').removeClass('d-none').addClass('alert-danger').text(m); } });
+}
+function mqToggle(id, situacao) {
+    $.ajax({ url: CTX + '/ControllerMaquina', method: 'POST', contentType: 'application/json', data: JSON.stringify({ acao: 'delete', idMaquina: id, situacao: situacao }),
+        success: function (res) { mostrarAlerta(res.msg, 'info', '#alerta'); mqCarregar(); },
+        error: function () { mostrarAlerta('Erro ao alterar situação.', 'danger', '#alerta'); } });
 }
 
 /** Oculta e limpa o conteúdo de um container de alerta. Usado em: areaproducao.jsp */

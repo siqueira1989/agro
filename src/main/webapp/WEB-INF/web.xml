@@ -80,6 +80,10 @@
         <servlet-name>ControllerDiarioCampo</servlet-name>
         <servlet-class>Controller.ControllerDiarioCampo</servlet-class>
     </servlet>
+    <servlet>
+        <servlet-name>ControllerMaquina</servlet-name>
+        <servlet-class>Controller.ControllerMaquina</servlet-class>
+    </servlet>
     <servlet-mapping>
         <servlet-name>ClassificacaoServlet</servlet-name>
         <url-pattern>/ClassificacaoServlet</url-pattern>
@@ -151,6 +155,10 @@
     <servlet-mapping>
         <servlet-name>ControllerDiarioCampo</servlet-name>
         <url-pattern>/ControllerDiarioCampo</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>ControllerMaquina</servlet-name>
+        <url-pattern>/ControllerMaquina</url-pattern>
     </servlet-mapping>
     <session-config>
         <session-timeout>
