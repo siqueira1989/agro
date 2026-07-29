@@ -87,6 +87,25 @@ public class EstoqueMovimentoDAO {
         }
     }
 
+    /**
+     * Saída usando uma conexão já aberta (participa da transação do chamador —
+     * NÃO faz commit/rollback). Útil para operações atômicas como a baixa de
+     * vários insumos ao finalizar um Diário de Campo.
+     */
+    public void registrarSaida(Connection c, int idInsumo, BigDecimal qtd, LocalDate data, String obs)
+            throws SQLException, EstoqueInsuficienteException {
+        BigDecimal[] atual = lerSaldoPreco(c, idInsumo);
+        BigDecimal saldoAtual = atual[0];
+        if (saldoAtual.compareTo(qtd) < 0) {
+            throw new EstoqueInsuficienteException(
+                "Estoque insuficiente: disponível " + saldoAtual.stripTrailingZeros().toPlainString()
+                + ", solicitado " + qtd.stripTrailingZeros().toPlainString() + ".");
+        }
+        BigDecimal novoSaldo = saldoAtual.subtract(qtd);
+        atualizarSaldoPreco(c, idInsumo, novoSaldo, atual[1]);
+        inserirMovimento(c, idInsumo, "SAIDA", qtd, null, null, data, obs, novoSaldo);
+    }
+
     /** Histórico de movimentações de um insumo (mais recentes primeiro). */
     public List<Map<String, Object>> listarPorInsumo(int idInsumo) throws SQLException {
         String sql = "SELECT m.*, p.nomepessoa AS parceiro_nome "

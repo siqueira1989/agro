@@ -23,6 +23,8 @@
 --   V11 estoque de insumos (insumo + estoque_movimento)
 --   V12 remoção do módulo Talão
 --   V13 quadras da área de produção + situacao (soft delete)
+--   V14 Diário de Campo (operações por talhão: funcionários, máquinas,
+--       insumos, custos e baixa de estoque)
 --
 -- Observação: SCHEMA (estrutura), sem dados. Gerado via pg_dump.
 -- =====================================================================
@@ -284,6 +286,197 @@ CREATE SEQUENCE public.despesascusto_iddespesascusto_seq
 --
 
 ALTER SEQUENCE public.despesascusto_iddespesascusto_seq OWNED BY public.despesascusto.iddespesascusto;
+
+
+--
+-- Name: diario_campo; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.diario_campo (
+    iddiario integer NOT NULL,
+    numero_diario character varying(20) NOT NULL,
+    data date DEFAULT CURRENT_DATE NOT NULL,
+    id_area integer,
+    id_quadra integer,
+    id_cultura integer,
+    id_responsavel integer,
+    id_tipo_atividade integer NOT NULL,
+    descricao character varying(200),
+    status character varying(15) DEFAULT 'PLANEJADA'::character varying NOT NULL,
+    data_prevista date,
+    data_realizada date,
+    hora_inicio time without time zone,
+    hora_fim time without time zone,
+    observacoes text,
+    custo_mao_obra numeric(12,2) DEFAULT 0 NOT NULL,
+    custo_insumos numeric(12,2) DEFAULT 0 NOT NULL,
+    custo_maquinas numeric(12,2) DEFAULT 0 NOT NULL,
+    custo_total numeric(12,2) DEFAULT 0 NOT NULL,
+    criado_em timestamp without time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: diario_campo_iddiario_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.diario_campo_iddiario_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: diario_campo_iddiario_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.diario_campo_iddiario_seq OWNED BY public.diario_campo.iddiario;
+
+
+--
+-- Name: diario_funcionario; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.diario_funcionario (
+    id integer NOT NULL,
+    iddiario integer NOT NULL,
+    idpessoa integer NOT NULL,
+    tipo_funcionario character varying(12),
+    funcao_exercida character varying(60),
+    horas_trabalhadas numeric(6,2) DEFAULT 0 NOT NULL,
+    custo_hora numeric(12,2) DEFAULT 0 NOT NULL,
+    valor_contratado numeric(12,2) DEFAULT 0 NOT NULL,
+    custo numeric(12,2) DEFAULT 0 NOT NULL
+);
+
+
+--
+-- Name: diario_funcionario_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.diario_funcionario_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: diario_funcionario_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.diario_funcionario_id_seq OWNED BY public.diario_funcionario.id;
+
+
+--
+-- Name: diario_insumo; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.diario_insumo (
+    id integer NOT NULL,
+    iddiario integer NOT NULL,
+    id_insumo integer NOT NULL,
+    quantidade numeric(14,3) DEFAULT 0 NOT NULL,
+    unidade character varying(5),
+    dose_aplicada character varying(60),
+    custo_unitario numeric(12,2) DEFAULT 0 NOT NULL,
+    custo numeric(12,2) DEFAULT 0 NOT NULL,
+    baixado boolean DEFAULT false NOT NULL
+);
+
+
+--
+-- Name: diario_insumo_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.diario_insumo_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: diario_insumo_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.diario_insumo_id_seq OWNED BY public.diario_insumo.id;
+
+
+--
+-- Name: diario_maquina; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.diario_maquina (
+    id integer NOT NULL,
+    iddiario integer NOT NULL,
+    id_maquina integer,
+    categoria character varying(12),
+    nome character varying(80),
+    horimetro_inicial numeric(10,2) DEFAULT 0 NOT NULL,
+    horimetro_final numeric(10,2) DEFAULT 0 NOT NULL,
+    horas_trabalhadas numeric(10,2) DEFAULT 0 NOT NULL,
+    valor_hora numeric(12,2) DEFAULT 0 NOT NULL,
+    custo numeric(12,2) DEFAULT 0 NOT NULL
+);
+
+
+--
+-- Name: diario_maquina_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.diario_maquina_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: diario_maquina_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.diario_maquina_id_seq OWNED BY public.diario_maquina.id;
+
+
+--
+-- Name: diario_tipo_atividade; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.diario_tipo_atividade (
+    idtipo integer NOT NULL,
+    nome character varying(40) NOT NULL,
+    ativo boolean DEFAULT true NOT NULL
+);
+
+
+--
+-- Name: diario_tipo_atividade_idtipo_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.diario_tipo_atividade_idtipo_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: diario_tipo_atividade_idtipo_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.diario_tipo_atividade_idtipo_seq OWNED BY public.diario_tipo_atividade.idtipo;
 
 
 --
@@ -1079,6 +1272,41 @@ ALTER TABLE ONLY public.despesascusto ALTER COLUMN iddespesascusto SET DEFAULT n
 
 
 --
+-- Name: diario_campo iddiario; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.diario_campo ALTER COLUMN iddiario SET DEFAULT nextval('public.diario_campo_iddiario_seq'::regclass);
+
+
+--
+-- Name: diario_funcionario id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.diario_funcionario ALTER COLUMN id SET DEFAULT nextval('public.diario_funcionario_id_seq'::regclass);
+
+
+--
+-- Name: diario_insumo id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.diario_insumo ALTER COLUMN id SET DEFAULT nextval('public.diario_insumo_id_seq'::regclass);
+
+
+--
+-- Name: diario_maquina id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.diario_maquina ALTER COLUMN id SET DEFAULT nextval('public.diario_maquina_id_seq'::regclass);
+
+
+--
+-- Name: diario_tipo_atividade idtipo; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.diario_tipo_atividade ALTER COLUMN idtipo SET DEFAULT nextval('public.diario_tipo_atividade_idtipo_seq'::regclass);
+
+
+--
 -- Name: estoque_movimento idmov; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1291,6 +1519,62 @@ ALTER TABLE ONLY public.classificacao
 
 ALTER TABLE ONLY public.despesascusto
     ADD CONSTRAINT despesascusto_pkey PRIMARY KEY (iddespesascusto);
+
+
+--
+-- Name: diario_campo diario_campo_numero_diario_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.diario_campo
+    ADD CONSTRAINT diario_campo_numero_diario_key UNIQUE (numero_diario);
+
+
+--
+-- Name: diario_campo diario_campo_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.diario_campo
+    ADD CONSTRAINT diario_campo_pkey PRIMARY KEY (iddiario);
+
+
+--
+-- Name: diario_funcionario diario_funcionario_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.diario_funcionario
+    ADD CONSTRAINT diario_funcionario_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: diario_insumo diario_insumo_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.diario_insumo
+    ADD CONSTRAINT diario_insumo_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: diario_maquina diario_maquina_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.diario_maquina
+    ADD CONSTRAINT diario_maquina_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: diario_tipo_atividade diario_tipo_atividade_nome_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.diario_tipo_atividade
+    ADD CONSTRAINT diario_tipo_atividade_nome_key UNIQUE (nome);
+
+
+--
+-- Name: diario_tipo_atividade diario_tipo_atividade_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.diario_tipo_atividade
+    ADD CONSTRAINT diario_tipo_atividade_pkey PRIMARY KEY (idtipo);
 
 
 --
@@ -1550,6 +1834,69 @@ ALTER TABLE ONLY public.vinculo_empregaticio
 
 
 --
+-- Name: idx_diario_area; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_diario_area ON public.diario_campo USING btree (id_area);
+
+
+--
+-- Name: idx_diario_cultura; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_diario_cultura ON public.diario_campo USING btree (id_cultura);
+
+
+--
+-- Name: idx_diario_data; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_diario_data ON public.diario_campo USING btree (data);
+
+
+--
+-- Name: idx_diario_quadra; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_diario_quadra ON public.diario_campo USING btree (id_quadra);
+
+
+--
+-- Name: idx_diario_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_diario_status ON public.diario_campo USING btree (status);
+
+
+--
+-- Name: idx_diario_tipo; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_diario_tipo ON public.diario_campo USING btree (id_tipo_atividade);
+
+
+--
+-- Name: idx_diariofunc_diario; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_diariofunc_diario ON public.diario_funcionario USING btree (iddiario);
+
+
+--
+-- Name: idx_diarioins_diario; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_diarioins_diario ON public.diario_insumo USING btree (iddiario);
+
+
+--
+-- Name: idx_diariomaq_diario; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_diariomaq_diario ON public.diario_maquina USING btree (iddiario);
+
+
+--
 -- Name: idx_estoque_mov_insumo; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1718,6 +2065,20 @@ CREATE TRIGGER casc_del_func AFTER DELETE ON public.funcionarioproducao FOR EACH
 
 
 --
+-- Name: diario_campo chk_func_exist; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER chk_func_exist BEFORE INSERT OR UPDATE ON public.diario_campo FOR EACH ROW EXECUTE FUNCTION public.trg_valida_funcionario_existe('id_responsavel');
+
+
+--
+-- Name: diario_funcionario chk_func_exist; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER chk_func_exist BEFORE INSERT OR UPDATE ON public.diario_funcionario FOR EACH ROW EXECUTE FUNCTION public.trg_valida_funcionario_existe('idpessoa');
+
+
+--
 -- Name: falta_funcionario chk_func_exist; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -1785,6 +2146,70 @@ CREATE TRIGGER chk_func_exist BEFORE INSERT OR UPDATE ON public.vale_funcionario
 --
 
 CREATE TRIGGER chk_func_exist BEFORE INSERT OR UPDATE ON public.vinculo_empregaticio FOR EACH ROW EXECUTE FUNCTION public.trg_valida_funcionario_existe('idpessoa');
+
+
+--
+-- Name: diario_campo diario_campo_id_area_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.diario_campo
+    ADD CONSTRAINT diario_campo_id_area_fkey FOREIGN KEY (id_area) REFERENCES public.areaproducao(idareaproducao);
+
+
+--
+-- Name: diario_campo diario_campo_id_cultura_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.diario_campo
+    ADD CONSTRAINT diario_campo_id_cultura_fkey FOREIGN KEY (id_cultura) REFERENCES public.alimento(idproduto);
+
+
+--
+-- Name: diario_campo diario_campo_id_quadra_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.diario_campo
+    ADD CONSTRAINT diario_campo_id_quadra_fkey FOREIGN KEY (id_quadra) REFERENCES public.quadra(idquadra);
+
+
+--
+-- Name: diario_campo diario_campo_id_tipo_atividade_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.diario_campo
+    ADD CONSTRAINT diario_campo_id_tipo_atividade_fkey FOREIGN KEY (id_tipo_atividade) REFERENCES public.diario_tipo_atividade(idtipo);
+
+
+--
+-- Name: diario_funcionario diario_funcionario_iddiario_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.diario_funcionario
+    ADD CONSTRAINT diario_funcionario_iddiario_fkey FOREIGN KEY (iddiario) REFERENCES public.diario_campo(iddiario) ON DELETE CASCADE;
+
+
+--
+-- Name: diario_insumo diario_insumo_id_insumo_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.diario_insumo
+    ADD CONSTRAINT diario_insumo_id_insumo_fkey FOREIGN KEY (id_insumo) REFERENCES public.insumo(idinsumo);
+
+
+--
+-- Name: diario_insumo diario_insumo_iddiario_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.diario_insumo
+    ADD CONSTRAINT diario_insumo_iddiario_fkey FOREIGN KEY (iddiario) REFERENCES public.diario_campo(iddiario) ON DELETE CASCADE;
+
+
+--
+-- Name: diario_maquina diario_maquina_iddiario_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.diario_maquina
+    ADD CONSTRAINT diario_maquina_iddiario_fkey FOREIGN KEY (iddiario) REFERENCES public.diario_campo(iddiario) ON DELETE CASCADE;
 
 
 --

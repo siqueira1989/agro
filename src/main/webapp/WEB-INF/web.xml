@@ -76,6 +76,10 @@
         <servlet-name>ControllerEstoque</servlet-name>
         <servlet-class>Controller.ControllerEstoque</servlet-class>
     </servlet>
+    <servlet>
+        <servlet-name>ControllerDiarioCampo</servlet-name>
+        <servlet-class>Controller.ControllerDiarioCampo</servlet-class>
+    </servlet>
     <servlet-mapping>
         <servlet-name>ClassificacaoServlet</servlet-name>
         <url-pattern>/ClassificacaoServlet</url-pattern>
@@ -143,6 +147,10 @@
     <servlet-mapping>
         <servlet-name>ControllerEstoque</servlet-name>
         <url-pattern>/ControllerEstoque</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>ControllerDiarioCampo</servlet-name>
+        <url-pattern>/ControllerDiarioCampo</url-pattern>
     </servlet-mapping>
     <session-config>
         <session-timeout>
