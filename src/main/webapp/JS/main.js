@@ -4214,9 +4214,22 @@ $(document).ready(function () {
     $('#btnSalvarMaquina').on('click', mqSalvar);
 });
 function mqToggleBlocos() {
-    var veic = $('#mqTipo').val() === 'VEICULO';
+    var tipo = $('#mqTipo').val();
+    var veic = tipo === 'VEICULO';
+    var implemento = tipo === 'IMPLEMENTO';
     $('#mqBlocoKm').toggleClass('d-none', !veic);
     $('#mqBlocoHora').toggleClass('d-none', veic);
+    // Implemento não tem combustível próprio (a energia vem do trator) nem operador próprio
+    // (o operador do trator já é contabilizado). Custo/hora = depreciação + manutenção.
+    $('#mqCombWrap').toggleClass('d-none', implemento);
+    if (implemento) {
+        $('#mqComb').val('0');
+        $('#mqTituloHora').text('Custo por Hora (Implemento)');
+        $('#mqAjudaHora').text('Implemento é tracionado pelo trator: sem combustível e sem operador próprios. Custo/Hora = manutenção + depreciação. O operador (do trator) é lançado à parte, via funcionário.');
+    } else {
+        $('#mqTituloHora').text('Custo por Hora (Trator)');
+        $('#mqAjudaHora').text('Se preencher os componentes, o Custo/Hora é a soma deles (combustível + manutenção + depreciação). A mão de obra do operador é lançada à parte, via funcionário.');
+    }
 }
 function mqCarregar() {
     var t = $('#tabelaMaquinas').DataTable(); t.clear();

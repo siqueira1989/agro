@@ -52,14 +52,14 @@
 
     <!-- Custo por HORA (trator/implemento) -->
     <div id="mqBlocoHora" class="mt-2">
-      <h6 class="fw-bold text-secondary">Custo por Hora (Trator/Implemento)</h6>
+      <h6 class="fw-bold text-secondary" id="mqTituloHora">Custo por Hora</h6>
       <div class="row g-2">
-        <div class="col-md-3"><label class="form-label">Combustível/h</label><input type="number" step="0.01" class="form-control mq-comp" id="mqComb" value="0"></div>
+        <div class="col-md-3" id="mqCombWrap"><label class="form-label">Combustível/h</label><input type="number" step="0.01" class="form-control mq-comp" id="mqComb" value="0"></div>
         <div class="col-md-3"><label class="form-label">Manutenção/h</label><input type="number" step="0.01" class="form-control mq-comp" id="mqManut" value="0"></div>
         <div class="col-md-3"><label class="form-label">Depreciação/h</label><input type="number" step="0.01" class="form-control mq-comp" id="mqDeprec" value="0"></div>
         <div class="col-md-3"><label class="form-label fw-bold">Custo/Hora (R$) *</label><input type="number" step="0.01" class="form-control" id="mqCustoHora" value="0"></div>
       </div>
-      <small class="text-muted">Boas práticas: se preencher os componentes, o Custo/Hora é a soma deles (combustível + manutenção + depreciação). A mão de obra do operador é lançada à parte, via funcionário.</small>
+      <small class="text-muted" id="mqAjudaHora"></small>
     </div>
 
     <!-- Custo por KM (veículo) -->
