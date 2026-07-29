@@ -3865,8 +3865,8 @@ $(document).ready(function () {
 /******************************************************************************************************/
 /* DIÁRIO DE CAMPO — dentro do Perfil da Área (DetalheAreaProducao.jsp)                               */
 /******************************************************************************************************/
-var dcAreaId = null, dcCacheFunc = [], dcCacheIns = [], dcCacheMaq = [], dcCacheTalhao = [], dcCacheTipos = [];
-var dcOptTalhao = '', dcOptCultura = '', dcOptTipo = '', dcOptFunc = '';
+var dcAreaId = null, dcCacheFunc = [], dcCacheIns = [], dcCacheMaq = [], dcCacheTalhao = [], dcCacheTipos = [], dcCulturaMap = {};
+var dcOptTalhao = '', dcOptTipo = '', dcOptFunc = '';
 
 function dcMoney(v) { return 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function dcBadgeStatus(s) {
@@ -3893,9 +3893,7 @@ function dcInit(areaId) {
         $('#dcTalhao').html(dcOptTalhao || '<option value="">(sem talhões)</option>');
     });
     $.getJSON(CTX + '/ControllerAreaProducao?alimentos=1', function (as) {
-        dcOptCultura = '<option value="">—</option>';
-        as.forEach(function (a) { dcOptCultura += '<option value="' + a.id + '">' + a.nome + '</option>'; });
-        $('#dcCultura').html(dcOptCultura);
+        dcCulturaMap = {}; as.forEach(function (a) { dcCulturaMap[a.id] = a.nome; });
     });
     dcCarregarTipos();
     $.getJSON(CTX + '/ControllerDiarioCampo?funcionarios=1', function (fs) {
@@ -3942,10 +3940,17 @@ function dcCarregarTipos() {
     });
 }
 
+/** Preenche a Cultura (input desabilitado + id oculto) com a cultura cadastrada no talhão. */
 function dcAplicarCulturaDoTalhao() {
     var idq = parseInt($('#dcTalhao').val()) || 0;
     var q = dcCacheTalhao.filter(function (x) { return x.idQuadra === idq; })[0];
-    if (q && q.idAlimento) $('#dcCultura').val(String(q.idAlimento));
+    if (q && q.idAlimento) {
+        $('#dcCultura').val(String(q.idAlimento));
+        $('#dcCulturaNome').val(q.alimentoNome || dcCulturaMap[q.idAlimento] || '');
+    } else {
+        $('#dcCultura').val('');
+        $('#dcCulturaNome').val(q ? '(talhão sem cultura cadastrada)' : '');
+    }
 }
 
 function dcInsumoOpts() {
@@ -3986,9 +3991,9 @@ function dcCarregarLista() {
 
 function dcResetForm() {
     $('#alertDiario').addClass('d-none').text('');
-    $('#dcTalhao').html(dcOptTalhao); $('#dcCultura').html(dcOptCultura);
+    $('#dcTalhao').html(dcOptTalhao);
     $('#dcResponsavel').html(dcOptFunc); $('#dcTipo').html(dcOptTipo);
-    $('#dcId,#dcStatus,#dcNumero').val('');
+    $('#dcId,#dcStatus,#dcNumero,#dcCultura,#dcCulturaNome').val('');
     $('#dcDescricao,#dcObs,#dcDataPrev,#dcHoraIni,#dcHoraFim').val('');
     $('#dcData').val(new Date().toISOString().slice(0, 10));
     $('#dcFuncBody,#dcMaqBody,#dcInsBody').empty();
@@ -4138,6 +4143,7 @@ function dcEditar(id) {
         $('#dcId').val(d.idDiario); $('#dcStatus').val(d.status); $('#dcNumero').val(d.numeroDiario);
         $('#dcData').val(d.data || ''); $('#dcTalhao').val(d.idQuadra ? String(d.idQuadra) : '');
         $('#dcCultura').val(d.idCultura ? String(d.idCultura) : '');
+        $('#dcCulturaNome').val(d.culturaNome || '');
         $('#dcResponsavel').val(d.idResponsavel ? String(d.idResponsavel) : '');
         $('#dcTipo').val(String(d.idTipoAtividade));
         $('#dcDescricao').val(d.descricao || ''); $('#dcDataPrev').val(d.dataPrevista || '');

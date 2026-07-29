@@ -109,7 +109,9 @@
       <div class="row g-2">
         <div class="col-md-3"><label class="form-label">Data *</label><input type="date" class="form-control" id="dcData"></div>
         <div class="col-md-3"><label class="form-label">Talhão *</label><select class="form-select" id="dcTalhao"></select></div>
-        <div class="col-md-3"><label class="form-label">Cultura</label><select class="form-select" id="dcCultura"><option value="">—</option></select></div>
+        <div class="col-md-3"><label class="form-label">Cultura (do talhão)</label>
+          <input type="text" class="form-control bg-light" id="dcCulturaNome" readonly placeholder="—">
+          <input type="hidden" id="dcCultura"></div>
         <div class="col-md-3"><label class="form-label">Responsável *</label><select class="form-select" id="dcResponsavel"></select></div>
       </div>
       <div class="row g-2 mt-1">
