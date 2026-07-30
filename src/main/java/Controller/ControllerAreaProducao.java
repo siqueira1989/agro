@@ -164,6 +164,7 @@ public class ControllerAreaProducao extends HttpServlet {
             quadra.setNomeQuadra(nome.trim());
             Integer plantas = getInt(q, "numeroPlantas");
             quadra.setNumeroPlantas(plantas != null ? plantas : 0);
+            quadra.setAreaHa(getBD(q, "areaHa"));
             quadra.setIdAlimento(getInt(q, "idAlimento"));
             lista.add(quadra);
         }
@@ -243,6 +244,7 @@ public class ControllerAreaProducao extends HttpServlet {
             q.setIdAreaProducao(idArea);
             q.setNomeQuadra(nome.trim());
             q.setNumeroPlantas(plantas != null ? plantas : 0);
+            q.setAreaHa(getBD(jo, "areaHa"));
             q.setIdAlimento(idAlimento);
             quadraDAO.inserir(q);
             dao.recomputarQtdPlantas(idArea);
@@ -279,6 +281,13 @@ public class ControllerAreaProducao extends HttpServlet {
 
     private String getStr(JsonObject jo, String campo) {
         return jo.has(campo) && !jo.get(campo).isJsonNull() ? jo.get(campo).getAsString() : null;
+    }
+
+    private java.math.BigDecimal getBD(JsonObject jo, String campo) {
+        try {
+            return jo.has(campo) && !jo.get(campo).isJsonNull() && !jo.get(campo).getAsString().trim().isEmpty()
+                    ? jo.get(campo).getAsBigDecimal() : java.math.BigDecimal.ZERO;
+        } catch (Exception e) { return java.math.BigDecimal.ZERO; }
     }
 
     private Integer getInt(JsonObject jo, String campo) {

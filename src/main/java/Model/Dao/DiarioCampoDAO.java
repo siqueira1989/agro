@@ -72,7 +72,7 @@ public class DiarioCampoDAO {
     private void inserirCabecalho(Connection c, int id, String numero, DiarioCampo d) throws SQLException {
         String sql = "INSERT INTO diario_campo (iddiario, numero_diario, data, id_area, id_quadra, id_cultura, "
                 + "id_responsavel, id_tipo_atividade, descricao, status, data_prevista, data_realizada, "
-                + "hora_inicio, hora_fim, observacoes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+                + "hora_inicio, hora_fim, observacoes, id_safra) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
         try (PreparedStatement st = c.prepareStatement(sql)) {
             st.setInt(1, id); st.setString(2, numero);
             st.setDate(3, Date.valueOf(d.getData() != null ? d.getData() : LocalDate.now()));
@@ -81,21 +81,21 @@ public class DiarioCampoDAO {
             st.setString(9, d.getDescricao()); st.setString(10, d.getStatus() != null ? d.getStatus() : "PLANEJADA");
             setDateOrNull(st, 11, d.getDataPrevista()); setDateOrNull(st, 12, d.getDataRealizada());
             setTimeOrNull(st, 13, d.getHoraInicio()); setTimeOrNull(st, 14, d.getHoraFim());
-            st.setString(15, d.getObservacoes());
+            st.setString(15, d.getObservacoes()); setIntOrNull(st, 16, d.getIdSafra());
             st.executeUpdate();
         }
     }
 
     private void atualizarCabecalho(Connection c, DiarioCampo d) throws SQLException {
         String sql = "UPDATE diario_campo SET data=?, id_area=?, id_quadra=?, id_cultura=?, id_responsavel=?, "
-                + "id_tipo_atividade=?, descricao=?, data_prevista=?, hora_inicio=?, hora_fim=?, observacoes=? WHERE iddiario=?";
+                + "id_tipo_atividade=?, descricao=?, data_prevista=?, hora_inicio=?, hora_fim=?, observacoes=?, id_safra=? WHERE iddiario=?";
         try (PreparedStatement st = c.prepareStatement(sql)) {
             st.setDate(1, Date.valueOf(d.getData() != null ? d.getData() : LocalDate.now()));
             setIntOrNull(st, 2, d.getIdArea()); setIntOrNull(st, 3, d.getIdQuadra()); setIntOrNull(st, 4, d.getIdCultura());
             setIntOrNull(st, 5, d.getIdResponsavel()); st.setInt(6, d.getIdTipoAtividade());
             st.setString(7, d.getDescricao()); setDateOrNull(st, 8, d.getDataPrevista());
             setTimeOrNull(st, 9, d.getHoraInicio()); setTimeOrNull(st, 10, d.getHoraFim());
-            st.setString(11, d.getObservacoes()); st.setInt(12, d.getIdDiario());
+            st.setString(11, d.getObservacoes()); setIntOrNull(st, 12, d.getIdSafra()); st.setInt(13, d.getIdDiario());
             st.executeUpdate();
         }
     }
@@ -255,13 +255,14 @@ public class DiarioCampoDAO {
 
     public DiarioCampo buscarPorId(int id) throws SQLException {
         String sql = "SELECT d.*, ar.propriedadeareaproducao AS area_nome, q.nome_quadra AS quadra_nome, "
-                + "al.nomeproduto AS cultura_nome, p.nomepessoa AS resp_nome, t.nome AS tipo_nome "
+                + "al.nomeproduto AS cultura_nome, p.nomepessoa AS resp_nome, t.nome AS tipo_nome, sf.nome AS safra_nome "
                 + "FROM diario_campo d "
                 + "LEFT JOIN areaproducao ar ON ar.idareaproducao=d.id_area "
                 + "LEFT JOIN quadra q ON q.idquadra=d.id_quadra "
                 + "LEFT JOIN alimento al ON al.idproduto=d.id_cultura "
                 + "LEFT JOIN pessoa p ON p.idpessoa=d.id_responsavel "
-                + "LEFT JOIN diario_tipo_atividade t ON t.idtipo=d.id_tipo_atividade WHERE d.iddiario=?";
+                + "LEFT JOIN diario_tipo_atividade t ON t.idtipo=d.id_tipo_atividade "
+                + "LEFT JOIN safra sf ON sf.idsafra=d.id_safra WHERE d.iddiario=?";
         try (Connection c = new PostgresConnection().getConnection();
              PreparedStatement st = c.prepareStatement(sql)) {
             st.setInt(1, id);
@@ -279,13 +280,14 @@ public class DiarioCampoDAO {
                                     Integer idTipo, String status, String de, String ate) throws SQLException {
         StringBuilder sql = new StringBuilder(
             "SELECT d.*, ar.propriedadeareaproducao AS area_nome, q.nome_quadra AS quadra_nome, "
-          + "al.nomeproduto AS cultura_nome, p.nomepessoa AS resp_nome, t.nome AS tipo_nome "
+          + "al.nomeproduto AS cultura_nome, p.nomepessoa AS resp_nome, t.nome AS tipo_nome, sf.nome AS safra_nome "
           + "FROM diario_campo d "
           + "LEFT JOIN areaproducao ar ON ar.idareaproducao=d.id_area "
           + "LEFT JOIN quadra q ON q.idquadra=d.id_quadra "
           + "LEFT JOIN alimento al ON al.idproduto=d.id_cultura "
           + "LEFT JOIN pessoa p ON p.idpessoa=d.id_responsavel "
-          + "LEFT JOIN diario_tipo_atividade t ON t.idtipo=d.id_tipo_atividade WHERE 1=1");
+          + "LEFT JOIN diario_tipo_atividade t ON t.idtipo=d.id_tipo_atividade "
+          + "LEFT JOIN safra sf ON sf.idsafra=d.id_safra WHERE 1=1");
         List<Object> ps = new ArrayList<>();
         if (idArea != null)   { sql.append(" AND d.id_area=?"); ps.add(idArea); }
         if (idQuadra != null) { sql.append(" AND d.id_quadra=?"); ps.add(idQuadra); }
@@ -523,6 +525,7 @@ public class DiarioCampoDAO {
         d.setIdCultura((Integer) rs.getObject("id_cultura")); d.setCulturaNome(rs.getString("cultura_nome"));
         d.setIdResponsavel((Integer) rs.getObject("id_responsavel")); d.setResponsavelNome(rs.getString("resp_nome"));
         d.setIdTipoAtividade(rs.getInt("id_tipo_atividade")); d.setTipoAtividadeNome(rs.getString("tipo_nome"));
+        d.setIdSafra((Integer) rs.getObject("id_safra")); d.setSafraNome(rs.getString("safra_nome"));
         d.setDescricao(rs.getString("descricao")); d.setStatus(rs.getString("status"));
         Date dp = rs.getDate("data_prevista"); d.setDataPrevista(dp != null ? dp.toLocalDate() : null);
         Date dr = rs.getDate("data_realizada"); d.setDataRealizada(dr != null ? dr.toLocalDate() : null);

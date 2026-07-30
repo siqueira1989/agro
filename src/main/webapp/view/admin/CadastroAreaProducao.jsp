@@ -66,7 +66,7 @@
         <div class="table-responsive">
           <table class="table table-sm mb-0 align-middle">
             <thead class="table-light">
-              <tr><th>Nome da Quadra</th><th style="width:150px;">Nº de Plantas</th><th style="width:250px;">Tipo de Planta</th><th style="width:60px;"></th></tr>
+              <tr><th>Nome da Quadra</th><th style="width:130px;">Nº de Plantas</th><th style="width:110px;">Área (ha)</th><th style="width:230px;">Tipo de Planta</th><th style="width:60px;"></th></tr>
             </thead>
             <tbody id="quadrasBody"></tbody>
           </table>

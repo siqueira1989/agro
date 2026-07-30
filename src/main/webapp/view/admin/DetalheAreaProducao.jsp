@@ -129,6 +129,7 @@
         <div class="col-md-2"><label class="form-label">Hora fim</label><input type="time" class="form-control" id="dcHoraFim"></div>
         <div class="col-md-5"><label class="form-label">Observações</label><input type="text" class="form-control" id="dcObs" maxlength="200"></div>
       </div>
+      <div class="mt-2"><span class="badge bg-light text-dark border"><i class="fas fa-seedling me-1 text-success"></i>Safra vinculada: <strong id="dcSafraNome">—</strong></span></div>
 
       <!-- Funcionários -->
       <div class="d-flex justify-content-between align-items-center mt-3 mb-1">

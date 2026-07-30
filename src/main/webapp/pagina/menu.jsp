@@ -53,6 +53,9 @@
                     <a class="dropdown-item" href="<%=request.getContextPath()%>/view/admin/areaproducao.jsp">
                         <i class="fas fa-map-marked-alt me-1"></i>Área de Produção
                     </a>
+                    <a class="dropdown-item" href="<%=request.getContextPath()%>/view/admin/safra.jsp">
+                        <i class="fas fa-seedling me-1"></i>Safra
+                    </a>
                 </div>
             </li>
 

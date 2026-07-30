@@ -15,14 +15,15 @@ public class QuadraDAO {
 
     /** Insere uma quadra usando uma conexão já aberta (transação com a área). */
     public void inserir(Connection conn, Quadra q) throws SQLException {
-        String sql = "INSERT INTO quadra (idareaproducao, nome_quadra, numero_plantas, id_alimento, ativa) "
-                   + "VALUES (?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO quadra (idareaproducao, nome_quadra, numero_plantas, id_alimento, ativa, area_ha) "
+                   + "VALUES (?, ?, ?, ?, ?, ?)";
         try (PreparedStatement st = conn.prepareStatement(sql)) {
             st.setInt(1, q.getIdAreaProducao());
             st.setString(2, q.getNomeQuadra());
             st.setInt(3, q.getNumeroPlantas());
             if (q.getIdAlimento() != null) st.setInt(4, q.getIdAlimento()); else st.setNull(4, Types.INTEGER);
             st.setBoolean(5, q.isAtiva());
+            st.setBigDecimal(6, q.getAreaHa() != null ? q.getAreaHa() : java.math.BigDecimal.ZERO);
             st.executeUpdate();
         }
     }
@@ -51,6 +52,7 @@ public class QuadraDAO {
                 q.setIdAreaProducao(rs.getInt("idareaproducao"));
                 q.setNomeQuadra(rs.getString("nome_quadra"));
                 q.setNumeroPlantas(rs.getInt("numero_plantas"));
+                q.setAreaHa(rs.getBigDecimal("area_ha"));
                 q.setIdAlimento((Integer) rs.getObject("id_alimento"));
                 q.setAlimentoNome(rs.getString("alimento_nome"));
                 q.setAtiva(rs.getBoolean("ativa"));

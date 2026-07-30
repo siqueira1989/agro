@@ -1,17 +1,14 @@
 -- =====================================================================
 -- AGRO TECH ONE — BANCO DE DADOS COMPLETO (schema consolidado)
---
--- Arquivo único com TODAS as alterações/versões já aplicadas ao banco.
--- Reflete o estado atual. Serve para recriar o banco do zero em outro PC.
---   createdb agro
---   psql -U postgres -d agro -f agro_banco_completo.sql
+-- Recria o banco do zero: createdb agro && psql -U postgres -d agro -f agro_banco_completo.sql
 --
 -- HISTÓRICO DE VERSÕES (migrações em src/main/resources/db/migration)
 --   V1 base · V2 triggers · V3 CLT rural · V4 vínculo · V5 id_vinculo
 --   V6 empreita · V7 produção/caixas · V8 CLT multi-modo · V9 pagamentos
 --   V10 tipo_parceiro · V11 estoque insumos · V12 remove talão
---   V13 quadras + situacao · V14 Diário de Campo
---   V15 Maquinário (trator/implemento custo/hora, veículo custo/km) + km no diário
+--   V13 quadras + situacao · V14 Diário de Campo · V15 Maquinário
+--   V16 Safra (safra + safra_talhao N:N, area_ha no talhão, id_safra no diário,
+--       rateio de custos COE/SEBRAE-CONAB, trava por período)
 --
 -- SCHEMA (estrutura), sem dados. Gerado via pg_dump.
 -- =====================================================================
@@ -299,7 +296,8 @@ CREATE TABLE public.diario_campo (
     custo_insumos numeric(12,2) DEFAULT 0 NOT NULL,
     custo_maquinas numeric(12,2) DEFAULT 0 NOT NULL,
     custo_total numeric(12,2) DEFAULT 0 NOT NULL,
-    criado_em timestamp without time zone DEFAULT now() NOT NULL
+    criado_em timestamp without time zone DEFAULT now() NOT NULL,
+    id_safra integer
 );
 
 
@@ -1118,7 +1116,8 @@ CREATE TABLE public.quadra (
     numero_plantas integer DEFAULT 0 NOT NULL,
     id_alimento integer,
     ativa boolean DEFAULT true NOT NULL,
-    criado_em timestamp without time zone DEFAULT now() NOT NULL
+    criado_em timestamp without time zone DEFAULT now() NOT NULL,
+    area_ha numeric(10,2) DEFAULT 0 NOT NULL
 );
 
 
@@ -1176,6 +1175,76 @@ CREATE SEQUENCE public.registroponto_idregistroponto_seq
 --
 
 ALTER SEQUENCE public.registroponto_idregistroponto_seq OWNED BY public.registroponto.idregistroponto;
+
+
+--
+-- Name: safra; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.safra (
+    idsafra integer NOT NULL,
+    nome character varying(80) NOT NULL,
+    id_cultura_principal integer,
+    data_inicial date NOT NULL,
+    data_final date NOT NULL,
+    status character varying(15) DEFAULT 'PLANEJADA'::character varying NOT NULL,
+    estimativa_producao numeric(14,3) DEFAULT 0 NOT NULL,
+    unidade_producao character varying(10) DEFAULT 'SACA'::character varying NOT NULL,
+    despesas_fixas numeric(12,2) DEFAULT 0 NOT NULL,
+    criado_em timestamp without time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: safra_idsafra_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.safra_idsafra_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: safra_idsafra_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.safra_idsafra_seq OWNED BY public.safra.idsafra;
+
+
+--
+-- Name: safra_talhao; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.safra_talhao (
+    id integer NOT NULL,
+    id_safra integer NOT NULL,
+    id_quadra integer NOT NULL,
+    area_destinada_ha numeric(10,2) DEFAULT 0 NOT NULL
+);
+
+
+--
+-- Name: safra_talhao_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.safra_talhao_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: safra_talhao_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.safra_talhao_id_seq OWNED BY public.safra_talhao.id;
 
 
 --
@@ -1500,6 +1569,20 @@ ALTER TABLE ONLY public.quadra ALTER COLUMN idquadra SET DEFAULT nextval('public
 --
 
 ALTER TABLE ONLY public.registroponto ALTER COLUMN idregistroponto SET DEFAULT nextval('public.registroponto_idregistroponto_seq'::regclass);
+
+
+--
+-- Name: safra idsafra; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.safra ALTER COLUMN idsafra SET DEFAULT nextval('public.safra_idsafra_seq'::regclass);
+
+
+--
+-- Name: safra_talhao id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.safra_talhao ALTER COLUMN id SET DEFAULT nextval('public.safra_talhao_id_seq'::regclass);
 
 
 --
@@ -1837,6 +1920,30 @@ ALTER TABLE ONLY public.registroponto
 
 
 --
+-- Name: safra safra_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.safra
+    ADD CONSTRAINT safra_pkey PRIMARY KEY (idsafra);
+
+
+--
+-- Name: safra_talhao safra_talhao_id_safra_id_quadra_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.safra_talhao
+    ADD CONSTRAINT safra_talhao_id_safra_id_quadra_key UNIQUE (id_safra, id_quadra);
+
+
+--
+-- Name: safra_talhao safra_talhao_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.safra_talhao
+    ADD CONSTRAINT safra_talhao_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: falta_funcionario uk_falta_funcionario_dia; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1902,6 +2009,13 @@ CREATE INDEX idx_diario_data ON public.diario_campo USING btree (data);
 --
 
 CREATE INDEX idx_diario_quadra ON public.diario_campo USING btree (id_quadra);
+
+
+--
+-- Name: idx_diario_safra; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_diario_safra ON public.diario_campo USING btree (id_safra);
 
 
 --
@@ -2028,6 +2142,27 @@ CREATE INDEX idx_quadra_area ON public.quadra USING btree (idareaproducao);
 --
 
 CREATE INDEX idx_regponto_func_data ON public.registroponto USING btree (idfuncionario, dataponto);
+
+
+--
+-- Name: idx_safra_periodo; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_safra_periodo ON public.safra USING btree (data_inicial, data_final);
+
+
+--
+-- Name: idx_safratalhao_quadra; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_safratalhao_quadra ON public.safra_talhao USING btree (id_quadra);
+
+
+--
+-- Name: idx_safratalhao_safra; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_safratalhao_safra ON public.safra_talhao USING btree (id_safra);
 
 
 --
@@ -2216,6 +2351,14 @@ ALTER TABLE ONLY public.diario_campo
 
 
 --
+-- Name: diario_campo diario_campo_id_safra_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.diario_campo
+    ADD CONSTRAINT diario_campo_id_safra_fkey FOREIGN KEY (id_safra) REFERENCES public.safra(idsafra) ON DELETE SET NULL;
+
+
+--
 -- Name: diario_campo diario_campo_id_tipo_atividade_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2301,6 +2444,30 @@ ALTER TABLE ONLY public.quadra
 
 ALTER TABLE ONLY public.quadra
     ADD CONSTRAINT quadra_idareaproducao_fkey FOREIGN KEY (idareaproducao) REFERENCES public.areaproducao(idareaproducao) ON DELETE CASCADE;
+
+
+--
+-- Name: safra safra_id_cultura_principal_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.safra
+    ADD CONSTRAINT safra_id_cultura_principal_fkey FOREIGN KEY (id_cultura_principal) REFERENCES public.alimento(idproduto);
+
+
+--
+-- Name: safra_talhao safra_talhao_id_quadra_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.safra_talhao
+    ADD CONSTRAINT safra_talhao_id_quadra_fkey FOREIGN KEY (id_quadra) REFERENCES public.quadra(idquadra) ON DELETE CASCADE;
+
+
+--
+-- Name: safra_talhao safra_talhao_id_safra_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.safra_talhao
+    ADD CONSTRAINT safra_talhao_id_safra_fkey FOREIGN KEY (id_safra) REFERENCES public.safra(idsafra) ON DELETE CASCADE;
 
 
 --

@@ -2,6 +2,7 @@ package Controller;
 
 import Model.Dao.DiarioCampoDAO;
 import Model.Dao.EstoqueInsuficienteException;
+import Model.Dao.SafraDAO;
 import Model.Dao.TipoAtividadeDAO;
 import Model.Model.DiarioCampo;
 import Model.Model.DiarioInsumo;
@@ -39,6 +40,7 @@ public class ControllerDiarioCampo extends HttpServlet {
     private static final long serialVersionUID = 1L;
     private DiarioCampoDAO dao;
     private TipoAtividadeDAO tipoDAO;
+    private SafraDAO safraDAO;
 
     private final Gson gson = new GsonBuilder()
         .registerTypeAdapter(LocalDate.class, (JsonSerializer<LocalDate>) (s, t, c) -> new JsonPrimitive(s.toString()))
@@ -56,6 +58,7 @@ public class ControllerDiarioCampo extends HttpServlet {
     public void init() {
         dao = new DiarioCampoDAO();
         tipoDAO = new TipoAtividadeDAO();
+        safraDAO = new SafraDAO();
     }
 
     @Override
@@ -138,6 +141,18 @@ public class ControllerDiarioCampo extends HttpServlet {
             if (i.getIdInsumo() == 0 || i.getQuantidade() == null || i.getQuantidade().signum() <= 0) {
                 writeJson(resp, 400, false, "Cada insumo precisa de um produto e quantidade maior que zero."); return;
             }
+        }
+
+        // Safra: resolve pelo talhão + data; trava lançamentos em safra FINALIZADA e vincula a safra
+        java.time.LocalDate dataAtiv = d.getData() != null ? d.getData() : java.time.LocalDate.now();
+        String[] sf = safraDAO.resolverSafra(d.getIdQuadra(), dataAtiv);
+        if (sf != null) {
+            if ("FINALIZADA".equals(sf[2])) {
+                writeJson(resp, 400, false, "A safra \"" + sf[1] + "\" está FINALIZADA — não é permitido lançar/editar atividades nela."); return;
+            }
+            d.setIdSafra(Integer.parseInt(sf[0]));
+        } else {
+            d.setIdSafra(null);
         }
 
         if (update) {

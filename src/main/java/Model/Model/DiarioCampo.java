@@ -19,6 +19,7 @@ public class DiarioCampo {
     private Integer idCultura;      private String culturaNome;
     private Integer idResponsavel;  private String responsavelNome;
     private int idTipoAtividade;    private String tipoAtividadeNome;
+    private Integer idSafra;        private String safraNome;
     private String descricao;
     private String status = "PLANEJADA";
     private LocalDate dataPrevista;
@@ -61,6 +62,10 @@ public class DiarioCampo {
     public void setIdTipoAtividade(int idTipoAtividade) { this.idTipoAtividade = idTipoAtividade; }
     public String getTipoAtividadeNome() { return tipoAtividadeNome; }
     public void setTipoAtividadeNome(String tipoAtividadeNome) { this.tipoAtividadeNome = tipoAtividadeNome; }
+    public Integer getIdSafra() { return idSafra; }
+    public void setIdSafra(Integer idSafra) { this.idSafra = idSafra; }
+    public String getSafraNome() { return safraNome; }
+    public void setSafraNome(String safraNome) { this.safraNome = safraNome; }
     public String getDescricao() { return descricao; }
     public void setDescricao(String descricao) { this.descricao = descricao; }
     public String getStatus() { return status; }

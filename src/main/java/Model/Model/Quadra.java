@@ -11,6 +11,7 @@ public class Quadra {
     private int idAreaProducao;
     private String nomeQuadra;
     private int numeroPlantas;
+    private java.math.BigDecimal areaHa = java.math.BigDecimal.ZERO;  // área real (ha)
     private Integer idAlimento;      // FK alimento(idproduto)
     private String alimentoNome;     // preenchido para exibição
     private boolean ativa = true;
@@ -26,6 +27,8 @@ public class Quadra {
 
     public int getNumeroPlantas() { return numeroPlantas; }
     public void setNumeroPlantas(int numeroPlantas) { this.numeroPlantas = numeroPlantas; }
+    public java.math.BigDecimal getAreaHa() { return areaHa; }
+    public void setAreaHa(java.math.BigDecimal areaHa) { this.areaHa = areaHa; }
 
     public Integer getIdAlimento() { return idAlimento; }
     public void setIdAlimento(Integer idAlimento) { this.idAlimento = idAlimento; }

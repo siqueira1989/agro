@@ -69,7 +69,7 @@
       <div id="alertQuadra" class="alert d-none" role="alert"></div>
       <div class="table-responsive mb-3">
         <table class="table table-sm table-hover align-middle mb-0">
-          <thead class="table-light"><tr><th>Nome</th><th class="text-end">Nº Plantas</th><th>Tipo de Planta</th><th>Situação</th><th style="width:130px;"></th></tr></thead>
+          <thead class="table-light"><tr><th>Nome</th><th class="text-end">Nº Plantas</th><th class="text-end">Área (ha)</th><th>Tipo de Planta</th><th>Situação</th><th style="width:130px;"></th></tr></thead>
           <tbody id="quadrasEditBody"></tbody>
         </table>
       </div>
@@ -77,10 +77,12 @@
       <div class="border-top pt-3">
         <h6 class="fw-bold text-success"><i class="fas fa-plus me-1"></i>Adicionar Quadra</h6>
         <div class="row g-2 align-items-end">
-          <div class="col-md-4"><label class="form-label">Nome da quadra</label>
+          <div class="col-md-3"><label class="form-label">Nome da quadra</label>
             <input type="text" class="form-control" id="addQuadraNome" maxlength="60"></div>
-          <div class="col-md-3"><label class="form-label">Nº de plantas</label>
+          <div class="col-md-2"><label class="form-label">Nº de plantas</label>
             <input type="number" class="form-control" id="addQuadraPlantas" min="0" value="0"></div>
+          <div class="col-md-2"><label class="form-label">Área (ha)</label>
+            <input type="number" class="form-control" id="addQuadraArea" min="0" step="0.01" value="0"></div>
           <div class="col-md-3"><label class="form-label">Tipo de planta</label>
             <select class="form-select" id="addQuadraAlimento"><option value="">Selecione</option></select></div>
           <div class="col-md-2">

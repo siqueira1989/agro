@@ -3686,6 +3686,7 @@ function apAddQuadraRow() {
     var tr = '<tr>' +
         '<td><input type="text" class="form-control form-control-sm q-nome" maxlength="60" placeholder="Ex.: Quadra 1"></td>' +
         '<td><input type="number" class="form-control form-control-sm q-plantas" min="0" value="0"></td>' +
+        '<td><input type="number" class="form-control form-control-sm q-area" min="0" step="0.01" value="0"></td>' +
         '<td><select class="form-select form-select-sm q-alimento">' + apOptionsAlimento() + '</select></td>' +
         '<td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger q-remove"><i class="fas fa-trash"></i></button></td>' +
         '</tr>';
@@ -3704,6 +3705,7 @@ function apSalvarCadastro() {
         quadras.push({
             nomeQuadra: nome,
             numeroPlantas: parseInt($(this).find('.q-plantas').val()) || 0,
+            areaHa: parseFloat($(this).find('.q-area').val()) || 0,
             idAlimento: parseInt($(this).find('.q-alimento').val()) || 0
         });
     });
@@ -3771,15 +3773,15 @@ function apCarregarQuadrasEdit(id) {
     // excluída; permanece visível com o status e pode ser reativada.
     $.getJSON(CTX + '/ControllerAreaProducao?quadras=' + id + '&ativas=false', function (lista) {
         var $b = $('#quadrasEditBody').empty();
-        if (!lista.length) { $b.append('<tr><td colspan="5" class="text-center text-muted py-2">Sem quadras.</td></tr>'); return; }
+        if (!lista.length) { $b.append('<tr><td colspan="6" class="text-center text-muted py-2">Sem quadras.</td></tr>'); return; }
         lista.forEach(function (q) {
             var badge = q.ativa ? '<span class="badge bg-success">Ativa</span>' : '<span class="badge bg-secondary">Inativa</span>';
             var acao = q.ativa
                 ? '<button class="btn btn-sm btn-outline-danger" onclick="apDesativarQuadra(' + q.idQuadra + ')"><i class="fas fa-ban me-1"></i>Desativar</button>'
                 : '<button class="btn btn-sm btn-outline-success" onclick="apAtivarQuadra(' + q.idQuadra + ')"><i class="fas fa-circle-check me-1"></i>Reativar</button>';
             $b.append('<tr class="' + (q.ativa ? '' : 'table-light text-muted') + '"><td>' + q.nomeQuadra +
-                '</td><td class="text-end">' + q.numeroPlantas + '</td><td>' + (q.alimentoNome || '—') +
-                '</td><td>' + badge + '</td><td class="text-center">' + acao + '</td></tr>');
+                '</td><td class="text-end">' + q.numeroPlantas + '</td><td class="text-end">' + (Number(q.areaHa || 0).toLocaleString('pt-BR')) +
+                '</td><td>' + (q.alimentoNome || '—') + '</td><td>' + badge + '</td><td class="text-center">' + acao + '</td></tr>');
         });
     });
 }
@@ -3811,7 +3813,7 @@ function apAddQuadraEdit() {
     var id = parseInt($('#areaId').val());
     var nome = $('#addQuadraNome').val().trim();
     if (!nome) { mostrarAlerta('Informe o nome da quadra.', 'danger', '#alertQuadra'); return; }
-    var payload = { acao: 'addquadra', idareaproducao: id, nomeQuadra: nome, numeroPlantas: parseInt($('#addQuadraPlantas').val()) || 0, idAlimento: parseInt($('#addQuadraAlimento').val()) || 0 };
+    var payload = { acao: 'addquadra', idareaproducao: id, nomeQuadra: nome, numeroPlantas: parseInt($('#addQuadraPlantas').val()) || 0, areaHa: parseFloat($('#addQuadraArea').val()) || 0, idAlimento: parseInt($('#addQuadraAlimento').val()) || 0 };
     $.ajax({
         url: CTX + '/ControllerAreaProducao', method: 'POST', contentType: 'application/json', data: JSON.stringify(payload),
         success: function (res) { if (res.ok) { window.location.reload(); } else { mostrarAlerta(res.msg, 'danger', '#alertQuadra'); } },
@@ -3914,8 +3916,10 @@ function dcInit(areaId) {
     $('#btnAddTipo').off('click').on('click', dcAddTipo);
     $('#btnSalvarDiario').off('click').on('click', dcSalvar);
 
-    // Talhão -> preenche cultura automaticamente (do cadastro do talhão)
+    // Talhão -> preenche cultura automaticamente (do cadastro do talhão) + resolve safra
     $('#dcTalhao').off('change.dc').on('change.dc', dcAplicarCulturaDoTalhao);
+    // Data -> resolve a safra (talhão + data)
+    $('#dcData').off('change.dc').on('change.dc', dcResolverSafra);
     // Tipo de atividade -> filtra insumos (Adubação=adubo, Pulverização=defensivo)
     $('#dcTipo').off('change.dc').on('change.dc', dcRefiltrarInsumos);
 
@@ -3951,6 +3955,19 @@ function dcAplicarCulturaDoTalhao() {
         $('#dcCultura').val('');
         $('#dcCulturaNome').val(q ? '(talhão sem cultura cadastrada)' : '');
     }
+    dcResolverSafra();
+}
+
+/** Resolve e exibe a safra do talhão na data (trava/vínculo — validado no backend). */
+function dcResolverSafra() {
+    var idq = parseInt($('#dcTalhao').val()) || 0;
+    var data = $('#dcData').val();
+    if (!idq || !data) { $('#dcSafraNome').text('—'); return; }
+    $.getJSON(CTX + '/ControllerSafra?resolver=' + idq + '&data=' + data, function (r) {
+        if (r && r.idSafra) {
+            $('#dcSafraNome').text(r.nome + ' [' + r.status + ']' + (r.status === 'FINALIZADA' ? ' — FINALIZADA: bloqueia lançamento' : ''));
+        } else { $('#dcSafraNome').text('nenhuma (data fora de período de safra)'); }
+    });
 }
 
 function dcInsumoOpts() {
@@ -4153,6 +4170,7 @@ function dcEditar(id) {
         (d.insumos || []).forEach(function (i) { dcAddInsRow(i); });
         if (!(d.funcionarios || []).length) dcAddFuncRow();
         dcRecalcPreview();
+        dcResolverSafra();
         $('#modalNovoDiario').modal('show');
     });
 }
@@ -4284,6 +4302,148 @@ function mqToggle(id, situacao) {
         success: function (res) { mostrarAlerta(res.msg, 'info', '#alerta'); mqCarregar(); },
         error: function () { mostrarAlerta('Erro ao alterar situação.', 'danger', '#alerta'); } });
 }
+
+/******************************************************************************************************/
+/* MÓDULO SAFRA — safra.jsp (CRUD + vínculo de talhões)                                               */
+/******************************************************************************************************/
+var sfCacheTalhoes = [], sfOptCultura = '';
+function sfMoney(v) { return 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function sfBadge(s) {
+    var m = { PLANEJADA: 'bg-secondary', EM_ANDAMENTO: 'bg-info text-dark', FINALIZADA: 'bg-success' };
+    return '<span class="badge ' + (m[s] || 'bg-secondary') + '">' + (s || '') + '</span>';
+}
+
+$(document).ready(function () {
+    if (!$('#tabelaSafras').length) return;
+    $('#tabelaSafras').DataTable({ language: { url: 'https://cdn.datatables.net/plug-ins/1.11.5/i18n/pt_BR.json' } });
+    $.getJSON(CTX + '/ControllerSafra?culturas=1', function (cs) {
+        sfOptCultura = '<option value="">—</option>';
+        cs.forEach(function (c) { sfOptCultura += '<option value="' + c.id + '">' + c.nome + '</option>'; });
+    });
+    $.getJSON(CTX + '/ControllerSafra?talhoes=1', function (ts) { sfCacheTalhoes = ts; });
+    sfCarregar();
+    $('#btnNovaSafra').on('click', sfNovo);
+    $('#btnAddTalhaoSafra').on('click', function () { sfAddTalhaoRow(); });
+    $('#btnSalvarSafra').on('click', sfSalvar);
+    $('#sfTalhaoBody').on('click', '.sf-rm', function () { $(this).closest('tr').remove(); });
+});
+
+function sfCarregar() {
+    var t = $('#tabelaSafras').DataTable(); t.clear();
+    $.get(CTX + '/ControllerSafra', function (lista) {
+        lista.forEach(function (s) {
+            var periodo = (s.dataInicial || '') + ' a ' + (s.dataFinal || '');
+            var acoes = '<a class="btn-acao btn-acao-editar" title="Editar" href="#" onclick="sfEditar(' + s.idSafra + ');return false;"><i class="fas fa-pen-to-square"></i></a> ' +
+                '<a class="btn-acao" title="Resumo financeiro" href="' + CTX + '/view/admin/resumoSafra.jsp?id=' + s.idSafra + '"><i class="fas fa-chart-pie"></i></a>';
+            t.row.add([s.nome, s.culturaNome || '—', periodo, sfBadge(s.status),
+                Number(s.estimativaProducao || 0).toLocaleString('pt-BR') + ' ' + (s.unidadeProducao || ''), acoes]).draw(false);
+        });
+    });
+}
+
+function sfTalhaoOpts() {
+    var o = '<option value="">Selecione</option>';
+    sfCacheTalhoes.forEach(function (q) { o += '<option value="' + q.idQuadra + '" data-area="' + (q.areaHa || 0) + '">' + q.area + ' / ' + q.nome + ' (' + q.numeroPlantas + ' pl, ' + Number(q.areaHa || 0) + ' ha)</option>'; });
+    return o;
+}
+function sfAddTalhaoRow(t) {
+    $('#sfTalhaoBody').append('<tr>' +
+        '<td><select class="form-select form-select-sm sf-tq">' + sfTalhaoOpts() + '</select></td>' +
+        '<td><input type="number" step="0.01" min="0" class="form-control form-control-sm sf-tarea" value="0"></td>' +
+        '<td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger sf-rm"><i class="fas fa-trash"></i></button></td></tr>');
+    if (t) {
+        var $tr = $('#sfTalhaoBody tr:last');
+        $tr.find('.sf-tq').val(String(t.idQuadra)); $tr.find('.sf-tarea').val(t.areaDestinadaHa || 0);
+    }
+}
+
+function sfNovo() {
+    $('#alertaSafra').addClass('d-none').text(''); $('#modalSafraTitulo').html('<i class="fas fa-seedling me-2"></i>Nova Safra');
+    $('#sfId,#sfNome').val(''); $('#sfCultura').html(sfOptCultura);
+    $('#sfStatus').val('PLANEJADA'); $('#sfUnidade').val('SACA');
+    $('#sfDataIni,#sfDataFim').val(''); $('#sfEstimativa,#sfDespFixas').val('0');
+    $('#sfTalhaoBody').empty(); sfAddTalhaoRow();
+    $('#modalSafra').modal('show');
+}
+function sfEditar(id) {
+    $.getJSON(CTX + '/ControllerSafra?id=' + id, function (s) {
+        $('#alertaSafra').addClass('d-none').text(''); $('#modalSafraTitulo').html('<i class="fas fa-pen-to-square me-2"></i>Editar Safra');
+        $('#sfCultura').html(sfOptCultura);
+        $('#sfId').val(s.idSafra); $('#sfNome').val(s.nome);
+        $('#sfCultura').val(s.idCulturaPrincipal ? String(s.idCulturaPrincipal) : '');
+        $('#sfStatus').val(s.status); $('#sfUnidade').val(s.unidadeProducao || 'SACA');
+        $('#sfDataIni').val(s.dataInicial || ''); $('#sfDataFim').val(s.dataFinal || '');
+        $('#sfEstimativa').val(s.estimativaProducao || 0); $('#sfDespFixas').val(s.despesasFixas || 0);
+        $('#sfTalhaoBody').empty();
+        (s.talhoes || []).forEach(function (t) { sfAddTalhaoRow(t); });
+        if (!(s.talhoes || []).length) sfAddTalhaoRow();
+        $('#modalSafra').modal('show');
+    });
+}
+function sfSalvar() {
+    var talhoes = [], invalido = false;
+    $('#sfTalhaoBody tr').each(function () {
+        var idq = $(this).find('.sf-tq').val(); if (!idq) return;
+        var areaMax = parseFloat($(this).find('.sf-tq :selected').data('area')) || 0;
+        var area = parseFloat($(this).find('.sf-tarea').val()) || 0;
+        if (areaMax > 0 && area > areaMax) invalido = true;
+        talhoes.push({ idQuadra: parseInt(idq), areaDestinadaHa: area });
+    });
+    if (invalido) { $('#alertaSafra').removeClass('d-none').addClass('alert-danger').text('Há talhão com área destinada maior que a área real. Corrija antes de salvar.'); return; }
+    var id = $('#sfId').val();
+    var payload = {
+        acao: id ? 'update' : 'create', idSafra: id ? parseInt(id) : 0,
+        nome: $('#sfNome').val().trim(),
+        idCulturaPrincipal: $('#sfCultura').val() ? parseInt($('#sfCultura').val()) : null,
+        dataInicial: $('#sfDataIni').val() || null, dataFinal: $('#sfDataFim').val() || null,
+        status: $('#sfStatus').val(), estimativaProducao: parseFloat($('#sfEstimativa').val()) || 0,
+        unidadeProducao: $('#sfUnidade').val(), despesasFixas: parseFloat($('#sfDespFixas').val()) || 0,
+        talhoes: talhoes
+    };
+    if (!payload.nome || !payload.dataInicial || !payload.dataFinal) { $('#alertaSafra').removeClass('d-none').addClass('alert-danger').text('Nome e datas são obrigatórios.'); return; }
+    $.ajax({ url: CTX + '/ControllerSafra', method: 'POST', contentType: 'application/json; charset=utf-8', data: JSON.stringify(payload),
+        success: function (res) { if (res.ok) { $('#modalSafra').modal('hide'); mostrarAlerta(res.msg, 'success', '#alerta'); sfCarregar(); } else $('#alertaSafra').removeClass('d-none').addClass('alert-danger').text(res.msg); },
+        error: function (xhr) { var m = 'Erro ao salvar safra.'; try { m = JSON.parse(xhr.responseText).msg || m; } catch (e) {} $('#alertaSafra').removeClass('d-none').addClass('alert-danger').text(m); } });
+}
+
+/******************************************************************************************************/
+/* RESUMO FINANCEIRO DA SAFRA — resumoSafra.jsp                                                       */
+/******************************************************************************************************/
+$(document).ready(function () {
+    if (!$('#resumoSafra').length) return;
+    var id = new URLSearchParams(window.location.search).get('id');
+    $.getJSON(CTX + '/ControllerSafra?resumo=' + id, function (r) {
+        if (!r || !r.safra) return;
+        var s = r.safra;
+        $('#rsNome').text(s.nome || ''); $('#rsStatus').html(sfBadge(s.status));
+        $('#rsCultura').text(s.culturaNome || '—');
+        $('#rsPeriodo').text((s.dataInicial || '') + ' a ' + (s.dataFinal || ''));
+        $('#rsUnidade').text(s.unidadeProducao === 'TONELADA' ? 'Tonelada' : 'Saca');
+        $('#rsAtiv').text(r.qtdAtividades); $('#rsPlantas').text(Number(r.totalPlantas || 0).toLocaleString('pt-BR'));
+        $('#rsArea').text(Number(r.totalAreaHa || 0).toLocaleString('pt-BR'));
+        $('#rsCustoTotal').text(sfMoney(r.custoTotal));
+        $('#rsPorPlanta').text('R$ ' + Number(r.custoPorPlanta || 0).toLocaleString('pt-BR', {minimumFractionDigits:4, maximumFractionDigits:4}));
+        $('#rsPorHa').text(sfMoney(r.custoPorHa)); $('#rsPorSaca').text(sfMoney(r.custoPorUnidade));
+        $('#rsIns').text(sfMoney(r.custoInsumos)); $('#rsMaq').text(sfMoney(r.custoMaquinas));
+        $('#rsMo').text(sfMoney(r.custoMaoObra)); $('#rsFix').text(sfMoney(r.despesasFixas));
+        $('#rsPctIns').text((r.pctInsumos || 0) + '%'); $('#rsPctMaq').text((r.pctMaquinas || 0) + '%');
+        $('#rsPctMo').text((r.pctMaoObra || 0) + '%'); $('#rsPctFix').text((r.pctDespesasFixas || 0) + '%');
+        $('#rsTotalFoot').text(sfMoney(r.custoTotal));
+        var barra = '';
+        barra += '<div class="progress-bar bg-primary" style="width:' + (r.pctInsumos || 0) + '%" title="Insumos"></div>';
+        barra += '<div class="progress-bar bg-secondary" style="width:' + (r.pctMaquinas || 0) + '%" title="Maquinário"></div>';
+        barra += '<div class="progress-bar bg-success" style="width:' + (r.pctMaoObra || 0) + '%" title="Mão de obra"></div>';
+        barra += '<div class="progress-bar bg-warning" style="width:' + (r.pctDespesasFixas || 0) + '%" title="Despesas fixas"></div>';
+        $('#rsBarra').html(barra);
+        var $b = $('#rsRateioBody').empty();
+        if (!(r.rateio || []).length) $b.append('<tr><td colspan="5" class="text-center text-muted py-2">Sem talhões.</td></tr>');
+        (r.rateio || []).forEach(function (x) {
+            $b.append('<tr><td>' + x.talhao + '</td><td class="text-end">' + Number(x.numeroPlantas).toLocaleString('pt-BR') +
+                '</td><td class="text-end">' + x.participacaoPct + '%</td><td class="text-end">' + sfMoney(x.custoRateado) +
+                '</td><td class="text-end">' + sfMoney(x.custoReal) + '</td></tr>');
+        });
+    });
+});
 
 /** Oculta e limpa o conteúdo de um container de alerta. Usado em: areaproducao.jsp */
 function limparAlerta(sel) { $(sel).removeClass().addClass('alert d-none').empty(); }
