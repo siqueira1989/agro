@@ -171,8 +171,11 @@ public class SafraDAO {
     /* ======================= APURAÇÃO DE CUSTOS ======================= */
 
     /**
-     * Painel de custos da safra (COE + rateio + indicadores). Considera as
-     * atividades dos talhões da safra dentro do período (exceto CANCELADA).
+     * Painel de custos da safra (COE + rateio + indicadores). Considera apenas
+     * as atividades CONCLUÍDAS dos talhões da safra dentro do período — ou seja,
+     * o custo efetivamente realizado. Atividades PLANEJADA/EM_ANDAMENTO são
+     * pré-agendamentos e não entram no consolidado (a baixa de estoque também só
+     * ocorre ao finalizar). Coerente com o card da Área e os relatórios.
      */
     public Map<String, Object> resumoFinanceiro(int idSafra) throws SQLException {
         Map<String, Object> out = new LinkedHashMap<>();
@@ -180,12 +183,14 @@ public class SafraDAO {
             Safra s = buscarPorId2(c, idSafra);
             if (s == null) return out;
 
-            // COE por componente (atividades dos talhões da safra, no período, não canceladas)
+            // COE por componente (só atividades CONCLUÍDAS: custo efetivamente realizado.
+            // PLANEJADA/EM_ANDAMENTO são pré-agendamentos e não entram no custo consolidado —
+            // coerente com o card da Área e com os relatórios de agregação.)
             BigDecimal cInsumos = BigDecimal.ZERO, cMaq = BigDecimal.ZERO, cMo = BigDecimal.ZERO;
             String sqlCoe = "SELECT COALESCE(SUM(d.custo_insumos),0) i, COALESCE(SUM(d.custo_maquinas),0) m, "
                     + "COALESCE(SUM(d.custo_mao_obra),0) mo, COUNT(*) n FROM diario_campo d "
                     + "JOIN safra_talhao st ON st.id_quadra=d.id_quadra AND st.id_safra=? "
-                    + "WHERE d.data BETWEEN ? AND ? AND d.status <> 'CANCELADA'";
+                    + "WHERE d.data BETWEEN ? AND ? AND d.status = 'CONCLUIDA'";
             int nAtiv = 0;
             try (PreparedStatement ps = c.prepareStatement(sqlCoe)) {
                 ps.setInt(1, idSafra); ps.setDate(2, Date.valueOf(s.getDataInicial())); ps.setDate(3, Date.valueOf(s.getDataFinal()));
@@ -234,7 +239,7 @@ public class SafraDAO {
     }
 
     private BigDecimal custoRealTalhao(Connection c, int idSafra, int idQuadra, LocalDate ini, LocalDate fim) throws SQLException {
-        String sql = "SELECT COALESCE(SUM(custo_total),0) FROM diario_campo WHERE id_quadra=? AND data BETWEEN ? AND ? AND status <> 'CANCELADA'";
+        String sql = "SELECT COALESCE(SUM(custo_total),0) FROM diario_campo WHERE id_quadra=? AND data BETWEEN ? AND ? AND status = 'CONCLUIDA'";
         try (PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setInt(1, idQuadra); ps.setDate(2, Date.valueOf(ini)); ps.setDate(3, Date.valueOf(fim));
             ResultSet rs = ps.executeQuery();
