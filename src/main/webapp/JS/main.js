@@ -226,9 +226,10 @@ function validarCPF(cpf) {
  */
 function CarregarClassificacao() {
 
-    // Inicializa o DataTable
+    // Já inicializada: recarrega os dados sem destruir (preserva busca/ordenação/página).
     if ($.fn.DataTable.isDataTable('#tabelaClassificacao')) {
-        $('#tabelaClassificacao').DataTable().destroy();
+        $('#tabelaClassificacao').DataTable().ajax.reload(null, false);
+        return;
     }
     const tabela = $('#tabelaClassificacao').DataTable({
         "processing": false,
@@ -398,10 +399,10 @@ function abrirModalExclusaoDespesasCustos(id, despesa) {
 
 /** Inicializa/recarrega o DataTable de despesas e custos via DespesasCustosServlet. Usado em: despesascustos.jsp */
 function CarregarDadosDespesasCustos() {
-    // Inicializa o DataTable
-    // Inicializa o DataTable
+    // Já inicializada: recarrega sem destruir (preserva busca/ordenação/página).
     if ($.fn.DataTable.isDataTable('#tabelaDespesasCustos')) {
-        $('#tabelaDespesasCustos').DataTable().destroy();
+        $('#tabelaDespesasCustos').DataTable().ajax.reload(null, false);
+        return;
     }
 
     const tabela = $('#tabelaDespesasCustos').DataTable({
@@ -737,9 +738,10 @@ function editarAlimento(id) {
 /** Inicializa/recarrega o DataTable de alimentos via ControllerAlimento. Usado em: alimento.jsp */
 function CarregarAlimento() {
 
-    // Inicializa o DataTable
+    // Já inicializada: recarrega sem destruir (preserva busca/ordenação/página).
     if ($.fn.DataTable.isDataTable('#tabelaAlimento')) {
-        $('#tabelaAlimento').DataTable().destroy();
+        $('#tabelaAlimento').DataTable().ajax.reload(null, false);
+        return;
     }
     const tabela = $('#tabelaAlimento').DataTable({
         "processing": false,
@@ -890,11 +892,12 @@ function badgeTipoParceiro(tipo) {
 /** Inicializa/recarrega o DataTable de parceiros via ControllerParceiro. Usado em: parceiro.jsp */
 function CarregarParceiros() {
 
-    // Inicializa o DataTable
-    if ($.fn.DataTable.isDataTable('#tabelaParceiros')) {
-        $('#tabelaParceiros').DataTable().destroy();
-    }
     const url = "/agro/ControllerParceiro" + (filtroTipoParceiro ? "?tipo=" + filtroTipoParceiro : "");
+    // Já inicializada: atualiza a URL (filtro por tipo) e recarrega sem destruir.
+    if ($.fn.DataTable.isDataTable('#tabelaParceiros')) {
+        $('#tabelaParceiros').DataTable().ajax.url(url).load(null, false);
+        return;
+    }
     const tabela = $('#tabelaParceiros').DataTable({
         "processing": false,
         "serverSide": false,
@@ -1701,6 +1704,23 @@ $(function () {
 /* $(document).ready() — blocos movidos dos JSPs com guardas de página                               */
 /******************************************************************************************************/
 
+/* ====================================================================================
+   Auto-refresh SUAVE de tabelas (padrão do sistema)
+   - Nunca usa DataTable().destroy(): preserva busca, ordenação e página do usuário.
+   - Pausa quando a aba está em background (document.hidden) ou quando há um modal
+     aberto (.modal.show), para não recarregar a lista enquanto o usuário edita.
+   - Intervalo padrão: 15s. Use a mesma "chave" por tabela (evita timers duplicados).
+   ==================================================================================== */
+window.__tabelaTimers = window.__tabelaTimers || {};
+function autoRefreshTabela(chave, recarregarFn, intervalMs) {
+    if (window.__tabelaTimers[chave]) clearInterval(window.__tabelaTimers[chave]);
+    window.__tabelaTimers[chave] = setInterval(function () {
+        if (document.hidden) return;                        // aba inativa
+        if (document.querySelector('.modal.show')) return;  // modal aberto: não atrapalha edição
+        try { recarregarFn(); } catch (e) { /* silencioso */ }
+    }, intervalMs || 15000);
+}
+
 /* ========== login.jsp ========== */
 $(document).ready(function () {
     if (!$('#formLogin').length) return;
@@ -1821,7 +1841,7 @@ function pesquisacep(valor) {
 $(document).ready(function () {
     if (!$('#tabelaClassificacao').length) return;
     CarregarClassificacao();
-    setInterval(CarregarClassificacao, 20000);
+    autoRefreshTabela('classificacao', CarregarClassificacao, 15000);
 });
 
 /* ========== despesascustos.jsp ========== */
@@ -1837,7 +1857,7 @@ $(document).ready(function () {
     });
 
     CarregarDadosDespesasCustos();
-    setInterval(CarregarDadosDespesasCustos, 10000);
+    autoRefreshTabela('despesascustos', CarregarDadosDespesasCustos, 15000);
 
     $('#formCadastro').on('submit', function (e) {
         e.preventDefault();
@@ -1893,7 +1913,7 @@ $(document).ready(function () {
     }
 
     CarregarAlimento();
-    setInterval(CarregarAlimento, 10000);
+    autoRefreshTabela('alimento', CarregarAlimento, 15000);
 
     // Pré-requisito: alimento precisa de ao menos uma Classificação cadastrada.
     window.__classifCount = null;
@@ -1934,7 +1954,7 @@ $(document).ready(function () {
 
     CarregarParceiros();
     carregarResumoParceiros();
-    setInterval(CarregarParceiros, 20000);
+    autoRefreshTabela('parceiros', function () { CarregarParceiros(); carregarResumoParceiros(); }, 15000);
 
     // Abas de filtro por tipo
     $(document).on("click", ".aba-tipo-parceiro", function (e) {
@@ -2086,7 +2106,7 @@ $(document).ready(function () {
     }
 
     CarregarFuncionarios();
-    setInterval(CarregarFuncionarios, 10000);
+    autoRefreshTabela('funcionarios', CarregarFuncionarios, 15000);
 
     $('#filtroTipo, #filtroSituacao').on('change', function () {
         if (tabelaFuncionarios) tabelaFuncionarios.draw();
@@ -2133,7 +2153,7 @@ function CarregarFuncionarios() {
         success: function (lista) {
             dadosFuncionarios = Array.isArray(lista) ? lista : [];
             if (tabelaFuncionarios) {
-                tabelaFuncionarios.clear().rows.add(dadosFuncionarios).draw();
+                tabelaFuncionarios.clear().rows.add(dadosFuncionarios).draw(false);
             } else {
                 tabelaFuncionarios = $('#tabelaFuncionarios').DataTable({
                     data: dadosFuncionarios,
@@ -3632,12 +3652,13 @@ $(document).ready(function () {
     }
     $('#tabelaAreas').DataTable({ language: { url: 'https://cdn.datatables.net/plug-ins/1.11.5/i18n/pt_BR.json' } });
     apCarregarLista();
+    autoRefreshTabela('areas', apCarregarLista, 15000);
 });
 
 function apCarregarLista() {
     var tabela = $('#tabelaAreas').DataTable();
     $.get(CTX + '/ControllerAreaProducao', function (dados) {
-        tabela.clear();
+        tabela.clear();  // limpa só quando os dados chegam (sem flash de tabela vazia)
         dados.forEach(function (a) {
             var badge = a.situacao ? '<span class="badge bg-success">Ativa</span>' : '<span class="badge bg-secondary">Inativa</span>';
             var nome = (a.PropriedadeAreaProducao || '').replace(/'/g, "\\'");
@@ -3917,6 +3938,7 @@ function dcInit(areaId) {
     $.getJSON(CTX + '/ControllerMaquina?ativas=true', function (ms) { dcCacheMaq = ms; });
 
     dcCarregarLista();
+    autoRefreshTabela('diario', dcCarregarLista, 15000);
 
     $('#dcFiltroStatus').off('change').on('change', dcCarregarLista);
     $('#btnNovoDiario').off('click').on('click', dcAbrirNovo);
@@ -4264,6 +4286,7 @@ $(document).ready(function () {
     if (!$('#tabelaMaquinas').length) return;
     $('#tabelaMaquinas').DataTable({ language: { url: 'https://cdn.datatables.net/plug-ins/1.11.5/i18n/pt_BR.json' } });
     mqCarregar();
+    autoRefreshTabela('maquinas', mqCarregar, 15000);
     $('#mqTipo').on('change', mqToggleBlocos);
     $('#btnNovoMaquina').on('click', mqNovo);
     $('#btnSalvarMaquina').on('click', mqSalvar);
@@ -4287,8 +4310,9 @@ function mqToggleBlocos() {
     }
 }
 function mqCarregar() {
-    var t = $('#tabelaMaquinas').DataTable(); t.clear();
+    var t = $('#tabelaMaquinas').DataTable();
     $.get(CTX + '/ControllerMaquina', function (lista) {
+        t.clear();  // limpa só quando os dados chegam (sem flash de tabela vazia)
         lista.forEach(function (m) {
             t.row.add([m.nome, m.tipo, m.marca || '—', m.identificacao || '—',
                 'R$ ' + Number(m.custoHora || 0).toLocaleString('pt-BR', {minimumFractionDigits:2}),
@@ -4353,6 +4377,7 @@ $(document).ready(function () {
     });
     $.getJSON(CTX + '/ControllerSafra?talhoes=1', function (ts) { sfCacheTalhoes = ts; });
     sfCarregar();
+    autoRefreshTabela('safras', sfCarregar, 15000);
     $('#btnNovaSafra').on('click', sfNovo);
     $('#btnAddTalhaoSafra').on('click', function () { sfAddTalhaoRow(); });
     $('#btnSalvarSafra').on('click', sfSalvar);
@@ -4360,8 +4385,9 @@ $(document).ready(function () {
 });
 
 function sfCarregar() {
-    var t = $('#tabelaSafras').DataTable(); t.clear();
+    var t = $('#tabelaSafras').DataTable();
     $.get(CTX + '/ControllerSafra', function (lista) {
+        t.clear();  // limpa só quando os dados chegam (sem flash de tabela vazia)
         lista.forEach(function (s) {
             var periodo = (s.dataInicial || '') + ' a ' + (s.dataFinal || '');
             var acoes = '<a class="btn-acao btn-acao-editar" title="Editar" href="#" onclick="sfEditar(' + s.idSafra + ');return false;"><i class="fas fa-pen-to-square"></i></a> ' +
@@ -4915,11 +4941,13 @@ function badgeCategoriaInsumo(cat) {
 
 /** Recarrega a DataTable de insumos aplicando o filtro de categoria. */
 function CarregarInsumos() {
-    if ($.fn.DataTable.isDataTable('#tabelaInsumos')) {
-        $('#tabelaInsumos').DataTable().destroy();
-    }
     const cat = $("#filtroCategoria").val() || "";
     const url = "/agro/ControllerInsumo" + (cat ? "?categoria=" + cat : "");
+    // Já inicializada: atualiza a URL (filtro categoria) e recarrega sem destruir.
+    if ($.fn.DataTable.isDataTable('#tabelaInsumos')) {
+        $('#tabelaInsumos').DataTable().ajax.url(url).load(null, false);
+        return;
+    }
     $('#tabelaInsumos').DataTable({
         "ajax": { "url": url, "method": "GET", "dataSrc": function (json) { insumosCache = json; return json; } },
         "columns": [
@@ -5192,6 +5220,7 @@ $(document).ready(function () {
 
     CarregarInsumos();
     carregarResumoEstoque();
+    autoRefreshTabela('insumos', function () { CarregarInsumos(); carregarResumoEstoque(); }, 15000);
 
     $("#filtroCategoria").on("change", CarregarInsumos);
     $("#insGrandeza").on("change", function () { popularUnidades($(this).val()); });
