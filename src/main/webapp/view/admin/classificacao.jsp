@@ -56,15 +56,13 @@
                             <div id="modalClassificacaoCadastro" class="alert d-none" role="alert"></div>
 
                             <div class="mb-3">
-                                <label for="classificacao">Classificação</label>
+                                <label for="classificacao" class="form-label">Classificação</label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-list-alt text-info"></i></span>
-                                    </div>
                                     <input type="text" id="classificacao" name="classificacao" class="form-control" required>
                                     <div class="invalid-feedback">Informe a classificação.</div>
                                 </div>
                             </div>
-                            <div id="modalClassificacaoCadastro" class="mt-2"></div>
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-primary me-2" onclick="salvarClassificacao()">
@@ -100,7 +98,6 @@
                                 <input type="text" id="atualizacaoClassificacao" name="atualizacaoClassificacao" class="form-control" required>
                                 <div class="invalid-feedback">Informe a classificação.</div>
                             </div>
-                            <div id="modalClassificacaoAtualizar" class="mt-2"></div>
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-primary me-2" onclick="atualizarClassificacao()">
@@ -133,7 +130,6 @@
                         <input type="hidden" id="exclusaoId" name="exclusaoId">
                         <input type="hidden" id="deletar" value="Delete">
                         <strong id="exclusaoClassificacao"></strong>
-                        <div id="modalClassificacaoExcluir" class="mt-2"></div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-danger me-2" onclick="excluirClassificacao()">

@@ -59,20 +59,18 @@
                             <div id="ModalCadastroAlimento"></div>
                         
                         <div class="mb-3">
-                            <label for="alimento">Alimento</label>
+                            <label for="alimento" class="form-label">Alimento</label>
                             <div class="input-group">
                                 <span class="input-group-text"><i class="fas fa-carrot"></i></span>
-                                </div>
                                 <input type="text" class="form-control" id="alimento" name="alimento" required>
                                 <div class="invalid-feedback">Informe o alimento.</div>
                             </div>
                         </div>
 
                         <div class="mb-3">
-                            <label for="variedade">Variedade</label>
+                            <label for="variedade" class="form-label">Variedade</label>
                             <div class="input-group">
                                 <span class="input-group-text"><i class="fas fa-seedling"></i></span>
-                                </div>
                                 <input type="text" class="form-control" id="variedade" name="variedade" required>
                                 <input type="hidden" class="form-control" id="tipo" name="tipo" value="Alimento">
                                 <div class="invalid-feedback">Informe a variedade.</div>
@@ -80,10 +78,9 @@
                         </div>
 
                         <div class="mb-3">
-                            <label for="classificacao">Classificação</label>
+                            <label for="SelectClassificacao" class="form-label">Classificação</label>
                             <div class="input-group">
                                 <span class="input-group-text"><i class="fas fa-tags"></i></span>
-                                </div>
                                 <select id="SelectClassificacao" name="classificacoes" class="form-control" multiple required>
                                     <option disabled value="">Selecione uma ou mais classificações...</option>
                                     <!-- Opções dinâmicas -->
