@@ -4061,6 +4061,11 @@ function dcAddFuncRow(f) {
     }
 }
 function dcAddMaqRow(m) {
+    if (!m && !dcCacheMaq.length) {
+        preReqAlerta('#alertDiario', 'Não há <strong>Maquinário</strong> cadastrado. Cadastre em Configuração → Maquinário para usar aqui.',
+            CTX + '/view/admin/maquina.jsp', 'Cadastrar Maquinário');
+        return;
+    }
     var opt = '<option value="">Selecione</option>';
     dcCacheMaq.forEach(function (mq) { opt += '<option value="' + mq.idMaquina + '" data-tipo="' + mq.tipo + '" data-ch="' + (mq.custoHora || 0) + '" data-ck="' + (mq.custoKm || 0) + '">' + mq.nome + ' (' + mq.tipo + ')</option>'; });
     $('#dcMaqBody').append('<tr>' +
@@ -4087,6 +4092,11 @@ function dcAtualizarLinhaMaquina($tr) {
     dcRecalcPreview();
 }
 function dcAddInsRow(i) {
+    if (!i && !dcCacheIns.length) {
+        preReqAlerta('#alertDiario', 'Não há <strong>Insumo</strong> cadastrado. Cadastre no Estoque de Insumos para usar aqui.',
+            CTX + '/view/admin/estoque.jsp', 'Cadastrar Insumo');
+        return;
+    }
     $('#dcInsBody').append('<tr>' +
         '<td><select class="form-select form-select-sm dc-ipro">' + dcInsumoOpts() + '</select></td>' +
         '<td><input type="number" class="form-control form-control-sm dc-iqtd" min="0" step="0.001" value="0"></td>' +
@@ -4500,6 +4510,15 @@ $(document).ready(function () {
     $('#periodoGerar').val(mesAtual);
     $('#periodoVer').val(mesAtual);
 
+    // Pré-requisito: a Folha depende de Funcionários cadastrados.
+    $.getJSON(CTX + '/ControllerFuncionario', function (fs) {
+        if (!(fs || []).length) {
+            preReqAlerta('#alertPage', 'Para gerar a Folha de Pagamento é preciso ter <strong>Funcionários</strong> cadastrados.',
+                CTX + '/view/admin/ColaboCadastro.jsp', 'Cadastrar Funcionário');
+            $('#btnGerarFolha, #btnVerFolha, #btnExcelFolha, #btnPdfFolha').prop('disabled', true);
+        }
+    });
+
     $('#btnGerarFolha').on('click', gerarFolha);
     $('#btnVerFolha').on('click', function () { verFolha($('#periodoVer').val()); });
     $('#btnExcelFolha').on('click', function () { folhaExportar('excel'); });
@@ -4593,6 +4612,12 @@ const DIAS_SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 /** Popula o select #selFuncionario com todos os funcionários ativos. Usado em: pontoeletronico.jsp */
 function pontoCFuncionarios() {
     $.get(CTX + '/ControllerPontoEletronico?tipo=funcionarios', function (lista) {
+        if (!(lista || []).length) {
+            preReqAlerta('#alerta', 'Para usar o Ponto Eletrônico é preciso ter ao menos um <strong>Funcionário</strong> cadastrado.',
+                CTX + '/view/admin/ColaboCadastro.jsp', 'Cadastrar Funcionário');
+            $('#btnBuscar').prop('disabled', true);
+            return;
+        }
         const sel = $('#selFuncionario');
         lista.forEach(f => sel.append(
             '<option value="' + f.idPessoa + '">' + f.nomePessoa + ' (' + (f.tipoFuncionario || '—') + ')</option>'
@@ -5090,6 +5115,10 @@ function atualizarDisponivelSaida() {
 }
 
 function abrirSaida() {
+    if (!insumosCache.filter(function (i) { return i.situacao; }).length) {
+        preReqAlerta('#alerta', 'Para registrar uma Saída é preciso ter ao menos um <strong>Insumo</strong> cadastrado (com estoque).', null);
+        return;
+    }
     $("#alertaSaida").addClass("d-none").text("");
     preencherSelectInsumos("saiInsumo");
     $("#saiQtd").val(""); $("#saiObs").val("");
