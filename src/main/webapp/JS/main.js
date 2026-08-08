@@ -1895,7 +1895,17 @@ $(document).ready(function () {
     CarregarAlimento();
     setInterval(CarregarAlimento, 10000);
 
-    $('#modalFormulario').on('show.bs.modal', function () {
+    // Pré-requisito: alimento precisa de ao menos uma Classificação cadastrada.
+    window.__classifCount = null;
+    $.getJSON('/agro/ClassificacaoServlet', function (cs) { window.__classifCount = (cs || []).length; });
+
+    $('#modalFormulario').on('show.bs.modal', function (e) {
+        if (window.__classifCount === 0) {
+            e.preventDefault();
+            preReqAlerta('#alerta', 'Para cadastrar um Alimento é preciso ter ao menos uma <strong>Classificação</strong> cadastrada.',
+                CTX + '/view/admin/classificacao.jsp', 'Cadastrar Classificação');
+            return;
+        }
         CarregarClassificacaoModal();
     });
 
@@ -4017,6 +4027,17 @@ function dcResetForm() {
     $('#dcTotalPreview').text(dcMoney(0));
 }
 function dcAbrirNovo() {
+    // Pré-requisitos: a área precisa de talhões e o sistema de funcionários cadastrados.
+    if (!dcCacheTalhao.length) {
+        preReqAlerta('#alertPerfil', 'Esta área não tem <strong>talhões</strong> cadastrados. Cadastre um talhão antes de lançar atividades.',
+            CTX + '/view/admin/AtualizarAreaProducao.jsp?id=' + dcAreaId, 'Adicionar Talhão');
+        return;
+    }
+    if (!dcCacheFunc.length) {
+        preReqAlerta('#alertPerfil', 'Para lançar uma atividade é preciso ter ao menos um <strong>Funcionário</strong> cadastrado (responsável).',
+            CTX + '/view/admin/ColaboCadastro.jsp', 'Cadastrar Funcionário');
+        return;
+    }
     dcResetForm();
     $('#dcModalTitulo').text('Novo Diário de Campo');
     dcAddFuncRow();
@@ -4358,6 +4379,11 @@ function sfAddTalhaoRow(t) {
 }
 
 function sfNovo() {
+    if (!sfCacheTalhoes.length) {
+        preReqAlerta('#alerta', 'Para cadastrar uma Safra é preciso ter <strong>talhões</strong> cadastrados (Área de Produção → talhões).',
+            CTX + '/view/admin/areaproducao.jsp', 'Ir para Área de Produção');
+        return;
+    }
     $('#alertaSafra').addClass('d-none').text(''); $('#modalSafraTitulo').html('<i class="fas fa-seedling me-2"></i>Nova Safra');
     $('#sfId,#sfNome').val(''); $('#sfCultura').html(sfOptCultura);
     $('#sfStatus').val('PLANEJADA'); $('#sfUnidade').val('SACA');
@@ -4444,6 +4470,17 @@ $(document).ready(function () {
         });
     });
 });
+
+/**
+ * Exibe um aviso de pré-requisito (módulo dependente sem dados) num container de
+ * alerta, com link para o cadastro que falta. Usado pelos guards de cadastro.
+ */
+function preReqAlerta(sel, msg, href, txt) {
+    var link = href ? ' <a href="' + href + '" class="alert-link fw-bold">' + (txt || 'Cadastrar agora') + ' <i class="fas fa-arrow-right ms-1"></i></a>' : '';
+    $(sel).removeClass('d-none alert-success alert-info alert-danger').addClass('alert alert-warning')
+          .html('<i class="fas fa-triangle-exclamation me-1"></i>' + msg + link);
+    try { $('html,body').animate({ scrollTop: 0 }, 200); } catch (e) {}
+}
 
 /** Oculta e limpa o conteúdo de um container de alerta. Usado em: areaproducao.jsp */
 function limparAlerta(sel) { $(sel).removeClass().addClass('alert d-none').empty(); }
@@ -4999,12 +5036,25 @@ function preencherSelectInsumos(selectId) {
 }
 
 function abrirEntrada() {
-    $("#alertaEntrada").addClass("d-none").text("");
-    preencherSelectInsumos("entInsumo");
-    carregarFornecedoresInsumo("entFornecedor", false);
-    $("#entQtd").val(""); $("#entPreco").val(""); $("#entObs").val("");
-    $("#entData").val(new Date().toISOString().slice(0, 10));
-    $("#modalEntrada").modal("show");
+    // Pré-requisitos: precisa de insumo cadastrado e de fornecedor tipo Insumo.
+    if (!insumosCache.filter(function (i) { return i.situacao; }).length) {
+        preReqAlerta('#alerta', 'Para registrar uma Entrada é preciso ter ao menos um <strong>Insumo</strong> cadastrado.', null);
+        return;
+    }
+    $.getJSON("/agro/ControllerInsumo?acao=fornecedores", function (forns) {
+        if (!(forns || []).length) {
+            preReqAlerta('#alerta', 'Para registrar uma Entrada é preciso de ao menos um <strong>Parceiro do tipo Insumo</strong> (fornecedor).',
+                CTX + '/view/admin/CadastroParceiro.jsp', 'Cadastrar Parceiro');
+            return;
+        }
+        $("#alertaEntrada").addClass("d-none").text("");
+        preencherSelectInsumos("entInsumo");
+        var $s = $("#entFornecedor").empty();
+        forns.forEach(function (f) { $s.append('<option value="' + f.idPessoa + '">' + f.nome + '</option>'); });
+        $("#entQtd").val(""); $("#entPreco").val(""); $("#entObs").val("");
+        $("#entData").val(new Date().toISOString().slice(0, 10));
+        $("#modalEntrada").modal("show");
+    });
 }
 
 function salvarEntrada() {
