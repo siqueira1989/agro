@@ -4972,12 +4972,14 @@ function popularUnidades(grandeza, selecionada) {
     if (selecionada) $u.val(selecionada);
 }
 
-/** Carrega os parceiros tipo insumo num select. */
-function carregarFornecedoresInsumo(selectId, incluirVazio) {
+/** Carrega os parceiros tipo insumo num select. cb(lista) é chamado após carregar. */
+function carregarFornecedoresInsumo(selectId, incluirVazio, cb) {
     $.getJSON("/agro/ControllerInsumo?acao=fornecedores", function (lista) {
+        lista = lista || [];
         const $s = $("#" + selectId).empty();
         if (incluirVazio) $s.append('<option value="">— nenhum —</option>');
         lista.forEach(function (f) { $s.append(`<option value="${f.idPessoa}">${f.nome}</option>`); });
+        if (cb) cb(lista);
     });
 }
 
@@ -4990,14 +4992,18 @@ function abrirModalNovoInsumo() {
     $("#insGrandeza").val("MASSA");
     popularUnidades("MASSA");
     $("#insMinimo").val("0");
-    carregarFornecedoresInsumo("insFornecedor", true);
+    carregarFornecedoresInsumo("insFornecedor", true, dcAtualizarHintFornecedor);
     $("#modalInsumo").modal("show");
+}
+
+/** Mostra um aviso no modal do insumo quando não há Parceiro do tipo Insumo. */
+function dcAtualizarHintFornecedor(lista) {
+    $("#insFornecedorHint").toggleClass("d-none", (lista && lista.length) > 0);
 }
 
 function abrirModalEditarInsumo(id) {
     $("#alertaInsumo").addClass("d-none").text("");
     $("#modalInsumoTitulo").html('<i class="fas fa-pen-to-square me-2"></i>Editar Insumo');
-    carregarFornecedoresInsumo("insFornecedor", true);
     $.getJSON("/agro/ControllerInsumo?id=" + id, function (i) {
         $("#insId").val(i.idInsumo);
         $("#insNome").val(i.nome);
@@ -5005,7 +5011,11 @@ function abrirModalEditarInsumo(id) {
         $("#insGrandeza").val(i.grandeza);
         popularUnidades(i.grandeza, i.unidade);
         $("#insMinimo").val(i.estoqueMinimo);
-        setTimeout(function () { if (i.idFornecedor) $("#insFornecedor").val(i.idFornecedor); }, 200);
+        // seta o fornecedor só APÓS carregar as opções (evita corrida)
+        carregarFornecedoresInsumo("insFornecedor", true, function (lista) {
+            dcAtualizarHintFornecedor(lista);
+            $("#insFornecedor").val(i.idFornecedor ? String(i.idFornecedor) : "");
+        });
         $("#modalInsumo").modal("show");
     });
 }

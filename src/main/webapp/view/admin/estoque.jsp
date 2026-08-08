@@ -115,6 +115,7 @@
                 <div class="col-md-6">
                     <label class="form-label">Fornecedor padrão (insumo)</label>
                     <select class="form-select" id="insFornecedor"><option value="">— nenhum —</option></select>
+                    <small id="insFornecedorHint" class="text-warning d-none"><i class="fas fa-triangle-exclamation me-1"></i>Nenhum <strong>Parceiro do tipo Insumo</strong> cadastrado. <a href="${pageContext.request.contextPath}/view/admin/CadastroParceiro.jsp" class="alert-link">Cadastrar</a></small>
                 </div>
             </div>
             <div class="mt-2 small text-muted">Quantidade e preço médio são geridos pelas movimentações (Entrada/Saída).</div>
