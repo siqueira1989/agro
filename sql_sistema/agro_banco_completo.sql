@@ -9,6 +9,7 @@
 --   V13 quadras + situacao · V14 Diário de Campo · V15 Maquinário
 --   V16 Safra (safra + safra_talhao N:N, area_ha no talhão, id_safra no diário,
 --       rateio de custos COE/SEBRAE-CONAB, trava por período)
+--   V17 Safra obrigatória no Diário (id_safra NOT NULL, FK ON DELETE RESTRICT)
 --
 -- SCHEMA (estrutura), sem dados. Gerado via pg_dump.
 -- =====================================================================
@@ -297,7 +298,7 @@ CREATE TABLE public.diario_campo (
     custo_maquinas numeric(12,2) DEFAULT 0 NOT NULL,
     custo_total numeric(12,2) DEFAULT 0 NOT NULL,
     criado_em timestamp without time zone DEFAULT now() NOT NULL,
-    id_safra integer
+    id_safra integer NOT NULL
 );
 
 
@@ -2355,7 +2356,7 @@ ALTER TABLE ONLY public.diario_campo
 --
 
 ALTER TABLE ONLY public.diario_campo
-    ADD CONSTRAINT diario_campo_id_safra_fkey FOREIGN KEY (id_safra) REFERENCES public.safra(idsafra) ON DELETE SET NULL;
+    ADD CONSTRAINT diario_campo_id_safra_fkey FOREIGN KEY (id_safra) REFERENCES public.safra(idsafra) ON DELETE RESTRICT;
 
 
 --
