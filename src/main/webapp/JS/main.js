@@ -1378,8 +1378,8 @@ function initFuncionarioCadastro() {
     $('#cpfPf').mask('000.000.000-00');
     $('#dataNascimentoPf').mask('00/00/0000');
     $('#dataInicio').mask('00/00/0000');
-    $('#dataFim').mask('00/00/0000');
     $('#valorEspecifico').mask('#.##0,00', { reverse: true });
+    $('#salario').mask('#.##0,00', { reverse: true });
     $('#telefonePessoa').mask('(00) 00000-0000').on('blur', function () {
       $(this).mask($(this).val().length === 14 ? '(00) 0000-0000' : '(00) 00000-0000');
     });
@@ -1631,6 +1631,12 @@ function initFuncionarioCadastro() {
                       'warning', '#alerta', 4000);
         return;
       }
+      // CLT: salário é obrigatório (base para o custo/hora nas atividades do diário)
+      if (tipoSel === 'CLT' && (!parseBRL($('#salario').val()) || parseBRL($('#salario').val()) <= 0)) {
+        $('#salario').addClass('is-invalid');
+        mostrarAlerta('Informe o salário mensal do funcionário CLT.', 'warning', '#alerta', 4000);
+        return;
+      }
 
       const idPessoaVal = $('#idPessoa').val();
       const payload = {
@@ -1652,7 +1658,8 @@ function initFuncionarioCadastro() {
         tipofuncionario: tipoSel,
         cargofuncionario: cargoVal,
         datainiciofuncionario: (tipoSel === 'CLT') ? converterDataParaISO($('#dataInicio').val().trim()) : null,
-        datafimfuncionario: (tipoSel === 'CLT') ? converterDataParaISO($('#dataFim').val().trim()) : null,
+        datafimfuncionario: null,
+        salariofuncionario: (tipoSel === 'CLT') ? parseBRL($('#salario').val()) : null,
         valorespecifico: valorEsp
       };
 
@@ -3900,11 +3907,80 @@ $(document).ready(function () {
 /******************************************************************************************************/
 var dcAreaId = null, dcCacheFunc = [], dcCacheIns = [], dcCacheMaq = [], dcCacheTalhao = [], dcCacheTipos = [], dcCulturaMap = {};
 var dcOptTalhao = '', dcOptTipo = '', dcOptFunc = '';
+var dcSafraResolvida = false, dcTemSafra = false;
 
 function dcMoney(v) { return 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function dcBadgeStatus(s) {
     var map = { PLANEJADA: 'bg-secondary', EM_ANDAMENTO: 'bg-info text-dark', CONCLUIDA: 'bg-success', CANCELADA: 'bg-danger' };
-    return '<span class="badge ' + (map[s] || 'bg-secondary') + '">' + (s || '') + '</span>';
+    var rot = { PLANEJADA: 'Planejado', EM_ANDAMENTO: 'Execução', CONCLUIDA: 'Concluído', CANCELADA: 'Cancelado' };
+    return '<span class="badge ' + (map[s] || 'bg-secondary') + '">' + (rot[s] || s || '') + '</span>';
+}
+
+/** Converte texto flexível de horas para horas decimais. Ex.: "2h30m"→2.5, "30min"→0.5, "2:30"→2.5, "1,5"→1.5, "90m"→1.5. */
+function dcParseHoras(txt) {
+    if (txt == null) return 0;
+    var s = String(txt).trim().toLowerCase().replace(',', '.');
+    if (s === '') return 0;
+    // formato "h:mm"
+    var mColon = s.match(/^(\d+):([0-5]?\d)$/);
+    if (mColon) return Math.round((parseInt(mColon[1]) + parseInt(mColon[2]) / 60) * 1000) / 1000;
+    // formato com h e/ou m (ex.: 2h30m, 2h, 30m, 45min, 1h5)
+    var mHM = s.match(/^(?:(\d+(?:\.\d+)?)\s*h)?\s*(?:(\d+(?:\.\d+)?)\s*(?:m|min)?)?$/);
+    if (mHM && (mHM[1] || mHM[2]) && /[hm:]/.test(s)) {
+        var h = parseFloat(mHM[1] || 0);
+        var mnt = parseFloat(mHM[2] || 0);
+        return Math.round((h + mnt / 60) * 1000) / 1000;
+    }
+    // número puro = horas decimais
+    var n = parseFloat(s);
+    return isNaN(n) ? 0 : n;
+}
+
+/** Formata horas decimais para exibição amigável. Ex.: 2.5→"2h30", 0.5→"0h30", 3→"3h". */
+function dcFormatHoras(dec) {
+    var v = Number(dec) || 0;
+    var h = Math.floor(v);
+    var m = Math.round((v - h) * 60);
+    if (m === 60) { h += 1; m = 0; }
+    return h + 'h' + (m > 0 ? (m < 10 ? '0' + m : m) : '');
+}
+
+/** Rebuild do select Responsável com base APENAS nos funcionários adicionados na atividade. */
+function dcAtualizarResponsavel() {
+    var atual = $('#dcResponsavel').val();
+    var vistos = {}, opts = '<option value="">Selecione</option>';
+    $('#dcFuncBody tr').each(function () {
+        var $sel = $(this).find('.dc-fpessoa');
+        var id = $sel.val(); if (!id || vistos[id]) return;
+        vistos[id] = true;
+        var nome = $sel.find(':selected').text() || ('#' + id);
+        opts += '<option value="' + id + '">' + nome + '</option>';
+    });
+    $('#dcResponsavel').html(opts);
+    if (atual && vistos[atual]) $('#dcResponsavel').val(atual);
+}
+
+/** Recarrega a lista de funcionários conforme a data (só vínculos ativos na data) e atualiza os selects. */
+function dcRecarregarFuncsPorData() {
+    var data = $('#dcData').val();
+    var url = CTX + '/ControllerDiarioCampo?funcionarios=1' + (data ? '&data=' + data : '');
+    $.getJSON(url, function (fs) {
+        dcCacheFunc = fs; dcOptFunc = '<option value="">Selecione</option>';
+        fs.forEach(function (f) { dcOptFunc += '<option value="' + f.idPessoa + '" data-tipo="' + f.tipo + '" data-ref="' + (f.custoRef || 0) + '">' + f.nome + ' (' + f.tipo + ')</option>'; });
+        // Reaplica nas linhas existentes. Preserva a pessoa já escolhida mesmo que ela não esteja
+        // na lista filtrada da data (ex.: edição), acrescentando a opção original de volta.
+        $('#dcFuncBody tr').each(function () {
+            var $sel = $(this).find('.dc-fpessoa'); var v = $sel.val();
+            var optAntigo = v ? $sel.find('option[value="' + v + '"]').prop('outerHTML') : '';
+            $sel.html(dcOptFunc);
+            if (v) {
+                if (!$sel.find('option[value="' + v + '"]').length && optAntigo) $sel.append(optAntigo);
+                $sel.val(v);
+            }
+        });
+        dcAtualizarResponsavel();
+        dcRecalcPreview();
+    });
 }
 /** Categoria de insumo esperada pelo tipo de atividade selecionado (filtro dinâmico). */
 function dcCategoriaPorTipo() {
@@ -3936,6 +4012,8 @@ function dcInit(areaId) {
     });
     $.getJSON(CTX + '/ControllerInsumo', function (is) { dcCacheIns = is.filter(function (i) { return i.situacao; }); });
     $.getJSON(CTX + '/ControllerMaquina?ativas=true', function (ms) { dcCacheMaq = ms; });
+    // Existe ao menos uma safra? (pré-requisito para lançar atividades)
+    $.getJSON(CTX + '/ControllerSafra', function (ls) { dcTemSafra = Array.isArray(ls) && ls.length > 0; });
 
     dcCarregarLista();
     autoRefreshTabela('diario', dcCarregarLista, 15000);
@@ -3950,8 +4028,8 @@ function dcInit(areaId) {
 
     // Talhão -> preenche cultura automaticamente (do cadastro do talhão) + resolve safra
     $('#dcTalhao').off('change.dc').on('change.dc', dcAplicarCulturaDoTalhao);
-    // Data -> resolve a safra (talhão + data)
-    $('#dcData').off('change.dc').on('change.dc', dcResolverSafra);
+    // Data -> resolve a safra (talhão + data) e recarrega os funcionários ativos na data
+    $('#dcData').off('change.dc').on('change.dc', function () { dcResolverSafra(); dcRecarregarFuncsPorData(); });
     // Tipo de atividade -> filtra insumos (Adubação=adubo, Pulverização=defensivo)
     $('#dcTipo').off('change.dc').on('change.dc', dcRefiltrarInsumos);
 
@@ -3962,10 +4040,16 @@ function dcInit(areaId) {
     $('#dcFuncBody').off('change.dc', '.dc-fpessoa').on('change.dc', '.dc-fpessoa', function () {
         var opt = $(this).find(':selected');
         $(this).closest('tr').find('.dc-ftipo').val(opt.data('tipo') || '');
+        dcAtualizarResponsavel();   // responsável só entre os funcionários adicionados
     });
     $('#dcMaqBody').off('change.dc', '.dc-mmaq').on('change.dc', '.dc-mmaq', function () { dcAtualizarLinhaMaquina($(this).closest('tr')); });
     $('#dcMaqBody').off('input.dc', '.dc-muso').on('input.dc', '.dc-muso', function () { dcAtualizarLinhaMaquina($(this).closest('tr')); });
-    $('#modalNovoDiario').off('click.dc', '.dc-rm').on('click.dc', '.dc-rm', function () { $(this).closest('tr').remove(); dcRecalcPreview(); });
+    $('#modalNovoDiario').off('click.dc', '.dc-rm').on('click.dc', '.dc-rm', function () {
+        var eraFunc = $(this).closest('#dcFuncBody').length > 0;
+        $(this).closest('tr').remove();
+        if (eraFunc) dcAtualizarResponsavel();
+        dcRecalcPreview();
+    });
 }
 
 function dcCarregarTipos() {
@@ -3994,11 +4078,17 @@ function dcAplicarCulturaDoTalhao() {
 function dcResolverSafra() {
     var idq = parseInt($('#dcTalhao').val()) || 0;
     var data = $('#dcData').val();
+    dcSafraResolvida = false;
     if (!idq || !data) { $('#dcSafraNome').text('—'); return; }
     $.getJSON(CTX + '/ControllerSafra?resolver=' + idq + '&data=' + data, function (r) {
         if (r && r.idSafra) {
-            $('#dcSafraNome').text(r.nome + ' [' + r.status + ']' + (r.status === 'FINALIZADA' ? ' — FINALIZADA: bloqueia lançamento' : ''));
-        } else { $('#dcSafraNome').text('nenhuma (data fora de período de safra)'); }
+            // Safra válida só se NÃO estiver finalizada (finalizada bloqueia lançamento).
+            dcSafraResolvida = (r.status !== 'FINALIZADA');
+            $('#dcSafraNome').html(r.nome + ' [' + r.status + ']' + (r.status === 'FINALIZADA' ? ' — <span class="text-danger fw-bold">FINALIZADA: bloqueia lançamento</span>' : ''));
+        } else {
+            dcSafraResolvida = false;
+            $('#dcSafraNome').html('<span class="text-danger">nenhuma safra cobre este talhão nesta data (obrigatório)</span>');
+        }
     });
 }
 
@@ -4022,11 +4112,12 @@ function dcCarregarLista() {
     var url = CTX + '/ControllerDiarioCampo?area=' + dcAreaId + (st ? '&status=' + st : '');
     $.getJSON(url, function (lista) {
         var $b = $('#dcTabelaBody').empty();
-        var pend = 0, concl = 0, custo = 0;
+        var pend = 0, concl = 0, custo = 0, planej = 0;
         if (!lista.length) $b.append('<tr><td colspan="8" class="text-center text-muted py-3">Nenhum diário nesta área.</td></tr>');
         lista.forEach(function (d) {
             if (d.status === 'CONCLUIDA') { concl++; custo += Number(d.custoTotal || 0); }
             else if (d.status === 'PLANEJADA' || d.status === 'EM_ANDAMENTO') pend++;
+            if (d.status === 'PLANEJADA') planej++;
             var acoes = '<button class="btn btn-sm btn-outline-dark" title="Ver" onclick="dcVerDetalhe(' + d.idDiario + ')"><i class="fas fa-eye"></i></button>';
             if (d.status !== 'CONCLUIDA') acoes += ' <button class="btn btn-sm btn-outline-primary" title="Editar" onclick="dcEditar(' + d.idDiario + ')"><i class="fas fa-pen-to-square"></i></button>';
             $b.append('<tr><td>' + (d.numeroDiario || '') + '</td><td>' + (d.data || '') + '</td><td>' + (d.quadraNome || '—') +
@@ -4035,21 +4126,31 @@ function dcCarregarLista() {
         });
         $('#dcCardAtividades').text(lista.length); $('#dcCardPendentes').text(pend);
         $('#dcCardConcluidas').text(concl); $('#dcCardCusto').text(dcMoney(custo));
+        // Notificação de atividades planejadas (agendamentos aguardando execução)
+        var $notif = $('#dcNotifPlanejadas');
+        if (planej > 0) {
+            $notif.removeClass('d-none').html('<i class="fas fa-calendar-check me-2"></i>' +
+                '<strong>' + planej + '</strong> atividade(s) <strong>planejada(s)</strong> (agendamento) aguardando execução nesta área.');
+        } else {
+            $notif.addClass('d-none').empty();
+        }
     });
 }
 
 function dcResetForm() {
     $('#alertDiario').addClass('d-none').text('');
     $('#dcTalhao').html(dcOptTalhao);
-    $('#dcResponsavel').html(dcOptFunc); $('#dcTipo').html(dcOptTipo);
+    $('#dcResponsavel').html('<option value="">Selecione</option>'); $('#dcTipo').html(dcOptTipo);
+    $('#dcStatusSel').val('PLANEJADA');
     $('#dcId,#dcStatus,#dcNumero,#dcCultura,#dcCulturaNome').val('');
     $('#dcDescricao,#dcObs,#dcDataPrev,#dcHoraIni,#dcHoraFim').val('');
     $('#dcData').val(new Date().toISOString().slice(0, 10));
     $('#dcFuncBody,#dcMaqBody,#dcInsBody').empty();
     $('#dcTotalPreview').text(dcMoney(0));
+    dcSafraResolvida = false;
 }
 function dcAbrirNovo() {
-    // Pré-requisitos: a área precisa de talhões e o sistema de funcionários cadastrados.
+    // Pré-requisitos: a área precisa de talhões, funcionários e uma safra cadastrada.
     if (!dcCacheTalhao.length) {
         preReqAlerta('#alertPerfil', 'Esta área não tem <strong>talhões</strong> cadastrados. Cadastre um talhão antes de lançar atividades.',
             CTX + '/view/admin/AtualizarAreaProducao.jsp?id=' + dcAreaId, 'Adicionar Talhão');
@@ -4060,10 +4161,16 @@ function dcAbrirNovo() {
             CTX + '/view/admin/ColaboCadastro.jsp', 'Cadastrar Funcionário');
         return;
     }
+    if (!dcTemSafra) {
+        preReqAlerta('#alertPerfil', 'Para lançar uma atividade é obrigatório ter uma <strong>Safra</strong> cadastrada que inclua o talhão e cubra a data.',
+            CTX + '/view/admin/safra.jsp', 'Cadastrar Safra');
+        return;
+    }
     dcResetForm();
     $('#dcModalTitulo').text('Novo Diário de Campo');
     dcAddFuncRow();
-    dcAplicarCulturaDoTalhao();   // preenche a cultura do talhão pré-selecionado
+    dcRecarregarFuncsPorData();    // funcionários ativos na data de hoje
+    dcAplicarCulturaDoTalhao();    // preenche a cultura do talhão pré-selecionado + resolve safra
     $('#modalNovoDiario').modal('show');
 }
 
@@ -4072,15 +4179,17 @@ function dcAddFuncRow(f) {
         '<td><select class="form-select form-select-sm dc-fpessoa">' + dcOptFunc + '</select></td>' +
         '<td><input class="form-control form-control-sm dc-ftipo" readonly placeholder="—" style="width:90px"></td>' +
         '<td><input class="form-control form-control-sm dc-ffuncao" maxlength="60"></td>' +
-        '<td><input type="number" class="form-control form-control-sm dc-fhoras" min="0" step="0.5" value="0"></td>' +
+        '<td><input type="text" class="form-control form-control-sm dc-fhoras" placeholder="2h30 / 45min / 1,5" title="Aceita horas e minutos: 2h30, 45min, 2:30 ou 1,5" value=""></td>' +
         '<td><input type="number" class="form-control form-control-sm dc-fvalor" min="0" step="0.01" value="0"></td>' +
         '<td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger dc-rm"><i class="fas fa-trash"></i></button></td></tr>');
     if (f) {
         var $tr = $('#dcFuncBody tr:last');
         $tr.find('.dc-fpessoa').val(String(f.idPessoa)); $tr.find('.dc-ftipo').val(f.tipoFuncionario || '');
-        $tr.find('.dc-ffuncao').val(f.funcaoExercida || ''); $tr.find('.dc-fhoras').val(f.horasTrabalhadas || 0);
+        $tr.find('.dc-ffuncao').val(f.funcaoExercida || '');
+        $tr.find('.dc-fhoras').val(Number(f.horasTrabalhadas) > 0 ? dcFormatHoras(f.horasTrabalhadas) : '');
         $tr.find('.dc-fvalor').val(f.valorContratado || 0);
     }
+    dcAtualizarResponsavel();
 }
 function dcAddMaqRow(m) {
     if (!m && !dcCacheMaq.length) {
@@ -4136,7 +4245,7 @@ function dcRecalcPreview() {
     $('#dcFuncBody tr').each(function () {
         var opt = $(this).find('.dc-fpessoa :selected'); if (!opt.val()) return;
         var tipo = opt.data('tipo'); var ref = Number(opt.data('ref') || 0);
-        var horas = Number($(this).find('.dc-fhoras').val()) || 0;
+        var horas = dcParseHoras($(this).find('.dc-fhoras').val());
         var valor = Number($(this).find('.dc-fvalor').val()) || 0;
         if (tipo === 'CLT') total += ref * horas;
         else if (tipo === 'DIARISTA') total += ref;
@@ -4160,7 +4269,7 @@ function dcSalvar() {
     $('#dcFuncBody tr').each(function () {
         var id = $(this).find('.dc-fpessoa').val(); if (!id) return;
         funcionarios.push({ idPessoa: parseInt(id), tipoFuncionario: $(this).find('.dc-ftipo').val(),
-            funcaoExercida: $(this).find('.dc-ffuncao').val(), horasTrabalhadas: parseFloat($(this).find('.dc-fhoras').val()) || 0,
+            funcaoExercida: $(this).find('.dc-ffuncao').val(), horasTrabalhadas: dcParseHoras($(this).find('.dc-fhoras').val()),
             valorContratado: parseFloat($(this).find('.dc-fvalor').val()) || 0 });
     });
     var maquinas = [];
@@ -4187,12 +4296,19 @@ function dcSalvar() {
         idCultura: $('#dcCultura').val() ? parseInt($('#dcCultura').val()) : null,
         idResponsavel: parseInt($('#dcResponsavel').val()) || null,
         idTipoAtividade: parseInt($('#dcTipo').val()) || 0,
+        status: ($('#dcStatusSel').val() || 'PLANEJADA'),
         descricao: $('#dcDescricao').val(), dataPrevista: $('#dcDataPrev').val() || null,
         horaInicio: $('#dcHoraIni').val() || null, horaFim: $('#dcHoraFim').val() || null,
         observacoes: $('#dcObs').val(), funcionarios: funcionarios, maquinas: maquinas, insumos: insumos
     };
     if (!payload.idQuadra || !payload.idResponsavel || !payload.idTipoAtividade) {
         $('#alertDiario').removeClass('d-none').addClass('alert-danger').text('Talhão, responsável e tipo de atividade são obrigatórios.'); return;
+    }
+    // Safra é obrigatória: bloqueia no cliente antes de enviar (o backend também valida).
+    if (!dcSafraResolvida) {
+        $('#alertDiario').removeClass('d-none').addClass('alert-danger')
+            .html('É obrigatório uma <strong>Safra</strong> cadastrada que inclua este talhão e cubra a data. Cadastre/ajuste a safra antes de salvar.');
+        return;
     }
     $.ajax({
         url: CTX + '/ControllerDiarioCampo', method: 'POST', contentType: 'application/json; charset=utf-8',
@@ -4211,10 +4327,10 @@ function dcEditar(id) {
         dcResetForm();
         $('#dcModalTitulo').text('Editar Diário ' + (d.numeroDiario || ''));
         $('#dcId').val(d.idDiario); $('#dcStatus').val(d.status); $('#dcNumero').val(d.numeroDiario);
+        $('#dcStatusSel').val(d.status === 'EM_ANDAMENTO' ? 'EM_ANDAMENTO' : 'PLANEJADA');
         $('#dcData').val(d.data || ''); $('#dcTalhao').val(d.idQuadra ? String(d.idQuadra) : '');
         $('#dcCultura').val(d.idCultura ? String(d.idCultura) : '');
         $('#dcCulturaNome').val(d.culturaNome || '');
-        $('#dcResponsavel').val(d.idResponsavel ? String(d.idResponsavel) : '');
         $('#dcTipo').val(String(d.idTipoAtividade));
         $('#dcDescricao').val(d.descricao || ''); $('#dcDataPrev').val(d.dataPrevista || '');
         $('#dcHoraIni').val(d.horaInicio || ''); $('#dcHoraFim').val(d.horaFim || ''); $('#dcObs').val(d.observacoes || '');
@@ -4222,6 +4338,10 @@ function dcEditar(id) {
         (d.maquinas || []).forEach(function (m) { dcAddMaqRow(m); });
         (d.insumos || []).forEach(function (i) { dcAddInsRow(i); });
         if (!(d.funcionarios || []).length) dcAddFuncRow();
+        // Responsável definido após montar as linhas (as opções vêm dos funcionários adicionados)
+        dcAtualizarResponsavel();
+        $('#dcResponsavel').val(d.idResponsavel ? String(d.idResponsavel) : '');
+        dcRecarregarFuncsPorData();   // filtra funcionários pela data salva (preservando os já lançados)
         dcRecalcPreview();
         dcResolverSafra();
         $('#modalNovoDiario').modal('show');
@@ -4288,9 +4408,18 @@ $(document).ready(function () {
     mqCarregar();
     autoRefreshTabela('maquinas', mqCarregar, 15000);
     $('#mqTipo').on('change', mqToggleBlocos);
+    // Custo/Hora = combustível + manutenção + depreciação (soma automática ao digitar os componentes)
+    $('#mqComb, #mqManut, #mqDeprec').on('input', mqRecalcularCustoHora);
     $('#btnNovoMaquina').on('click', mqNovo);
     $('#btnSalvarMaquina').on('click', mqSalvar);
 });
+/** Soma os componentes (combustível + manutenção + depreciação) no Custo/Hora. */
+function mqRecalcularCustoHora() {
+    var comb = parseFloat($('#mqComb').val()) || 0;
+    var manut = parseFloat($('#mqManut').val()) || 0;
+    var deprec = parseFloat($('#mqDeprec').val()) || 0;
+    $('#mqCustoHora').val((comb + manut + deprec).toFixed(2));
+}
 function mqToggleBlocos() {
     var tipo = $('#mqTipo').val();
     var veic = tipo === 'VEICULO';
@@ -4302,6 +4431,7 @@ function mqToggleBlocos() {
     $('#mqCombWrap').toggleClass('d-none', implemento);
     if (implemento) {
         $('#mqComb').val('0');
+        mqRecalcularCustoHora();
         $('#mqTituloHora').text('Custo por Hora (Implemento)');
         $('#mqAjudaHora').text('Implemento é tracionado pelo trator: sem combustível e sem operador próprios. Custo/Hora = manutenção + depreciação. O operador (do trator) é lançado à parte, via funcionário.');
     } else {

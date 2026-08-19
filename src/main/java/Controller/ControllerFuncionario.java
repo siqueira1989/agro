@@ -150,6 +150,7 @@ public class ControllerFuncionario extends HttpServlet {
             LocalDate dataInicio = getAsLocalDate(jsonObject, "datainiciofuncionario");
             LocalDate dataFim = getAsLocalDate(jsonObject, "datafimfuncionario");
             java.math.BigDecimal valorEspecifico = getAsBigDecimal(jsonObject, "valorespecifico");
+            java.math.BigDecimal salario = getAsBigDecimal(jsonObject, "salariofuncionario");
 
             if (isBlank(nomePessoa) || isBlank(cpfPf) || isBlank(matricula) || isBlank(cargo) || isBlank(tipoStr)) {
                 writeJson(response, HttpServletResponse.SC_BAD_REQUEST, false,
@@ -197,7 +198,7 @@ public class ControllerFuncionario extends HttpServlet {
                         numero != null ? numero : 0, complemento, cpfPf, dataNascimentoPf,
                         matricula, cargo, tipoFuncionario, dataInicio, dataFim);
                 funcionariodao.updateFuncionario(fEx);
-                criarVinculo(idExistente, tipoFuncionario, cargo, dataInicio, dataFim);
+                criarVinculo(idExistente, tipoFuncionario, cargo, dataInicio, dataFim, salario);
                 if (valorEspecifico != null) {
                     funcionariodao.updateValorEspecifico(idExistente, tipoFuncionario, valorEspecifico);
                 }
@@ -239,7 +240,7 @@ public class ControllerFuncionario extends HttpServlet {
             // Cria o vínculo inicial da pessoa recém-cadastrada
             Integer novoId = funcionariodao.obterIdFuncionarioPorCPF(cpfPf);
             if (novoId != null) {
-                criarVinculo(novoId, tipoFuncionario, cargo, dataInicio, dataFim);
+                criarVinculo(novoId, tipoFuncionario, cargo, dataInicio, dataFim, salario);
                 if (valorEspecifico != null) {
                     funcionariodao.updateValorEspecifico(novoId, tipoFuncionario, valorEspecifico);
                 }
@@ -596,7 +597,8 @@ public class ControllerFuncionario extends HttpServlet {
        ============================================================ */
     /** Cria um vínculo empregatício (período de trabalho) para a pessoa. */
     private void criarVinculo(int idPessoa, TipoFuncionario tipo, String cargo,
-                              LocalDate admissao, LocalDate desligamento) throws SQLException {
+                              LocalDate admissao, LocalDate desligamento,
+                              java.math.BigDecimal salario) throws SQLException {
         Vinculo v = new Vinculo();
         v.setIdPessoa(idPessoa);
         v.setTipoFuncionario(tipo);
@@ -604,6 +606,10 @@ public class ControllerFuncionario extends HttpServlet {
         v.setDataAdmissao(admissao);
         v.setDataDesligamento(desligamento);
         v.setStatus(desligamento != null ? "DESLIGADO" : "ATIVO");
+        // Salário mensal só se aplica ao CLT; demais tipos usam valor específico (diária/empreita).
+        if (tipo == TipoFuncionario.CLT && salario != null) {
+            v.setSalarioMensal(salario);
+        }
         vinculodao.inserir(v);
     }
 

@@ -213,17 +213,15 @@
                         </div>
                         <small class="text-muted">Quando o funcionário entrou na empresa.</small>
                     </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Data de Desligamento</label>
-                        <div class="input-group date" id="grpDataFim">
-                            <span class="input-group-text"><i class="fas fa-calendar-minus"></i></span>
-                            <input type="text" class="form-control" id="dataFim" name="dataFim"
-                                   placeholder="dd/mm/aaaa" autocomplete="off">
-                            <button class="btn btn-outline-secondary" type="button" id="btnAbrirCalFim" title="Selecionar data">
-                                <i class="fas fa-calendar"></i>
-                            </button>
+                    <div class="col-md-4" id="colSalario">
+                        <label class="form-label">Salário Mensal *</label>
+                        <div class="input-group">
+                            <span class="input-group-text">R$</span>
+                            <input type="text" class="form-control" id="salario" name="salario"
+                                   placeholder="0,00" autocomplete="off">
+                            <div class="invalid-feedback">Informe o salário.</div>
                         </div>
-                        <small class="text-muted">Preencher apenas ao desligar o funcionário.</small>
+                        <small class="text-muted">Salário mensal do CLT — base para o custo/hora nas atividades.</small>
                     </div>
                 </div>
 

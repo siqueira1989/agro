@@ -18,6 +18,7 @@
   </div>
 
   <div id="alertPerfil" class="alert d-none" role="alert"></div>
+  <div id="dcNotifPlanejadas" class="alert alert-warning d-none" role="alert"></div>
 
   <!-- DADOS -->
   <div class="card shadow-sm mb-3">
@@ -67,10 +68,9 @@
       <div class="d-flex gap-2">
         <select id="dcFiltroStatus" class="form-select form-select-sm" style="width:160px;">
           <option value="">Todos status</option>
-          <option value="PLANEJADA">Planejada</option>
-          <option value="EM_ANDAMENTO">Em andamento</option>
-          <option value="CONCLUIDA">Concluída</option>
-          <option value="CANCELADA">Cancelada</option>
+          <option value="PLANEJADA">Planejado</option>
+          <option value="EM_ANDAMENTO">Execução</option>
+          <option value="CONCLUIDA">Concluído</option>
         </select>
         <button class="btn btn-success btn-sm" id="btnNovoDiario"><i class="fas fa-plus me-1"></i>Novo Diário</button>
       </div>
@@ -121,7 +121,14 @@
             <button class="btn btn-outline-secondary" type="button" id="btnAddTipo" title="Novo tipo"><i class="fas fa-plus"></i></button>
           </div>
         </div>
-        <div class="col-md-8"><label class="form-label">Descrição</label><input type="text" class="form-control" id="dcDescricao" maxlength="200"></div>
+        <div class="col-md-3"><label class="form-label">Situação *</label>
+          <select class="form-select" id="dcStatusSel">
+            <option value="PLANEJADA">Planejado (agendamento)</option>
+            <option value="EM_ANDAMENTO">Execução</option>
+          </select>
+          <small class="text-muted">Planejado não calcula custo (previsão).</small>
+        </div>
+        <div class="col-md-5"><label class="form-label">Descrição</label><input type="text" class="form-control" id="dcDescricao" maxlength="200"></div>
       </div>
       <div class="row g-2 mt-1">
         <div class="col-md-3"><label class="form-label">Data prevista</label><input type="date" class="form-control" id="dcDataPrev"></div>

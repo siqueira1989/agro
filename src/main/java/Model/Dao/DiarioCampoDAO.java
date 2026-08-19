@@ -37,7 +37,8 @@ public class DiarioCampoDAO {
                 for (DiarioFuncionario f : d.getFuncionarios()) inserirFuncionario(c, id, f);
                 for (DiarioMaquina m : d.getMaquinas()) inserirMaquina(c, id, m);
                 for (DiarioInsumo i : d.getInsumos()) inserirInsumo(c, id, i);
-                recalcularCustos(c, id);
+                // PLANEJADA é apenas agendamento (previsão): não calcula custo. EM_ANDAMENTO/CONCLUIDA calculam.
+                if (calculaCusto(d.getStatus())) recalcularCustos(c, id); else zerarCustos(c, id);
                 c.commit();
                 d.setIdDiario(id); d.setNumeroDiario(numero);
                 return id;
@@ -62,10 +63,24 @@ public class DiarioCampoDAO {
                 for (DiarioFuncionario f : d.getFuncionarios()) inserirFuncionario(c, d.getIdDiario(), f);
                 for (DiarioMaquina m : d.getMaquinas()) inserirMaquina(c, d.getIdDiario(), m);
                 for (DiarioInsumo i : d.getInsumos()) inserirInsumo(c, d.getIdDiario(), i);
-                recalcularCustos(c, d.getIdDiario());
+                // PLANEJADA continua sem custo (previsão); EM_ANDAMENTO/CONCLUIDA calculam.
+                if (calculaCusto(d.getStatus())) recalcularCustos(c, d.getIdDiario()); else zerarCustos(c, d.getIdDiario());
                 c.commit();
             } catch (SQLException e) { c.rollback(); throw e; }
             finally { c.setAutoCommit(true); }
+        }
+    }
+
+    /** Só calcula custos para atividades em Execução ou Concluídas; Planejada é previsão (custo 0). */
+    private boolean calculaCusto(String status) {
+        return "EM_ANDAMENTO".equals(status) || "CONCLUIDA".equals(status);
+    }
+
+    /** Zera os custos do diário (usado quando a atividade está apenas Planejada). */
+    private void zerarCustos(Connection c, int idDiario) throws SQLException {
+        try (PreparedStatement st = c.prepareStatement("UPDATE diario_campo SET custo_mao_obra=0, "
+                + "custo_insumos=0, custo_maquinas=0, custo_total=0 WHERE iddiario=?")) {
+            st.setInt(1, idDiario); st.executeUpdate();
         }
     }
 
@@ -87,15 +102,19 @@ public class DiarioCampoDAO {
     }
 
     private void atualizarCabecalho(Connection c, DiarioCampo d) throws SQLException {
+        // status só pode ser PLANEJADA ou EM_ANDAMENTO na edição (CONCLUIDA é via finalizar, e diário
+        // concluído nem chega aqui). Se vier algo diferente, mantém PLANEJADA.
+        String novoStatus = "EM_ANDAMENTO".equals(d.getStatus()) ? "EM_ANDAMENTO" : "PLANEJADA";
         String sql = "UPDATE diario_campo SET data=?, id_area=?, id_quadra=?, id_cultura=?, id_responsavel=?, "
-                + "id_tipo_atividade=?, descricao=?, data_prevista=?, hora_inicio=?, hora_fim=?, observacoes=?, id_safra=? WHERE iddiario=?";
+                + "id_tipo_atividade=?, descricao=?, data_prevista=?, hora_inicio=?, hora_fim=?, observacoes=?, id_safra=?, status=? WHERE iddiario=?";
         try (PreparedStatement st = c.prepareStatement(sql)) {
             st.setDate(1, Date.valueOf(d.getData() != null ? d.getData() : LocalDate.now()));
             setIntOrNull(st, 2, d.getIdArea()); setIntOrNull(st, 3, d.getIdQuadra()); setIntOrNull(st, 4, d.getIdCultura());
             setIntOrNull(st, 5, d.getIdResponsavel()); st.setInt(6, d.getIdTipoAtividade());
             st.setString(7, d.getDescricao()); setDateOrNull(st, 8, d.getDataPrevista());
             setTimeOrNull(st, 9, d.getHoraInicio()); setTimeOrNull(st, 10, d.getHoraFim());
-            st.setString(11, d.getObservacoes()); setIntOrNull(st, 12, d.getIdSafra()); st.setInt(13, d.getIdDiario());
+            st.setString(11, d.getObservacoes()); setIntOrNull(st, 12, d.getIdSafra());
+            st.setString(13, novoStatus); st.setInt(14, d.getIdDiario());
             st.executeUpdate();
         }
     }
@@ -342,6 +361,20 @@ public class DiarioCampoDAO {
 
     /** Funcionários com custo de referência (CLT=custo/hora, Diarista=valor/dia) p/ os selects e preview. */
     public List<Map<String, Object>> listarFuncionariosDisponiveis() throws SQLException {
+        return listarFuncionariosDisponiveis(null);
+    }
+
+    /**
+     * Lista funcionários para os selects do diário. Quando {@code data} é informada,
+     * retorna apenas os que possuem vínculo ATIVO nessa data (admitido até a data e
+     * não desligado até ela) — ou seja, quem estava presente/vinculado no dia do lançamento.
+     */
+    public List<Map<String, Object>> listarFuncionariosDisponiveis(LocalDate data) throws SQLException {
+        // Vínculo usado para salário/custo e para o filtro por data (quando houver).
+        String joinVinc = (data != null)
+                ? "LEFT JOIN vinculo_empregaticio v ON v.idpessoa=f.idpessoa "
+                  + "AND v.data_admissao <= ? AND (v.data_desligamento IS NULL OR v.data_desligamento >= ?) "
+                : "LEFT JOIN vinculo_empregaticio v ON v.idpessoa=f.idpessoa AND v.data_desligamento IS NULL ";
         String sql = "SELECT f.idpessoa, pe.nomepessoa, "
                 + "CASE WHEN c.idpessoa IS NOT NULL THEN 'CLT' WHEN di.idpessoa IS NOT NULL THEN 'DIARISTA' "
                 + "     WHEN e.idpessoa IS NOT NULL THEN 'EMPREITA' ELSE 'OUTRO' END AS tipo, "
@@ -352,16 +385,20 @@ public class DiarioCampoDAO {
                 + "LEFT JOIN funcionarioclt c ON c.idpessoa=f.idpessoa "
                 + "LEFT JOIN funcionariodiarista di ON di.idpessoa=f.idpessoa "
                 + "LEFT JOIN funcionarioempreita e ON e.idpessoa=f.idpessoa "
-                + "LEFT JOIN vinculo_empregaticio v ON v.idpessoa=f.idpessoa AND v.data_desligamento IS NULL "
+                + joinVinc
+                + (data != null ? "WHERE v.id_vinculo IS NOT NULL " : "")
                 + "ORDER BY pe.nomepessoa";
         List<Map<String, Object>> out = new ArrayList<>();
         try (Connection c = new PostgresConnection().getConnection();
-             PreparedStatement st = c.prepareStatement(sql); ResultSet rs = st.executeQuery()) {
-            while (rs.next()) {
-                Map<String, Object> m = new LinkedHashMap<>();
-                m.put("idPessoa", rs.getInt("idpessoa")); m.put("nome", rs.getString("nomepessoa"));
-                m.put("tipo", rs.getString("tipo")); m.put("custoRef", rs.getBigDecimal("custo_ref"));
-                out.add(m);
+             PreparedStatement st = c.prepareStatement(sql)) {
+            if (data != null) { st.setDate(1, Date.valueOf(data)); st.setDate(2, Date.valueOf(data)); }
+            try (ResultSet rs = st.executeQuery()) {
+                while (rs.next()) {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("idPessoa", rs.getInt("idpessoa")); m.put("nome", rs.getString("nomepessoa"));
+                    m.put("tipo", rs.getString("tipo")); m.put("custoRef", rs.getBigDecimal("custo_ref"));
+                    out.add(m);
+                }
             }
         }
         return out;

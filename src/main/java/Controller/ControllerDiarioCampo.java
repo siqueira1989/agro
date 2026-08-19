@@ -67,7 +67,14 @@ public class ControllerDiarioCampo extends HttpServlet {
         resp.setCharacterEncoding(StandardCharsets.UTF_8.name());
         try (PrintWriter out = resp.getWriter()) {
             if (req.getParameter("tiposatividade") != null) { out.print(gson.toJson(tipoDAO.listar(true))); return; }
-            if (req.getParameter("funcionarios") != null)  { out.print(gson.toJson(dao.listarFuncionariosDisponiveis())); return; }
+            if (req.getParameter("funcionarios") != null)  {
+                String dataStr = req.getParameter("data");
+                java.time.LocalDate dataFiltro = null;
+                if (dataStr != null && !dataStr.isBlank()) {
+                    try { dataFiltro = java.time.LocalDate.parse(dataStr); } catch (Exception ignore) {}
+                }
+                out.print(gson.toJson(dao.listarFuncionariosDisponiveis(dataFiltro))); return;
+            }
             if (req.getParameter("relatorio") != null) {
                 out.print(gson.toJson(dao.relatorioCusto(req.getParameter("relatorio"),
                         req.getParameter("de"), req.getParameter("ate")))); return;
@@ -143,17 +150,16 @@ public class ControllerDiarioCampo extends HttpServlet {
             }
         }
 
-        // Safra: resolve pelo talhão + data; trava lançamentos em safra FINALIZADA e vincula a safra
+        // Safra: OBRIGATÓRIA. Resolve pelo talhão + data; trava lançamentos em safra FINALIZADA e vincula a safra.
         java.time.LocalDate dataAtiv = d.getData() != null ? d.getData() : java.time.LocalDate.now();
         String[] sf = safraDAO.resolverSafra(d.getIdQuadra(), dataAtiv);
-        if (sf != null) {
-            if ("FINALIZADA".equals(sf[2])) {
-                writeJson(resp, 400, false, "A safra \"" + sf[1] + "\" está FINALIZADA — não é permitido lançar/editar atividades nela."); return;
-            }
-            d.setIdSafra(Integer.parseInt(sf[0]));
-        } else {
-            d.setIdSafra(null);
+        if (sf == null) {
+            writeJson(resp, 400, false, "É obrigatório ter uma Safra cadastrada que inclua este talhão e cubra a data da atividade. Cadastre/ajuste a safra antes de lançar."); return;
         }
+        if ("FINALIZADA".equals(sf[2])) {
+            writeJson(resp, 400, false, "A safra \"" + sf[1] + "\" está FINALIZADA — não é permitido lançar/editar atividades nela."); return;
+        }
+        d.setIdSafra(Integer.parseInt(sf[0]));
 
         if (update) {
             if (d.getIdDiario() == 0) { writeJson(resp, 400, false, "ID do diário obrigatório."); return; }
