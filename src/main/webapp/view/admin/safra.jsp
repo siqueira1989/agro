@@ -39,32 +39,32 @@
     <div id="alertaSafra" class="alert d-none"></div>
     <input type="hidden" id="sfId">
     <div class="row g-2">
-      <div class="col-md-5"><label class="form-label">Nome *</label><input class="form-control" id="sfNome" maxlength="80" placeholder="Ex.: Soja 2026/2027"></div>
+      <div class="col-md-6"><label class="form-label">Nome *</label><input class="form-control" id="sfNome" maxlength="80" placeholder="Ex.: Soja 2026/2027"></div>
+      <div class="col-md-6"><label class="form-label">Área de Produção *</label><select class="form-select" id="sfArea"><option value="">Selecione</option></select></div>
+    </div>
+    <div class="row g-2 mt-1">
       <div class="col-md-4"><label class="form-label">Cultura Principal</label><select class="form-select" id="sfCultura"><option value="">—</option></select></div>
       <div class="col-md-3"><label class="form-label">Status</label>
         <select class="form-select" id="sfStatus">
           <option value="PLANEJADA">Planejada</option><option value="EM_ANDAMENTO">Em andamento</option><option value="FINALIZADA">Finalizada</option>
         </select></div>
+      <div class="col-md-3"><label class="form-label">Estimativa Produção</label><input type="number" step="0.001" class="form-control" id="sfEstimativa" value="0"></div>
+      <div class="col-md-2"><label class="form-label">Unidade</label>
+        <select class="form-select" id="sfUnidade"><option value="SACA">Saca</option><option value="TONELADA">Tonelada</option></select></div>
     </div>
     <div class="row g-2 mt-1">
       <div class="col-md-3"><label class="form-label">Data Inicial *</label><input type="date" class="form-control" id="sfDataIni"></div>
       <div class="col-md-3"><label class="form-label">Data Final *</label><input type="date" class="form-control" id="sfDataFim"></div>
-      <div class="col-md-3"><label class="form-label">Estimativa Produção</label><input type="number" step="0.001" class="form-control" id="sfEstimativa" value="0"></div>
-      <div class="col-md-3"><label class="form-label">Unidade</label>
-        <select class="form-select" id="sfUnidade"><option value="SACA">Saca</option><option value="TONELADA">Tonelada</option></select></div>
-    </div>
-    <div class="row g-2 mt-1">
       <div class="col-md-3"><label class="form-label">Despesas Fixas (R$)</label><input type="number" step="0.01" class="form-control" id="sfDespFixas" value="0"></div>
     </div>
 
-    <div class="d-flex justify-content-between align-items-center mt-3 mb-1">
-      <h6 class="fw-bold text-secondary mb-0"><i class="fas fa-th-large me-1"></i>Talhões da Safra</h6>
-      <button type="button" class="btn btn-outline-success btn-sm" id="btnAddTalhaoSafra"><i class="fas fa-plus me-1"></i>Adicionar talhão</button>
+    <div class="mt-3 mb-1">
+      <h6 class="fw-bold text-secondary mb-0"><i class="fas fa-th-large me-1"></i>Talhões da Área selecionada</h6>
     </div>
     <div class="table-responsive"><table class="table table-sm align-middle mb-0">
-      <thead class="table-light"><tr><th style="width:55%">Talhão</th><th>Área destinada (ha)</th><th></th></tr></thead>
-      <tbody id="sfTalhaoBody"></tbody></table></div>
-    <small class="text-muted">A área destinada não pode exceder a área real (ha) cadastrada no talhão.</small>
+      <thead class="table-light"><tr><th style="width:55%">Talhão</th><th>Área destinada (ha)</th></tr></thead>
+      <tbody id="sfTalhaoBody"><tr><td colspan="2" class="text-center text-muted py-2">Selecione uma Área de Produção acima.</td></tr></tbody></table></div>
+    <small class="text-muted">Todas as quadras (talhões) da área entram automaticamente. A área destinada não pode exceder a área real (ha) cadastrada no talhão.</small>
   </div>
   <div class="modal-footer">
     <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>

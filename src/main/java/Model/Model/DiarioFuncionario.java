@@ -1,8 +1,9 @@
 package Model.Model;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
-/** Funcionário alocado numa atividade do Diário (N por diário). */
+/** Funcionário alocado numa atividade do Diário (N por diário, podendo haver vários dias de execução). */
 public class DiarioFuncionario {
     private int id;
     private int idDiario;
@@ -14,6 +15,7 @@ public class DiarioFuncionario {
     private BigDecimal custoHora = BigDecimal.ZERO;        // snapshot
     private BigDecimal valorContratado = BigDecimal.ZERO;  // empreita
     private BigDecimal custo = BigDecimal.ZERO;            // snapshot no finalizar
+    private LocalDate dataExecucao;     // dia em que esta leva foi trabalhada (permite múltiplas execuções por diário)
 
     public int getId() { return id; }
     public void setId(int id) { this.id = id; }
@@ -35,4 +37,6 @@ public class DiarioFuncionario {
     public void setValorContratado(BigDecimal valorContratado) { this.valorContratado = valorContratado; }
     public BigDecimal getCusto() { return custo; }
     public void setCusto(BigDecimal custo) { this.custo = custo; }
+    public LocalDate getDataExecucao() { return dataExecucao; }
+    public void setDataExecucao(LocalDate dataExecucao) { this.dataExecucao = dataExecucao; }
 }

@@ -18,7 +18,6 @@
   </div>
 
   <div id="alertPerfil" class="alert d-none" role="alert"></div>
-  <div id="dcNotifPlanejadas" class="alert alert-warning d-none" role="alert"></div>
 
   <!-- DADOS -->
   <div class="card shadow-sm mb-3">
@@ -65,13 +64,23 @@
   <div class="card shadow-sm mb-4">
     <div class="card-header bg-white d-flex justify-content-between align-items-center">
       <h5 class="text-success fw-bold mb-0"><i class="fas fa-book me-2"></i>Diário de Campo</h5>
-      <div class="d-flex gap-2">
+      <div class="d-flex gap-2 align-items-center">
         <select id="dcFiltroStatus" class="form-select form-select-sm" style="width:160px;">
           <option value="">Todos status</option>
           <option value="PLANEJADA">Planejado</option>
           <option value="EM_ANDAMENTO">Execução</option>
           <option value="CONCLUIDA">Concluído</option>
         </select>
+        <div class="dropdown">
+          <button class="btn btn-outline-warning btn-sm position-relative" id="dcBtnAlertas" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Atividades planejadas">
+            <i class="fas fa-bell"></i>
+            <span class="badge rounded-pill bg-danger d-none" id="dcBadgeAlertas" style="font-size:.6rem;">0</span>
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end p-2" id="dcListaAlertas" style="min-width:280px;max-height:300px;overflow:auto;">
+            <li class="text-muted small px-2">Nenhuma atividade planejada.</li>
+          </ul>
+        </div>
+        <button class="btn btn-outline-success btn-sm" id="btnAgendarDiario"><i class="fas fa-calendar-plus me-1"></i>Agendar</button>
         <button class="btn btn-success btn-sm" id="btnNovoDiario"><i class="fas fa-plus me-1"></i>Novo Diário</button>
       </div>
     </div>
@@ -125,8 +134,9 @@
           <select class="form-select" id="dcStatusSel">
             <option value="PLANEJADA">Planejado (agendamento)</option>
             <option value="EM_ANDAMENTO">Execução</option>
+            <option value="CONCLUIDA">Concluído</option>
           </select>
-          <small class="text-muted">Planejado não calcula custo (previsão).</small>
+          <small class="text-muted">Planejado não calcula custo (previsão). Concluído calcula o custo final e já baixa o estoque dos insumos.</small>
         </div>
         <div class="col-md-5"><label class="form-label">Descrição</label><input type="text" class="form-control" id="dcDescricao" maxlength="200"></div>
       </div>
@@ -144,8 +154,25 @@
         <button class="btn btn-outline-secondary btn-sm" type="button" id="btnAddFunc"><i class="fas fa-plus me-1"></i>Adicionar</button>
       </div>
       <div class="table-responsive"><table class="table table-sm align-middle mb-2">
-        <thead class="table-light"><tr><th style="width:26%">Funcionário</th><th>Tipo</th><th>Função</th><th style="width:12%">Horas</th><th style="width:16%">Valor contratado</th><th></th></tr></thead>
+        <thead class="table-light"><tr><th style="width:26%">Funcionário</th><th>Tipo</th><th style="width:14%">Execução</th><th style="width:12%">Horas</th><th style="width:16%">Valor (auto)</th><th></th></tr></thead>
         <tbody id="dcFuncBody"></tbody></table></div>
+      <div id="dcFuncSoNaExecucao" class="alert alert-info py-2 small d-none">
+        <i class="fas fa-circle-info me-1"></i>Ao editar um diário já criado, os funcionários ficam somente leitura — use
+        <strong>"Registrar nova execução"</strong> abaixo para adicionar colaboradores de outro dia (o custo soma tudo).
+      </div>
+      <div id="dcBlocoExecucao" class="border rounded p-2 mb-2 d-none">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="fw-bold text-secondary mb-0"><i class="fas fa-calendar-day me-1"></i>Registrar Nova Execução</h6>
+        </div>
+        <div class="row g-2">
+          <div class="col-md-4"><label class="form-label small mb-0">Data da execução *</label><input type="date" class="form-control form-control-sm" id="exData"></div>
+        </div>
+        <div class="table-responsive mt-2"><table class="table table-sm align-middle mb-2">
+          <thead class="table-light"><tr><th style="width:30%">Funcionário</th><th>Tipo</th><th style="width:16%">Horas</th><th style="width:18%">Valor (auto)</th><th></th></tr></thead>
+          <tbody id="exFuncBody"></tbody></table></div>
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="btnAddExecFunc"><i class="fas fa-plus me-1"></i>Adicionar colaborador</button>
+        <button type="button" class="btn btn-success btn-sm float-end" id="btnSalvarExecucao"><i class="fas fa-save me-1"></i>Salvar Execução</button>
+      </div>
 
       <!-- Máquinas -->
       <div class="d-flex justify-content-between align-items-center mt-2 mb-1">
@@ -172,6 +199,38 @@
         <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
         <button class="btn btn-success" id="btnSalvarDiario"><i class="fas fa-save me-1"></i>Salvar Diário</button>
       </div>
+    </div>
+  </div></div>
+</div>
+
+<!-- MODAL: Agendar Atividade (agendamento enxuto, sem funcionários/máquinas/insumos) -->
+<div class="modal fade" id="modalAgendarDiario" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header bg-warning">
+      <h5 class="modal-title"><i class="fas fa-calendar-plus me-2"></i>Agendar Atividade</h5>
+      <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    </div>
+    <div class="modal-body">
+      <div id="alertAgendar" class="alert d-none"></div>
+      <div class="row g-2">
+        <div class="col-md-6"><label class="form-label">Talhão *</label><select class="form-select" id="agTalhao"></select></div>
+        <div class="col-md-6"><label class="form-label">Tipo de atividade *</label><select class="form-select" id="agTipo"></select></div>
+      </div>
+      <div class="row g-2 mt-1">
+        <div class="col-md-6"><label class="form-label">Responsável *</label><select class="form-select" id="agResponsavel"></select></div>
+        <div class="col-md-6"><label class="form-label">Data prevista *</label><input type="date" class="form-control" id="agData"></div>
+      </div>
+      <div class="row g-2 mt-1">
+        <div class="col-md-12"><label class="form-label">Descrição</label><input type="text" class="form-control" id="agDescricao" maxlength="200"></div>
+      </div>
+      <div class="row g-2 mt-1">
+        <div class="col-md-12"><label class="form-label">Observações</label><input type="text" class="form-control" id="agObs" maxlength="200"></div>
+      </div>
+      <small class="text-muted d-block mt-2">Agendamento não calcula custo — é só previsão. Depois, use "Iniciar execução" na lista para registrar funcionários, máquinas e insumos.</small>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+      <button class="btn btn-warning" id="btnSalvarAgendar"><i class="fas fa-save me-1"></i>Agendar</button>
     </div>
   </div></div>
 </div>

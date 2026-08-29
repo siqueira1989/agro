@@ -22,7 +22,9 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -108,6 +110,7 @@ public class ControllerDiarioCampo extends HttpServlet {
                 case "create":          handleSalvar(jo, resp, false); break;
                 case "update":          handleSalvar(jo, resp, true); break;
                 case "finalizar":       handleFinalizar(jo, resp); break;
+                case "addexecucao":     handleAddExecucao(jo, resp); break;
                 case "status":          handleStatus(jo, resp); break;
                 case "addtipoatividade":handleAddTipo(jo, resp); break;
                 default: writeJson(resp, 400, false, "Ação inválida.");
@@ -161,17 +164,50 @@ public class ControllerDiarioCampo extends HttpServlet {
         }
         d.setIdSafra(Integer.parseInt(sf[0]));
 
+        // "Concluído" direto no cadastro: grava como EM_ANDAMENTO (satisfaz a pré-condição de
+        // finalizar()) e encadeia finalizar() na mesma requisição — reaproveita o cálculo de custo
+        // final e a baixa de estoque já existentes, sem duplicar lógica de negócio.
+        boolean concluirDireto = "CONCLUIDA".equals(d.getStatus());
+        if (concluirDireto) d.setStatus("EM_ANDAMENTO");
+
         if (update) {
             if (d.getIdDiario() == 0) { writeJson(resp, 400, false, "ID do diário obrigatório."); return; }
             dao.atualizarCompleto(d);   // substitui cabeçalho + filhas e recalcula custos
+            if (concluirDireto) dao.finalizar(d.getIdDiario());
             writeJson(resp, 200, true, "Diário atualizado com sucesso!");
         } else {
             int id = dao.inserirCompleto(d);
+            if (concluirDireto) dao.finalizar(id);
             Map<String, Object> m = okPayload("Diário cadastrado com sucesso!");
             m.put("iddiario", id);
             m.put("numeroDiario", d.getNumeroDiario());
             writeJsonRaw(resp, 200, m);
         }
+    }
+
+    /** Registra uma nova execução (dia + equipe) num diário EM_ANDAMENTO, somando ao custo total sem apagar as anteriores. */
+    private void handleAddExecucao(JsonObject jo, HttpServletResponse resp) throws Exception {
+        int id = getInt(jo, "iddiario");
+        if (id == 0) { writeJson(resp, 400, false, "ID do diário obrigatório."); return; }
+        String dataStr = getStr(jo, "dataExecucao");
+        if (dataStr == null || dataStr.isBlank()) { writeJson(resp, 400, false, "Data da execução é obrigatória."); return; }
+        java.time.LocalDate dataExec;
+        try { dataExec = java.time.LocalDate.parse(dataStr); }
+        catch (Exception e) { writeJson(resp, 400, false, "Data da execução inválida."); return; }
+
+        List<DiarioFuncionario> funcionarios = new ArrayList<>();
+        if (jo.has("funcionarios") && jo.get("funcionarios").isJsonArray()) {
+            for (JsonElement je : jo.getAsJsonArray("funcionarios")) {
+                DiarioFuncionario f = gson.fromJson(je, DiarioFuncionario.class);
+                if (f.getHorasTrabalhadas() != null && f.getHorasTrabalhadas().signum() < 0) {
+                    writeJson(resp, 400, false, "Horas trabalhadas não podem ser negativas."); return;
+                }
+                funcionarios.add(f);
+            }
+        }
+        if (funcionarios.isEmpty()) { writeJson(resp, 400, false, "Informe ao menos um funcionário para a execução."); return; }
+        dao.adicionarExecucao(id, dataExec, funcionarios);
+        writeJson(resp, 200, true, "Execução registrada com sucesso! Custo total recalculado.");
     }
 
     private void handleFinalizar(JsonObject jo, HttpServletResponse resp) throws Exception {

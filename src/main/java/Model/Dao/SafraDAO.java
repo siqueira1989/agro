@@ -33,7 +33,7 @@ public class SafraDAO {
             try {
                 int id;
                 String sql = "INSERT INTO safra (nome, id_cultura_principal, data_inicial, data_final, status, "
-                        + "estimativa_producao, unidade_producao, despesas_fixas) VALUES (?,?,?,?,?,?,?,?) RETURNING idsafra";
+                        + "estimativa_producao, unidade_producao, despesas_fixas, id_area_producao) VALUES (?,?,?,?,?,?,?,?,?) RETURNING idsafra";
                 try (PreparedStatement st = c.prepareStatement(sql)) {
                     preencherSafra(st, s);
                     ResultSet rs = st.executeQuery(); rs.next(); id = rs.getInt(1);
@@ -52,10 +52,10 @@ public class SafraDAO {
             c.setAutoCommit(false);
             try {
                 String sql = "UPDATE safra SET nome=?, id_cultura_principal=?, data_inicial=?, data_final=?, status=?, "
-                        + "estimativa_producao=?, unidade_producao=?, despesas_fixas=? WHERE idsafra=?";
+                        + "estimativa_producao=?, unidade_producao=?, despesas_fixas=?, id_area_producao=? WHERE idsafra=?";
                 try (PreparedStatement st = c.prepareStatement(sql)) {
                     preencherSafra(st, s);
-                    st.setInt(9, s.getIdSafra());
+                    st.setInt(10, s.getIdSafra());
                     st.executeUpdate();
                 }
                 try (PreparedStatement d = c.prepareStatement("DELETE FROM safra_talhao WHERE id_safra=?")) {
@@ -77,6 +77,7 @@ public class SafraDAO {
         st.setBigDecimal(6, nz(s.getEstimativaProducao()));
         st.setString(7, s.getUnidadeProducao() != null ? s.getUnidadeProducao() : "SACA");
         st.setBigDecimal(8, nz(s.getDespesasFixas()));
+        if (s.getIdAreaProducao() != null) st.setInt(9, s.getIdAreaProducao()); else st.setNull(9, Types.INTEGER);
     }
 
     /** Insere um vínculo talhão, validando a área destinada contra a área real do talhão. */
@@ -106,8 +107,9 @@ public class SafraDAO {
     }
 
     public Safra buscarPorId(int id) throws SQLException {
-        String sql = "SELECT s.*, al.nomeproduto AS cultura_nome FROM safra s "
-                + "LEFT JOIN alimento al ON al.idproduto=s.id_cultura_principal WHERE s.idsafra=?";
+        String sql = "SELECT s.*, al.nomeproduto AS cultura_nome, ar.propriedadeareaproducao AS area_nome FROM safra s "
+                + "LEFT JOIN alimento al ON al.idproduto=s.id_cultura_principal "
+                + "LEFT JOIN areaproducao ar ON ar.idareaproducao=s.id_area_producao WHERE s.idsafra=?";
         try (Connection c = new PostgresConnection().getConnection();
              PreparedStatement st = c.prepareStatement(sql)) {
             st.setInt(1, id);
@@ -120,8 +122,9 @@ public class SafraDAO {
     }
 
     public List<Safra> listar() throws SQLException {
-        String sql = "SELECT s.*, al.nomeproduto AS cultura_nome FROM safra s "
-                + "LEFT JOIN alimento al ON al.idproduto=s.id_cultura_principal ORDER BY s.data_inicial DESC";
+        String sql = "SELECT s.*, al.nomeproduto AS cultura_nome, ar.propriedadeareaproducao AS area_nome FROM safra s "
+                + "LEFT JOIN alimento al ON al.idproduto=s.id_cultura_principal "
+                + "LEFT JOIN areaproducao ar ON ar.idareaproducao=s.id_area_producao ORDER BY s.data_inicial DESC";
         List<Safra> l = new ArrayList<>();
         try (Connection c = new PostgresConnection().getConnection();
              PreparedStatement st = c.prepareStatement(sql); ResultSet rs = st.executeQuery()) {
@@ -132,8 +135,9 @@ public class SafraDAO {
 
     private List<SafraTalhao> listarTalhoes(Connection c, int idSafra) throws SQLException {
         List<SafraTalhao> l = new ArrayList<>();
-        String sql = "SELECT st.*, q.nome_quadra, q.numero_plantas, q.area_ha FROM safra_talhao st "
-                + "JOIN quadra q ON q.idquadra=st.id_quadra WHERE st.id_safra=? ORDER BY st.id";
+        String sql = "SELECT st.*, q.nome_quadra, q.numero_plantas, q.area_ha, a.nomeproduto AS alimento_nome "
+                + "FROM safra_talhao st JOIN quadra q ON q.idquadra=st.id_quadra "
+                + "LEFT JOIN alimento a ON a.idproduto=q.id_alimento WHERE st.id_safra=? ORDER BY st.id";
         try (PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setInt(1, idSafra);
             ResultSet rs = ps.executeQuery();
@@ -142,6 +146,7 @@ public class SafraDAO {
                 t.setId(rs.getInt("id")); t.setIdSafra(idSafra); t.setIdQuadra(rs.getInt("id_quadra"));
                 t.setQuadraNome(rs.getString("nome_quadra")); t.setNumeroPlantas(rs.getInt("numero_plantas"));
                 t.setAreaHa(rs.getBigDecimal("area_ha")); t.setAreaDestinadaHa(rs.getBigDecimal("area_destinada_ha"));
+                t.setAlimentoNome(rs.getString("alimento_nome"));
                 l.add(t);
             }
         }
@@ -217,7 +222,8 @@ public class SafraDAO {
                 BigDecimal custoRateado = custoTotal.multiply(part).setScale(2, RoundingMode.HALF_UP);
                 BigDecimal custoReal = custoRealTalhao(c, idSafra, t.getIdQuadra(), s.getDataInicial(), s.getDataFinal());
                 Map<String, Object> r = new LinkedHashMap<>();
-                r.put("talhao", t.getQuadraNome()); r.put("numeroPlantas", t.getNumeroPlantas());
+                r.put("talhao", t.getQuadraNome()); r.put("alimento", t.getAlimentoNome());
+                r.put("numeroPlantas", t.getNumeroPlantas());
                 r.put("areaDestinadaHa", t.getAreaDestinadaHa());
                 r.put("participacaoPct", part.multiply(new BigDecimal(100)).setScale(2, RoundingMode.HALF_UP));
                 r.put("custoRateado", custoRateado); r.put("custoReal", custoReal);
@@ -249,7 +255,9 @@ public class SafraDAO {
 
     private Safra buscarPorId2(Connection c, int id) throws SQLException {
         try (PreparedStatement st = c.prepareStatement(
-                "SELECT s.*, al.nomeproduto AS cultura_nome FROM safra s LEFT JOIN alimento al ON al.idproduto=s.id_cultura_principal WHERE s.idsafra=?")) {
+                "SELECT s.*, al.nomeproduto AS cultura_nome, ar.propriedadeareaproducao AS area_nome FROM safra s "
+                + "LEFT JOIN alimento al ON al.idproduto=s.id_cultura_principal "
+                + "LEFT JOIN areaproducao ar ON ar.idareaproducao=s.id_area_producao WHERE s.idsafra=?")) {
             st.setInt(1, id);
             ResultSet rs = st.executeQuery();
             return rs.next() ? map(rs) : null;
@@ -269,6 +277,7 @@ public class SafraDAO {
         Date df = rs.getDate("data_final"); s.setDataFinal(df != null ? df.toLocalDate() : null);
         s.setStatus(rs.getString("status")); s.setEstimativaProducao(rs.getBigDecimal("estimativa_producao"));
         s.setUnidadeProducao(rs.getString("unidade_producao")); s.setDespesasFixas(rs.getBigDecimal("despesas_fixas"));
+        s.setIdAreaProducao((Integer) rs.getObject("id_area_producao")); s.setAreaProducaoNome(rs.getString("area_nome"));
         return s;
     }
 

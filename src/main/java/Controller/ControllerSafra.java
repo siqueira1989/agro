@@ -100,6 +100,7 @@ public class ControllerSafra extends HttpServlet {
         if (s.getNome() == null || s.getNome().isBlank()) { writeJson(resp, 400, false, "Nome da safra é obrigatório."); return; }
         if (s.getDataInicial() == null || s.getDataFinal() == null) { writeJson(resp, 400, false, "Datas inicial e final são obrigatórias."); return; }
         if (s.getDataFinal().isBefore(s.getDataInicial())) { writeJson(resp, 400, false, "Data final não pode ser anterior à inicial."); return; }
+        if (s.getIdAreaProducao() == null) { writeJson(resp, 400, false, "Área de Produção é obrigatória."); return; }
         if (s.getStatus() == null || !s.getStatus().matches("PLANEJADA|EM_ANDAMENTO|FINALIZADA")) s.setStatus("PLANEJADA");
         if (update) {
             if (s.getIdSafra() == 0) { writeJson(resp, 400, false, "ID da safra obrigatório."); return; }
@@ -123,7 +124,7 @@ public class ControllerSafra extends HttpServlet {
     }
     private List<Map<String, Object>> listarQuadras() throws Exception {
         List<Map<String, Object>> l = new ArrayList<>();
-        String sql = "SELECT q.idquadra, q.nome_quadra, q.numero_plantas, q.area_ha, a.propriedadeareaproducao "
+        String sql = "SELECT q.idquadra, q.nome_quadra, q.numero_plantas, q.area_ha, q.idareaproducao, a.propriedadeareaproducao "
                 + "FROM quadra q JOIN areaproducao a ON a.idareaproducao=q.idareaproducao WHERE q.ativa=true ORDER BY a.propriedadeareaproducao, q.nome_quadra";
         try (Connection c = new PostgresConnection().getConnection();
              PreparedStatement st = c.prepareStatement(sql); ResultSet rs = st.executeQuery()) {
@@ -131,7 +132,7 @@ public class ControllerSafra extends HttpServlet {
                 Map<String, Object> m = new LinkedHashMap<>();
                 m.put("idQuadra", rs.getInt("idquadra")); m.put("nome", rs.getString("nome_quadra"));
                 m.put("numeroPlantas", rs.getInt("numero_plantas")); m.put("areaHa", rs.getBigDecimal("area_ha"));
-                m.put("area", rs.getString("propriedadeareaproducao"));
+                m.put("idAreaProducao", rs.getInt("idareaproducao")); m.put("area", rs.getString("propriedadeareaproducao"));
                 l.add(m);
             }
         }

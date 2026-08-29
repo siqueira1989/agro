@@ -37,7 +37,7 @@
 
   <div class="row g-3">
     <!-- Composição de custos (COE) -->
-    <div class="col-lg-6"><div class="card shadow-sm h-100">
+    <div class="col-12"><div class="card shadow-sm">
       <div class="card-header bg-white fw-bold"><i class="fas fa-layer-group me-2"></i>Composição do Custo (COE + Fixas)</div>
       <div class="card-body">
         <table class="table table-sm">
@@ -55,12 +55,21 @@
     </div></div>
 
     <!-- Rateio por talhão -->
-    <div class="col-lg-6"><div class="card shadow-sm h-100">
-      <div class="card-header bg-white fw-bold"><i class="fas fa-balance-scale me-2"></i>Rateio Proporcional por Talhão</div>
+    <div class="col-12"><div class="card shadow-sm">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <span class="fw-bold"><i class="fas fa-balance-scale me-2"></i>Rateio Proporcional por Talhão</span>
+        <div class="d-flex align-items-center gap-2">
+          <label class="form-label small mb-0 text-muted">Alimento:</label>
+          <select class="form-select form-select-sm" id="rsFiltroAlimento" style="width:180px;">
+            <option value="">Todos</option>
+          </select>
+        </div>
+      </div>
       <div class="card-body p-0"><div class="table-responsive">
         <table class="table table-sm table-striped mb-0">
-          <thead class="table-light"><tr><th>Talhão</th><th class="text-end">Plantas</th><th class="text-end">Part.%</th><th class="text-end">Custo Rateado</th><th class="text-end">Custo Real</th></tr></thead>
+          <thead class="table-light"><tr><th>Talhão</th><th>Alimento</th><th class="text-end">Plantas</th><th class="text-end">Part.%</th><th class="text-end">Custo Rateado</th><th class="text-end">Custo Real</th></tr></thead>
           <tbody id="rsRateioBody"></tbody>
+          <tfoot><tr class="fw-bold"><td colspan="4">Total (filtro atual)</td><td class="text-end" id="rsFiltroRateadoTotal">R$ 0,00</td><td class="text-end" id="rsFiltroRealTotal">R$ 0,00</td></tr></tfoot>
         </table>
       </div></div>
     </div></div>

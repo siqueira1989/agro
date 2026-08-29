@@ -10,6 +10,7 @@ public class Safra {
     private int idSafra;
     private String nome;
     private Integer idCulturaPrincipal;   private String culturaNome;
+    private Integer idAreaProducao;       private String areaProducaoNome;
     private LocalDate dataInicial;
     private LocalDate dataFinal;
     private String status = "PLANEJADA";   // PLANEJADA | EM_ANDAMENTO | FINALIZADA
@@ -26,6 +27,10 @@ public class Safra {
     public void setIdCulturaPrincipal(Integer v) { this.idCulturaPrincipal = v; }
     public String getCulturaNome() { return culturaNome; }
     public void setCulturaNome(String culturaNome) { this.culturaNome = culturaNome; }
+    public Integer getIdAreaProducao() { return idAreaProducao; }
+    public void setIdAreaProducao(Integer idAreaProducao) { this.idAreaProducao = idAreaProducao; }
+    public String getAreaProducaoNome() { return areaProducaoNome; }
+    public void setAreaProducaoNome(String areaProducaoNome) { this.areaProducaoNome = areaProducaoNome; }
     public LocalDate getDataInicial() { return dataInicial; }
     public void setDataInicial(LocalDate dataInicial) { this.dataInicial = dataInicial; }
     public LocalDate getDataFinal() { return dataFinal; }

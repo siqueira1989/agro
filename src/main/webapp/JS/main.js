@@ -3908,6 +3908,7 @@ $(document).ready(function () {
 var dcAreaId = null, dcCacheFunc = [], dcCacheIns = [], dcCacheMaq = [], dcCacheTalhao = [], dcCacheTipos = [], dcCulturaMap = {};
 var dcOptTalhao = '', dcOptTipo = '', dcOptFunc = '';
 var dcSafraResolvida = false, dcTemSafra = false;
+var dcFuncPromise = null, dcTalhaoPromise = null;
 
 function dcMoney(v) { return 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function dcBadgeStatus(s) {
@@ -3996,7 +3997,7 @@ function dcInit(areaId) {
     dcAreaId = areaId;
     $('#dcData').val(new Date().toISOString().slice(0, 10));
 
-    $.getJSON(CTX + '/ControllerAreaProducao?quadras=' + areaId, function (qs) {
+    dcTalhaoPromise = $.getJSON(CTX + '/ControllerAreaProducao?quadras=' + areaId, function (qs) {
         dcCacheTalhao = qs; dcOptTalhao = '';
         qs.forEach(function (q) { dcOptTalhao += '<option value="' + q.idQuadra + '">' + q.nomeQuadra + '</option>'; });
         $('#dcTalhao').html(dcOptTalhao || '<option value="">(sem talhões)</option>');
@@ -4005,7 +4006,7 @@ function dcInit(areaId) {
         dcCulturaMap = {}; as.forEach(function (a) { dcCulturaMap[a.id] = a.nome; });
     });
     dcCarregarTipos();
-    $.getJSON(CTX + '/ControllerDiarioCampo?funcionarios=1', function (fs) {
+    dcFuncPromise = $.getJSON(CTX + '/ControllerDiarioCampo?funcionarios=1', function (fs) {
         dcCacheFunc = fs; dcOptFunc = '<option value="">Selecione</option>';
         fs.forEach(function (f) { dcOptFunc += '<option value="' + f.idPessoa + '" data-tipo="' + f.tipo + '" data-ref="' + (f.custoRef || 0) + '">' + f.nome + ' (' + f.tipo + ')</option>'; });
         $('#dcResponsavel').html(dcOptFunc);
@@ -4020,6 +4021,8 @@ function dcInit(areaId) {
 
     $('#dcFiltroStatus').off('change').on('change', dcCarregarLista);
     $('#btnNovoDiario').off('click').on('click', dcAbrirNovo);
+    $('#btnAgendarDiario').off('click').on('click', dcAbrirAgendar);
+    $('#btnSalvarAgendar').off('click').on('click', dcSalvarAgendar);
     $('#btnAddFunc').off('click').on('click', function () { dcAddFuncRow(); });
     $('#btnAddMaq').off('click').on('click', function () { dcAddMaqRow(); });
     $('#btnAddIns').off('click').on('click', function () { dcAddInsRow(); });
@@ -4050,6 +4053,16 @@ function dcInit(areaId) {
         if (eraFunc) dcAtualizarResponsavel();
         dcRecalcPreview();
     });
+
+    // Bloco "Registrar Nova Execução" (diário EM_ANDAMENTO, múltiplos dias/equipes)
+    $('#btnAddExecFunc').off('click').on('click', function () { dcAddExecFuncRow(); });
+    $('#btnSalvarExecucao').off('click').on('click', dcSalvarExecucao);
+    $('#dcBlocoExecucao').off('input.ex change.ex', '.ex-fpessoa,.ex-fhoras')
+        .on('input.ex change.ex', '.ex-fpessoa,.ex-fhoras', dcExecRecalcPreview);
+    $('#exFuncBody').off('change.ex', '.ex-fpessoa').on('change.ex', '.ex-fpessoa', function () {
+        $(this).closest('tr').find('.ex-ftipo').val($(this).find(':selected').data('tipo') || '');
+    });
+    $('#dcBlocoExecucao').off('click.ex', '.ex-rm').on('click.ex', '.ex-rm', function () { $(this).closest('tr').remove(); });
 }
 
 function dcCarregarTipos() {
@@ -4112,27 +4125,33 @@ function dcCarregarLista() {
     var url = CTX + '/ControllerDiarioCampo?area=' + dcAreaId + (st ? '&status=' + st : '');
     $.getJSON(url, function (lista) {
         var $b = $('#dcTabelaBody').empty();
-        var pend = 0, concl = 0, custo = 0, planej = 0;
+        var pend = 0, concl = 0, custo = 0, planejadas = [];
         if (!lista.length) $b.append('<tr><td colspan="8" class="text-center text-muted py-3">Nenhum diário nesta área.</td></tr>');
         lista.forEach(function (d) {
             if (d.status === 'CONCLUIDA') { concl++; custo += Number(d.custoTotal || 0); }
             else if (d.status === 'PLANEJADA' || d.status === 'EM_ANDAMENTO') pend++;
-            if (d.status === 'PLANEJADA') planej++;
+            if (d.status === 'PLANEJADA') planejadas.push(d);
             var acoes = '<button class="btn btn-sm btn-outline-dark" title="Ver" onclick="dcVerDetalhe(' + d.idDiario + ')"><i class="fas fa-eye"></i></button>';
-            if (d.status !== 'CONCLUIDA') acoes += ' <button class="btn btn-sm btn-outline-primary" title="Editar" onclick="dcEditar(' + d.idDiario + ')"><i class="fas fa-pen-to-square"></i></button>';
+            if (d.status === 'PLANEJADA') acoes += ' <button class="btn btn-sm btn-outline-success" title="Iniciar execução" onclick="dcEditar(' + d.idDiario + ')"><i class="fas fa-play"></i></button>';
+            else if (d.status !== 'CONCLUIDA') acoes += ' <button class="btn btn-sm btn-outline-primary" title="Editar" onclick="dcEditar(' + d.idDiario + ')"><i class="fas fa-pen-to-square"></i></button>';
             $b.append('<tr><td>' + (d.numeroDiario || '') + '</td><td>' + (d.data || '') + '</td><td>' + (d.quadraNome || '—') +
                 '</td><td>' + (d.culturaNome || '—') + '</td><td>' + (d.tipoAtividadeNome || '—') + '</td><td>' + dcBadgeStatus(d.status) +
                 '</td><td class="text-end">' + dcMoney(d.custoTotal) + '</td><td class="text-end">' + acoes + '</td></tr>');
         });
         $('#dcCardAtividades').text(lista.length); $('#dcCardPendentes').text(pend);
         $('#dcCardConcluidas').text(concl); $('#dcCardCusto').text(dcMoney(custo));
-        // Notificação de atividades planejadas (agendamentos aguardando execução)
-        var $notif = $('#dcNotifPlanejadas');
-        if (planej > 0) {
-            $notif.removeClass('d-none').html('<i class="fas fa-calendar-check me-2"></i>' +
-                '<strong>' + planej + '</strong> atividade(s) <strong>planejada(s)</strong> (agendamento) aguardando execução nesta área.');
+        // Ícone de notificação de atividades planejadas (agendamentos aguardando execução)
+        var $badge = $('#dcBadgeAlertas'), $lista = $('#dcListaAlertas').empty();
+        if (planejadas.length > 0) {
+            $badge.removeClass('d-none').text(planejadas.length);
+            planejadas.forEach(function (d) {
+                $lista.append('<li><a class="dropdown-item small" href="#" onclick="dcVerDetalhe(' + d.idDiario + ');return false;">' +
+                    '<i class="fas fa-calendar-check me-1 text-warning"></i>' + (d.tipoAtividadeNome || 'Atividade') +
+                    ' — ' + (d.quadraNome || '') + ' <span class="text-muted">(' + (d.dataPrevista || d.data || '') + ')</span></a></li>');
+            });
         } else {
-            $notif.addClass('d-none').empty();
+            $badge.addClass('d-none').text('0');
+            $lista.append('<li class="text-muted small px-2">Nenhuma atividade planejada.</li>');
         }
     });
 }
@@ -4145,11 +4164,24 @@ function dcResetForm() {
     $('#dcId,#dcStatus,#dcNumero,#dcCultura,#dcCulturaNome').val('');
     $('#dcDescricao,#dcObs,#dcDataPrev,#dcHoraIni,#dcHoraFim').val('');
     $('#dcData').val(new Date().toISOString().slice(0, 10));
-    $('#dcFuncBody,#dcMaqBody,#dcInsBody').empty();
+    $('#dcFuncBody,#dcMaqBody,#dcInsBody,#exFuncBody').empty();
     $('#dcTotalPreview').text(dcMoney(0));
     dcSafraResolvida = false;
+    dcFuncEditavel = true;
+    $('#btnAddFunc').removeClass('d-none');
+    $('#dcFuncSoNaExecucao,#dcBlocoExecucao').addClass('d-none');
 }
 function dcAbrirNovo() {
+    // Aguarda os carregamentos iniciais (funcionários/talhões) antes de checar pré-requisitos,
+    // evitando falso alerta de "sem funcionário" quando o usuário clica antes do fetch terminar.
+    var $btn = $('#btnNovoDiario').prop('disabled', true);
+    $.when(dcFuncPromise, dcTalhaoPromise).always(function () {
+        $btn.prop('disabled', false);
+        dcAbrirNovoInterno();
+    });
+}
+
+function dcAbrirNovoInterno() {
     // Pré-requisitos: a área precisa de talhões, funcionários e uma safra cadastrada.
     if (!dcCacheTalhao.length) {
         preReqAlerta('#alertPerfil', 'Esta área não tem <strong>talhões</strong> cadastrados. Cadastre um talhão antes de lançar atividades.',
@@ -4174,20 +4206,85 @@ function dcAbrirNovo() {
     $('#modalNovoDiario').modal('show');
 }
 
+/* ===================== AGENDAMENTO (modal enxuto, sem funcionários/máquinas/insumos) ===================== */
+
+function dcAbrirAgendar() {
+    var $btn = $('#btnAgendarDiario').prop('disabled', true);
+    $.when(dcFuncPromise, dcTalhaoPromise).always(function () {
+        $btn.prop('disabled', false);
+        if (!dcCacheTalhao.length) {
+            preReqAlerta('#alertPerfil', 'Esta área não tem <strong>talhões</strong> cadastrados. Cadastre um talhão antes de agendar atividades.',
+                CTX + '/view/admin/AtualizarAreaProducao.jsp?id=' + dcAreaId, 'Adicionar Talhão');
+            return;
+        }
+        if (!dcCacheFunc.length) {
+            preReqAlerta('#alertPerfil', 'Para agendar uma atividade é preciso ter ao menos um <strong>Funcionário</strong> cadastrado (responsável).',
+                CTX + '/view/admin/ColaboCadastro.jsp', 'Cadastrar Funcionário');
+            return;
+        }
+        $('#alertAgendar').addClass('d-none').text('');
+        $('#agTalhao').html(dcOptTalhao);
+        $('#agTipo').html(dcOptTipo);
+        $('#agResponsavel').html(dcOptFunc);
+        $('#agData').val(new Date().toISOString().slice(0, 10));
+        $('#agDescricao, #agObs').val('');
+        $('#modalAgendarDiario').modal('show');
+    });
+}
+
+function dcSalvarAgendar() {
+    var idQuadra = parseInt($('#agTalhao').val()) || null;
+    var idResponsavel = parseInt($('#agResponsavel').val()) || null;
+    var idTipoAtividade = parseInt($('#agTipo').val()) || 0;
+    var data = $('#agData').val();
+    if (!idQuadra || !idResponsavel || !idTipoAtividade || !data) {
+        $('#alertAgendar').removeClass('d-none').addClass('alert-danger').text('Talhão, responsável, tipo de atividade e data prevista são obrigatórios.');
+        return;
+    }
+    var q = dcCacheTalhao.filter(function (x) { return x.idQuadra === idQuadra; })[0];
+    var payload = {
+        acao: 'create', idArea: dcAreaId, idQuadra: idQuadra,
+        idCultura: q && q.idAlimento ? q.idAlimento : null,
+        idResponsavel: idResponsavel, idTipoAtividade: idTipoAtividade,
+        status: 'PLANEJADA', data: data, dataPrevista: data,
+        descricao: $('#agDescricao').val(), observacoes: $('#agObs').val(),
+        funcionarios: [], maquinas: [], insumos: []
+    };
+    $.ajax({
+        url: CTX + '/ControllerDiarioCampo', method: 'POST', contentType: 'application/json; charset=utf-8',
+        data: JSON.stringify(payload),
+        success: function (res) {
+            if (res.ok) { $('#modalAgendarDiario').modal('hide'); mostrarAlerta(res.msg + (res.numeroDiario ? ' (' + res.numeroDiario + ')' : ''), 'success', '#alertPerfil'); dcCarregarLista(); }
+            else $('#alertAgendar').removeClass('d-none').addClass('alert-danger').text(res.msg);
+        },
+        error: function (xhr) { var m = 'Erro ao agendar atividade.'; try { m = JSON.parse(xhr.responseText).msg || m; } catch (e) {} $('#alertAgendar').removeClass('d-none').addClass('alert-danger').text(m); }
+    });
+}
+
+var dcFuncEditavel = true;   // false quando editando um diário já existente (funcionários viram somente leitura; use "Registrar execução")
+
 function dcAddFuncRow(f) {
+    var dis = dcFuncEditavel ? '' : 'disabled';
     $('#dcFuncBody').append('<tr>' +
-        '<td><select class="form-select form-select-sm dc-fpessoa">' + dcOptFunc + '</select></td>' +
+        '<td><select class="form-select form-select-sm dc-fpessoa" ' + dis + '>' + dcOptFunc + '</select></td>' +
         '<td><input class="form-control form-control-sm dc-ftipo" readonly placeholder="—" style="width:90px"></td>' +
-        '<td><input class="form-control form-control-sm dc-ffuncao" maxlength="60"></td>' +
-        '<td><input type="text" class="form-control form-control-sm dc-fhoras" placeholder="2h30 / 45min / 1,5" title="Aceita horas e minutos: 2h30, 45min, 2:30 ou 1,5" value=""></td>' +
-        '<td><input type="number" class="form-control form-control-sm dc-fvalor" min="0" step="0.01" value="0"></td>' +
-        '<td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger dc-rm"><i class="fas fa-trash"></i></button></td></tr>');
+        '<td><input class="form-control form-control-sm dc-fexec bg-light" readonly placeholder="—" style="width:100px"></td>' +
+        '<td><input type="text" class="form-control form-control-sm dc-fhoras" placeholder="2h30 / 45min / 1,5" title="Aceita horas e minutos: 2h30, 45min, 2:30 ou 1,5" value="" ' + dis + '></td>' +
+        '<td><input type="number" class="form-control form-control-sm dc-fvalor bg-light" readonly title="Calculado automaticamente conforme o tipo de funcionário" value="0"></td>' +
+        '<td class="text-center">' + (dcFuncEditavel ? '<button type="button" class="btn btn-sm btn-outline-danger dc-rm"><i class="fas fa-trash"></i></button>' : '') + '</td></tr>');
     if (f) {
-        var $tr = $('#dcFuncBody tr:last');
-        $tr.find('.dc-fpessoa').val(String(f.idPessoa)); $tr.find('.dc-ftipo').val(f.tipoFuncionario || '');
-        $tr.find('.dc-ffuncao').val(f.funcaoExercida || '');
+        var $tr = $('#dcFuncBody tr:last'); var $sel = $tr.find('.dc-fpessoa');
+        $sel.val(String(f.idPessoa));
+        // Somente leitura (execução de outro dia) pode não estar na lista filtrada atual do select —
+        // garante que o nome apareça mesmo assim, adicionando a opção de volta.
+        if ($sel.val() !== String(f.idPessoa)) {
+            $sel.append('<option value="' + f.idPessoa + '">' + (f.nomePessoa || ('#' + f.idPessoa)) + '</option>');
+            $sel.val(String(f.idPessoa));
+        }
+        $tr.find('.dc-ftipo').val(f.tipoFuncionario || '');
+        $tr.find('.dc-fexec').val(f.dataExecucao ? formatarData(f.dataExecucao) : '');
         $tr.find('.dc-fhoras').val(Number(f.horasTrabalhadas) > 0 ? dcFormatHoras(f.horasTrabalhadas) : '');
-        $tr.find('.dc-fvalor').val(f.valorContratado || 0);
+        $tr.find('.dc-fvalor').val(f.custo || f.valorContratado || 0);
     }
     dcAtualizarResponsavel();
 }
@@ -4243,13 +4340,19 @@ function dcAddInsRow(i) {
 function dcRecalcPreview() {
     var total = 0;
     $('#dcFuncBody tr').each(function () {
+        if (!dcFuncEditavel) {
+            // Somente leitura (diário já existente): soma o custo já calculado pelo servidor,
+            // não recalcula a partir do select (que pode não ter a opção do funcionário daquele dia).
+            total += Number($(this).find('.dc-fvalor').val()) || 0;
+            return;
+        }
         var opt = $(this).find('.dc-fpessoa :selected'); if (!opt.val()) return;
         var tipo = opt.data('tipo'); var ref = Number(opt.data('ref') || 0);
         var horas = dcParseHoras($(this).find('.dc-fhoras').val());
-        var valor = Number($(this).find('.dc-fvalor').val()) || 0;
-        if (tipo === 'CLT') total += ref * horas;
-        else if (tipo === 'DIARISTA') total += ref;
-        else if (tipo === 'EMPREITA') total += valor;
+        // Valor é sempre calculado a partir do cadastro do funcionário (custo/hora CLT, diária ou empreita fixa).
+        var valor = (tipo === 'CLT') ? ref * horas : ref;
+        $(this).find('.dc-fvalor').val(valor.toFixed(2));
+        total += valor;
     });
     $('#dcMaqBody tr').each(function () {
         var opt = $(this).find('.dc-mmaq :selected'); if (!opt.val()) return;
@@ -4269,7 +4372,7 @@ function dcSalvar() {
     $('#dcFuncBody tr').each(function () {
         var id = $(this).find('.dc-fpessoa').val(); if (!id) return;
         funcionarios.push({ idPessoa: parseInt(id), tipoFuncionario: $(this).find('.dc-ftipo').val(),
-            funcaoExercida: $(this).find('.dc-ffuncao').val(), horasTrabalhadas: dcParseHoras($(this).find('.dc-fhoras').val()),
+            horasTrabalhadas: dcParseHoras($(this).find('.dc-fhoras').val()),
             valorContratado: parseFloat($(this).find('.dc-fvalor').val()) || 0 });
     });
     var maquinas = [];
@@ -4314,8 +4417,14 @@ function dcSalvar() {
         url: CTX + '/ControllerDiarioCampo', method: 'POST', contentType: 'application/json; charset=utf-8',
         data: JSON.stringify(payload),
         success: function (res) {
-            if (res.ok) { $('#modalNovoDiario').modal('hide'); mostrarAlerta(res.msg + (res.numeroDiario ? ' (' + res.numeroDiario + ')' : ''), 'success', '#alertPerfil'); dcCarregarLista(); }
-            else $('#alertDiario').removeClass('d-none').addClass('alert-danger').text(res.msg);
+            if (res.ok) {
+                mostrarAlerta(res.msg + (res.numeroDiario ? ' (' + res.numeroDiario + ')' : ''), 'success', '#alertPerfil');
+                dcCarregarLista();
+                // Atividade recém-passada para Execução: mantém o modal aberto e mostra o bloco de
+                // "Registrar Nova Execução" para já lançar a primeira equipe/dia, sem precisar reabrir.
+                if (editId && payload.status === 'EM_ANDAMENTO') dcEditar(parseInt(editId));
+                else $('#modalNovoDiario').modal('hide');
+            } else $('#alertDiario').removeClass('d-none').addClass('alert-danger').text(res.msg);
         },
         error: function (xhr) { var m = 'Erro ao salvar diário.'; try { m = JSON.parse(xhr.responseText).msg || m; } catch (e) {} $('#alertDiario').removeClass('d-none').addClass('alert-danger').text(m); }
     });
@@ -4325,9 +4434,12 @@ function dcSalvar() {
 function dcEditar(id) {
     $.getJSON(CTX + '/ControllerDiarioCampo?id=' + id, function (d) {
         dcResetForm();
+        dcFuncEditavel = false;
+        $('#btnAddFunc').addClass('d-none');
+        $('#dcFuncSoNaExecucao').removeClass('d-none');
         $('#dcModalTitulo').text('Editar Diário ' + (d.numeroDiario || ''));
         $('#dcId').val(d.idDiario); $('#dcStatus').val(d.status); $('#dcNumero').val(d.numeroDiario);
-        $('#dcStatusSel').val(d.status === 'EM_ANDAMENTO' ? 'EM_ANDAMENTO' : 'PLANEJADA');
+        $('#dcStatusSel').val(d.status === 'CONCLUIDA' ? 'CONCLUIDA' : (d.status === 'EM_ANDAMENTO' ? 'EM_ANDAMENTO' : 'PLANEJADA'));
         $('#dcData').val(d.data || ''); $('#dcTalhao').val(d.idQuadra ? String(d.idQuadra) : '');
         $('#dcCultura').val(d.idCultura ? String(d.idCultura) : '');
         $('#dcCulturaNome').val(d.culturaNome || '');
@@ -4337,14 +4449,64 @@ function dcEditar(id) {
         (d.funcionarios || []).forEach(function (f) { dcAddFuncRow(f); });
         (d.maquinas || []).forEach(function (m) { dcAddMaqRow(m); });
         (d.insumos || []).forEach(function (i) { dcAddInsRow(i); });
-        if (!(d.funcionarios || []).length) dcAddFuncRow();
         // Responsável definido após montar as linhas (as opções vêm dos funcionários adicionados)
         dcAtualizarResponsavel();
         $('#dcResponsavel').val(d.idResponsavel ? String(d.idResponsavel) : '');
-        dcRecarregarFuncsPorData();   // filtra funcionários pela data salva (preservando os já lançados)
         dcRecalcPreview();
         dcResolverSafra();
+        if (d.status === 'EM_ANDAMENTO') dcAbrirExecucaoForm();
         $('#modalNovoDiario').modal('show');
+    });
+}
+
+/* ===================== EXECUÇÃO EM MÚLTIPLOS DIAS (diário já EM_ANDAMENTO) ===================== */
+
+function dcAbrirExecucaoForm() {
+    $('#dcBlocoExecucao').removeClass('d-none');
+    $('#exFuncBody').empty();
+    $('#exData').val(new Date().toISOString().slice(0, 10));
+    dcAddExecFuncRow();
+}
+
+function dcAddExecFuncRow() {
+    $('#exFuncBody').append('<tr>' +
+        '<td><select class="form-select form-select-sm ex-fpessoa">' + dcOptFunc + '</select></td>' +
+        '<td><input class="form-control form-control-sm ex-ftipo" readonly placeholder="—" style="width:90px"></td>' +
+        '<td><input type="text" class="form-control form-control-sm ex-fhoras" placeholder="2h30 / 45min / 1,5" value=""></td>' +
+        '<td><input type="number" class="form-control form-control-sm ex-fvalor bg-light" readonly value="0"></td>' +
+        '<td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger ex-rm"><i class="fas fa-trash"></i></button></td></tr>');
+}
+
+function dcExecRecalcPreview() {
+    $('#exFuncBody tr').each(function () {
+        var opt = $(this).find('.ex-fpessoa :selected'); if (!opt.val()) return;
+        var tipo = opt.data('tipo'); var ref = Number(opt.data('ref') || 0);
+        var horas = dcParseHoras($(this).find('.ex-fhoras').val());
+        var valor = (tipo === 'CLT') ? ref * horas : ref;
+        $(this).find('.ex-fvalor').val(valor.toFixed(2));
+    });
+}
+
+function dcSalvarExecucao() {
+    var iddiario = parseInt($('#dcId').val()) || 0;
+    var dataExec = $('#exData').val();
+    if (!iddiario || !dataExec) { $('#alertDiario').removeClass('d-none').addClass('alert-danger').text('Data da execução é obrigatória.'); return; }
+    var funcionarios = [];
+    $('#exFuncBody tr').each(function () {
+        var id = $(this).find('.ex-fpessoa').val(); if (!id) return;
+        funcionarios.push({ idPessoa: parseInt(id), tipoFuncionario: $(this).find('.ex-ftipo').val(),
+            horasTrabalhadas: dcParseHoras($(this).find('.ex-fhoras').val()),
+            valorContratado: parseFloat($(this).find('.ex-fvalor').val()) || 0 });
+    });
+    if (!funcionarios.length) { $('#alertDiario').removeClass('d-none').addClass('alert-danger').text('Adicione ao menos um funcionário para a execução.'); return; }
+    $.ajax({
+        url: CTX + '/ControllerDiarioCampo', method: 'POST', contentType: 'application/json; charset=utf-8',
+        data: JSON.stringify({ acao: 'addexecucao', iddiario: iddiario, dataExecucao: dataExec, funcionarios: funcionarios }),
+        success: function (res) {
+            if (res.ok) { mostrarAlerta(res.msg, 'success', '#alertPerfil'); dcCarregarLista(); dcEditar(iddiario); }
+            else $('#alertDiario').removeClass('d-none').addClass('alert-danger').text(res.msg);
+        },
+        error: function (xhr) { var m = 'Erro ao registrar execução.'; try { m = JSON.parse(xhr.responseText).msg || m; } catch (e) {} $('#alertDiario').removeClass('d-none').addClass('alert-danger').text(m); }
     });
 }
 
@@ -4369,7 +4531,7 @@ function dcVerDetalhe(id) {
             arr.forEach(function (o) { s += '<tr>'; cols.forEach(function (c) { s += '<td>' + c[1](o) + '</td>'; }); s += '</tr>'; });
             return s + '</tbody></table>';
         }
-        h += bloco('Funcionários', d.funcionarios, [['Nome', function (o) { return o.nomePessoa || o.idPessoa; }], ['Tipo', function (o) { return o.tipoFuncionario || ''; }], ['Função', function (o) { return o.funcaoExercida || ''; }], ['Horas', function (o) { return o.horasTrabalhadas; }], ['Custo', function (o) { return dcMoney(o.custo); }]]);
+        h += bloco('Funcionários', d.funcionarios, [['Nome', function (o) { return o.nomePessoa || o.idPessoa; }], ['Tipo', function (o) { return o.tipoFuncionario || ''; }], ['Execução', function (o) { return o.dataExecucao ? formatarData(o.dataExecucao) : ''; }], ['Horas', function (o) { return o.horasTrabalhadas; }], ['Custo', function (o) { return dcMoney(o.custo); }]]);
         h += bloco('Máquinas', d.maquinas, [['Maquinário', function (o) { return o.nome || ''; }], ['Categoria', function (o) { return o.categoria || ''; }], ['Uso', function (o) { return (o.categoria === 'VEICULO' ? o.km + ' km' : o.horasTrabalhadas + ' h'); }], ['Custo', function (o) { return dcMoney(o.custo); }]]);
         h += bloco('Insumos', d.insumos, [['Insumo', function (o) { return o.insumoNome || o.idInsumo; }], ['Qtd', function (o) { return o.quantidade + ' ' + (o.unidade || ''); }], ['Custo', function (o) { return dcMoney(o.custo); }], ['Baixado', function (o) { return o.baixado ? 'Sim' : 'Não'; }]]);
         $('#ddCorpo').html(h);
@@ -4491,7 +4653,7 @@ function mqToggle(id, situacao) {
 /******************************************************************************************************/
 /* MÓDULO SAFRA — safra.jsp (CRUD + vínculo de talhões)                                               */
 /******************************************************************************************************/
-var sfCacheTalhoes = [], sfOptCultura = '';
+var sfCacheTalhoes = [], sfCacheAreas = [], sfOptCultura = '';
 function sfMoney(v) { return 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function sfBadge(s) {
     var m = { PLANEJADA: 'bg-secondary', EM_ANDAMENTO: 'bg-info text-dark', FINALIZADA: 'bg-success' };
@@ -4506,12 +4668,12 @@ $(document).ready(function () {
         cs.forEach(function (c) { sfOptCultura += '<option value="' + c.id + '">' + c.nome + '</option>'; });
     });
     $.getJSON(CTX + '/ControllerSafra?talhoes=1', function (ts) { sfCacheTalhoes = ts; });
+    $.getJSON(CTX + '/ControllerAreaProducao', function (as) { sfCacheAreas = as; });
     sfCarregar();
     autoRefreshTabela('safras', sfCarregar, 15000);
     $('#btnNovaSafra').on('click', sfNovo);
-    $('#btnAddTalhaoSafra').on('click', function () { sfAddTalhaoRow(); });
     $('#btnSalvarSafra').on('click', sfSalvar);
-    $('#sfTalhaoBody').on('click', '.sf-rm', function () { $(this).closest('tr').remove(); });
+    $('#sfArea').on('change', function () { sfRenderTalhoesPorArea(parseInt($(this).val()) || 0); });
 });
 
 function sfCarregar() {
@@ -4519,7 +4681,7 @@ function sfCarregar() {
     $.get(CTX + '/ControllerSafra', function (lista) {
         t.clear();  // limpa só quando os dados chegam (sem flash de tabela vazia)
         lista.forEach(function (s) {
-            var periodo = (s.dataInicial || '') + ' a ' + (s.dataFinal || '');
+            var periodo = (s.dataInicial ? formatarData(s.dataInicial) : '') + ' a ' + (s.dataFinal ? formatarData(s.dataFinal) : '');
             var acoes = '<a class="btn-acao btn-acao-editar" title="Editar" href="#" onclick="sfEditar(' + s.idSafra + ');return false;"><i class="fas fa-pen-to-square"></i></a> ' +
                 '<a class="btn-acao" title="Resumo financeiro" href="' + CTX + '/view/admin/resumoSafra.jsp?id=' + s.idSafra + '"><i class="fas fa-chart-pie"></i></a>';
             t.row.add([s.nome, s.culturaNome || '—', periodo, sfBadge(s.status),
@@ -4528,47 +4690,53 @@ function sfCarregar() {
     });
 }
 
-function sfTalhaoOpts() {
+function sfOptAreas() {
     var o = '<option value="">Selecione</option>';
-    sfCacheTalhoes.forEach(function (q) { o += '<option value="' + q.idQuadra + '" data-area="' + (q.areaHa || 0) + '">' + q.area + ' / ' + q.nome + ' (' + q.numeroPlantas + ' pl, ' + Number(q.areaHa || 0) + ' ha)</option>'; });
+    sfCacheAreas.forEach(function (a) { o += '<option value="' + a.idAreaProducao + '">' + a.PropriedadeAreaProducao + '</option>'; });
     return o;
 }
-function sfAddTalhaoRow(t) {
-    $('#sfTalhaoBody').append('<tr>' +
-        '<td><select class="form-select form-select-sm sf-tq">' + sfTalhaoOpts() + '</select></td>' +
-        '<td><input type="number" step="0.01" min="0" class="form-control form-control-sm sf-tarea" value="0"></td>' +
-        '<td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger sf-rm"><i class="fas fa-trash"></i></button></td></tr>');
-    if (t) {
-        var $tr = $('#sfTalhaoBody tr:last');
-        $tr.find('.sf-tq').val(String(t.idQuadra)); $tr.find('.sf-tarea').val(t.areaDestinadaHa || 0);
-    }
+/** Preenche a tabela de talhões com TODAS as quadras da área escolhida (auto), sem seleção manual.
+ *  existentes: mapa idQuadra -> areaDestinadaHa, para pré-preencher em modo edição. */
+function sfRenderTalhoesPorArea(idArea, existentes) {
+    existentes = existentes || {};
+    var qs = sfCacheTalhoes.filter(function (q) { return q.idAreaProducao === idArea; });
+    var $b = $('#sfTalhaoBody').empty();
+    if (!idArea) { $b.append('<tr><td colspan="2" class="text-center text-muted py-2">Selecione uma Área de Produção acima.</td></tr>'); return; }
+    if (!qs.length) { $b.append('<tr><td colspan="2" class="text-center text-muted py-2">Esta área não tem talhões cadastrados.</td></tr>'); return; }
+    qs.forEach(function (q) {
+        var areaDest = existentes[q.idQuadra] != null ? existentes[q.idQuadra] : (q.areaHa || 0);
+        $b.append('<tr><td><input type="hidden" class="sf-tq" value="' + q.idQuadra + '">' + q.nome +
+            ' <span class="text-muted small">(' + q.numeroPlantas + ' pl, ' + Number(q.areaHa || 0) + ' ha reais)</span></td>' +
+            '<td><input type="number" step="0.01" min="0" class="form-control form-control-sm sf-tarea" value="' + areaDest + '"></td></tr>');
+    });
 }
 
 function sfNovo() {
-    if (!sfCacheTalhoes.length) {
-        preReqAlerta('#alerta', 'Para cadastrar uma Safra é preciso ter <strong>talhões</strong> cadastrados (Área de Produção → talhões).',
+    if (!sfCacheAreas.length) {
+        preReqAlerta('#alerta', 'Para cadastrar uma Safra é preciso ter <strong>Área de Produção</strong> cadastrada.',
             CTX + '/view/admin/areaproducao.jsp', 'Ir para Área de Produção');
         return;
     }
     $('#alertaSafra').addClass('d-none').text(''); $('#modalSafraTitulo').html('<i class="fas fa-seedling me-2"></i>Nova Safra');
-    $('#sfId,#sfNome').val(''); $('#sfCultura').html(sfOptCultura);
+    $('#sfId,#sfNome').val(''); $('#sfCultura').html(sfOptCultura); $('#sfArea').html(sfOptAreas());
     $('#sfStatus').val('PLANEJADA'); $('#sfUnidade').val('SACA');
     $('#sfDataIni,#sfDataFim').val(''); $('#sfEstimativa,#sfDespFixas').val('0');
-    $('#sfTalhaoBody').empty(); sfAddTalhaoRow();
+    sfRenderTalhoesPorArea(0);
     $('#modalSafra').modal('show');
 }
 function sfEditar(id) {
     $.getJSON(CTX + '/ControllerSafra?id=' + id, function (s) {
         $('#alertaSafra').addClass('d-none').text(''); $('#modalSafraTitulo').html('<i class="fas fa-pen-to-square me-2"></i>Editar Safra');
-        $('#sfCultura').html(sfOptCultura);
+        $('#sfCultura').html(sfOptCultura); $('#sfArea').html(sfOptAreas());
         $('#sfId').val(s.idSafra); $('#sfNome').val(s.nome);
         $('#sfCultura').val(s.idCulturaPrincipal ? String(s.idCulturaPrincipal) : '');
+        $('#sfArea').val(s.idAreaProducao ? String(s.idAreaProducao) : '');
         $('#sfStatus').val(s.status); $('#sfUnidade').val(s.unidadeProducao || 'SACA');
         $('#sfDataIni').val(s.dataInicial || ''); $('#sfDataFim').val(s.dataFinal || '');
         $('#sfEstimativa').val(s.estimativaProducao || 0); $('#sfDespFixas').val(s.despesasFixas || 0);
-        $('#sfTalhaoBody').empty();
-        (s.talhoes || []).forEach(function (t) { sfAddTalhaoRow(t); });
-        if (!(s.talhoes || []).length) sfAddTalhaoRow();
+        var existentes = {};
+        (s.talhoes || []).forEach(function (t) { existentes[t.idQuadra] = t.areaDestinadaHa || 0; });
+        sfRenderTalhoesPorArea(s.idAreaProducao || 0, existentes);
         $('#modalSafra').modal('show');
     });
 }
@@ -4576,7 +4744,8 @@ function sfSalvar() {
     var talhoes = [], invalido = false;
     $('#sfTalhaoBody tr').each(function () {
         var idq = $(this).find('.sf-tq').val(); if (!idq) return;
-        var areaMax = parseFloat($(this).find('.sf-tq :selected').data('area')) || 0;
+        var q = sfCacheTalhoes.filter(function (x) { return String(x.idQuadra) === String(idq); })[0];
+        var areaMax = q ? Number(q.areaHa || 0) : 0;
         var area = parseFloat($(this).find('.sf-tarea').val()) || 0;
         if (areaMax > 0 && area > areaMax) invalido = true;
         talhoes.push({ idQuadra: parseInt(idq), areaDestinadaHa: area });
@@ -4586,13 +4755,16 @@ function sfSalvar() {
     var payload = {
         acao: id ? 'update' : 'create', idSafra: id ? parseInt(id) : 0,
         nome: $('#sfNome').val().trim(),
+        idAreaProducao: parseInt($('#sfArea').val()) || null,
         idCulturaPrincipal: $('#sfCultura').val() ? parseInt($('#sfCultura').val()) : null,
         dataInicial: $('#sfDataIni').val() || null, dataFinal: $('#sfDataFim').val() || null,
         status: $('#sfStatus').val(), estimativaProducao: parseFloat($('#sfEstimativa').val()) || 0,
         unidadeProducao: $('#sfUnidade').val(), despesasFixas: parseFloat($('#sfDespFixas').val()) || 0,
         talhoes: talhoes
     };
-    if (!payload.nome || !payload.dataInicial || !payload.dataFinal) { $('#alertaSafra').removeClass('d-none').addClass('alert-danger').text('Nome e datas são obrigatórios.'); return; }
+    if (!payload.nome || !payload.idAreaProducao || !payload.dataInicial || !payload.dataFinal) {
+        $('#alertaSafra').removeClass('d-none').addClass('alert-danger').text('Nome, Área de Produção e datas são obrigatórios.'); return;
+    }
     $.ajax({ url: CTX + '/ControllerSafra', method: 'POST', contentType: 'application/json; charset=utf-8', data: JSON.stringify(payload),
         success: function (res) { if (res.ok) { $('#modalSafra').modal('hide'); mostrarAlerta(res.msg, 'success', '#alerta'); sfCarregar(); } else $('#alertaSafra').removeClass('d-none').addClass('alert-danger').text(res.msg); },
         error: function (xhr) { var m = 'Erro ao salvar safra.'; try { m = JSON.parse(xhr.responseText).msg || m; } catch (e) {} $('#alertaSafra').removeClass('d-none').addClass('alert-danger').text(m); } });
@@ -4609,7 +4781,7 @@ $(document).ready(function () {
         var s = r.safra;
         $('#rsNome').text(s.nome || ''); $('#rsStatus').html(sfBadge(s.status));
         $('#rsCultura').text(s.culturaNome || '—');
-        $('#rsPeriodo').text((s.dataInicial || '') + ' a ' + (s.dataFinal || ''));
+        $('#rsPeriodo').text((s.dataInicial ? formatarData(s.dataInicial) : '') + ' a ' + (s.dataFinal ? formatarData(s.dataFinal) : ''));
         $('#rsUnidade').text(s.unidadeProducao === 'TONELADA' ? 'Tonelada' : 'Saca');
         $('#rsAtiv').text(r.qtdAtividades); $('#rsPlantas').text(Number(r.totalPlantas || 0).toLocaleString('pt-BR'));
         $('#rsArea').text(Number(r.totalAreaHa || 0).toLocaleString('pt-BR'));
@@ -4627,15 +4799,35 @@ $(document).ready(function () {
         barra += '<div class="progress-bar bg-success" style="width:' + (r.pctMaoObra || 0) + '%" title="Mão de obra"></div>';
         barra += '<div class="progress-bar bg-warning" style="width:' + (r.pctDespesasFixas || 0) + '%" title="Despesas fixas"></div>';
         $('#rsBarra').html(barra);
-        var $b = $('#rsRateioBody').empty();
-        if (!(r.rateio || []).length) $b.append('<tr><td colspan="5" class="text-center text-muted py-2">Sem talhões.</td></tr>');
-        (r.rateio || []).forEach(function (x) {
-            $b.append('<tr><td>' + x.talhao + '</td><td class="text-end">' + Number(x.numeroPlantas).toLocaleString('pt-BR') +
-                '</td><td class="text-end">' + x.participacaoPct + '%</td><td class="text-end">' + sfMoney(x.custoRateado) +
-                '</td><td class="text-end">' + sfMoney(x.custoReal) + '</td></tr>');
-        });
+        rsCacheRateio = r.rateio || [];
+        var alimentos = [], vistos = {};
+        rsCacheRateio.forEach(function (x) { if (x.alimento && !vistos[x.alimento]) { vistos[x.alimento] = true; alimentos.push(x.alimento); } });
+        var optsAlim = '<option value="">Todos</option>';
+        alimentos.sort().forEach(function (a) { optsAlim += '<option value="' + a + '">' + a + '</option>'; });
+        $('#rsFiltroAlimento').html(optsAlim);
+        rsRenderRateio();
     });
+    $('#rsFiltroAlimento').off('change').on('change', rsRenderRateio);
 });
+
+var rsCacheRateio = [];
+
+/** Renderiza a tabela de rateio por talhão, filtrando por alimento quando selecionado. */
+function rsRenderRateio() {
+    var filtro = $('#rsFiltroAlimento').val();
+    var lista = filtro ? rsCacheRateio.filter(function (x) { return x.alimento === filtro; }) : rsCacheRateio;
+    var $b = $('#rsRateioBody').empty();
+    if (!lista.length) $b.append('<tr><td colspan="6" class="text-center text-muted py-2">Sem talhões.</td></tr>');
+    var totalRateado = 0, totalReal = 0;
+    lista.forEach(function (x) {
+        totalRateado += Number(x.custoRateado) || 0; totalReal += Number(x.custoReal) || 0;
+        $b.append('<tr><td>' + x.talhao + '</td><td>' + (x.alimento || '—') + '</td><td class="text-end">' + Number(x.numeroPlantas).toLocaleString('pt-BR') +
+            '</td><td class="text-end">' + x.participacaoPct + '%</td><td class="text-end">' + sfMoney(x.custoRateado) +
+            '</td><td class="text-end">' + sfMoney(x.custoReal) + '</td></tr>');
+    });
+    $('#rsFiltroRateadoTotal').text(sfMoney(totalRateado));
+    $('#rsFiltroRealTotal').text(sfMoney(totalReal));
+}
 
 /**
  * Exibe um aviso de pré-requisito (módulo dependente sem dados) num container de

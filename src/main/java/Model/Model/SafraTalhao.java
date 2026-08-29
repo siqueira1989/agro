@@ -8,6 +8,7 @@ public class SafraTalhao {
     private int idSafra;
     private int idQuadra;
     private String quadraNome;                 // exibição
+    private String alimentoNome;                // exibição (cultura plantada na quadra)
     private int numeroPlantas;                  // exibição (base do rateio)
     private BigDecimal areaHa = BigDecimal.ZERO; // área real do talhão (exibição/validação)
     private BigDecimal areaDestinadaHa = BigDecimal.ZERO;
@@ -20,6 +21,8 @@ public class SafraTalhao {
     public void setIdQuadra(int idQuadra) { this.idQuadra = idQuadra; }
     public String getQuadraNome() { return quadraNome; }
     public void setQuadraNome(String quadraNome) { this.quadraNome = quadraNome; }
+    public String getAlimentoNome() { return alimentoNome; }
+    public void setAlimentoNome(String alimentoNome) { this.alimentoNome = alimentoNome; }
     public int getNumeroPlantas() { return numeroPlantas; }
     public void setNumeroPlantas(int numeroPlantas) { this.numeroPlantas = numeroPlantas; }
     public BigDecimal getAreaHa() { return areaHa; }
