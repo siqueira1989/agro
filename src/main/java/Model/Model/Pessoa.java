@@ -9,7 +9,17 @@ public class Pessoa {
     protected int idPessoa;
     protected String nomePessoa;
     protected String usuarioPessoa; // Removido static
-    protected String senhaPessoa;
+    /**
+     * Credencial. É {@code transient} de propósito (P0-2 da auditoria de
+     * 29/08/2026): o Gson ignora campos transientes, então a senha — hoje um
+     * hash PBKDF2, antes texto puro — nunca mais é serializada nas respostas
+     * JSON dos servlets. Antes, {@code ControllerCLT} devolvia a senha e o CPF
+     * de todos os funcionários em {@code gson.toJson(lista)}.
+     *
+     * <p>Os SELECT de listagem também deixaram de trazer a coluna; este campo
+     * só é preenchido no cadastro e na alteração, a caminho do banco.</p>
+     */
+    protected transient String senhaPessoa;
     protected String nivelPessoa;
     protected boolean situacaoPessoa; // Removido static
     protected String emailPessoa;

@@ -85,8 +85,10 @@ public class ControleColaborador extends HttpServlet {
             }
             out.flush();
         } catch (SQLException e) {
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControleColaborador.class, "Falha tratada em ControleColaborador.", e);
             writeJson(resp, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
-                    "Erro: " + e.getMessage(), "page");
+                    "Erro: " + cod, "page");
         }
     }
 
@@ -208,8 +210,10 @@ public class ControleColaborador extends HttpServlet {
             }
 
         } catch (SQLException e) {
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControleColaborador.class, "Falha tratada em ControleColaborador.", e);
             writeJson(resp, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
-                    "Erro ao gerar folha: " + e.getMessage(), "modal");
+                    "Erro ao gerar folha: " + cod, "modal");
         }
     }
 
@@ -228,8 +232,10 @@ public class ControleColaborador extends HttpServlet {
                 out.flush();
             }
         } catch (SQLException e) {
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControleColaborador.class, "Falha tratada em ControleColaborador.", e);
             writeJson(resp, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
-                    "Erro ao listar folha: " + e.getMessage(), "modal");
+                    "Erro ao listar folha: " + cod, "modal");
         }
     }
 

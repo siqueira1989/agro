@@ -74,8 +74,10 @@ public class ControllerAreaProducao extends HttpServlet {
             }
             out.flush();
         } catch (SQLException e) {
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControllerAreaProducao.class, "Falha tratada em ControllerAreaProducao.", e);
             writeJson(resp, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
-                    "Erro ao buscar áreas: " + e.getMessage(), "page");
+                    "Erro ao buscar áreas: " + cod, "page");
         }
     }
 
@@ -145,8 +147,10 @@ public class ControllerAreaProducao extends HttpServlet {
             dao.inserirComQuadras(area, quadras);   // qtd = soma das quadras
             writeJson(resp, HttpServletResponse.SC_OK, true, "Área cadastrada com sucesso!", "page");
         } catch (SQLException e) {
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControllerAreaProducao.class, "Falha tratada em ControllerAreaProducao.", e);
             writeJson(resp, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
-                    "Erro ao cadastrar: " + e.getMessage(), "page");
+                    "Erro ao cadastrar: " + cod, "page");
         }
     }
 
@@ -205,8 +209,10 @@ public class ControllerAreaProducao extends HttpServlet {
             dao.recomputarQtdPlantas(id);   // qtd sempre = soma das quadras ativas
             writeJson(resp, HttpServletResponse.SC_OK, true, "Área atualizada com sucesso!", "page");
         } catch (SQLException e) {
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControllerAreaProducao.class, "Falha tratada em ControllerAreaProducao.", e);
             writeJson(resp, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
-                    "Erro ao atualizar: " + e.getMessage(), "page");
+                    "Erro ao atualizar: " + cod, "page");
         }
     }
 
@@ -223,8 +229,10 @@ public class ControllerAreaProducao extends HttpServlet {
             writeJson(resp, HttpServletResponse.SC_OK, true,
                     novaSituacao ? "Área ativada com sucesso!" : "Área desativada com sucesso!", "page");
         } catch (SQLException e) {
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControllerAreaProducao.class, "Falha tratada em ControllerAreaProducao.", e);
             writeJson(resp, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
-                    "Erro ao alterar situação: " + e.getMessage(), "page");
+                    "Erro ao alterar situação: " + cod, "page");
         }
     }
 
@@ -250,8 +258,10 @@ public class ControllerAreaProducao extends HttpServlet {
             dao.recomputarQtdPlantas(idArea);
             writeJson(resp, HttpServletResponse.SC_OK, true, "Quadra adicionada!", "page");
         } catch (SQLException e) {
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControllerAreaProducao.class, "Falha tratada em ControllerAreaProducao.", e);
             writeJson(resp, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
-                    "Erro ao adicionar quadra: " + e.getMessage(), "page");
+                    "Erro ao adicionar quadra: " + cod, "page");
         }
     }
 
@@ -272,8 +282,10 @@ public class ControllerAreaProducao extends HttpServlet {
             writeJson(resp, HttpServletResponse.SC_OK, true,
                     ativar ? "Quadra reativada!" : "Quadra desativada!", "page");
         } catch (SQLException e) {
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControllerAreaProducao.class, "Falha tratada em ControllerAreaProducao.", e);
             writeJson(resp, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
-                    "Erro ao alterar a quadra: " + e.getMessage(), "page");
+                    "Erro ao alterar a quadra: " + cod, "page");
         }
     }
 

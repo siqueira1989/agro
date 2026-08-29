@@ -19,6 +19,17 @@ public class PontoEletronico {
     private int     extraMinutos;
     private int     minutosNoturnos;     // horas noturnas rurais (60min reais)
     private String  observacao;
+    /**
+     * Dia concedido como folga compensatoria do domingo trabalhado na mesma
+     * semana (P1-13 da auditoria de 29/08/2026).
+     *
+     * <p>Antes a folga era DEDUZIDA da ausencia de registro: "existe um dia
+     * entre segunda e sabado sem ponto e sem falta". Como quase ninguem tem
+     * ponto no sabado, quase toda semana era classificada como compensada e o
+     * domingo trabalhado deixava de ser pago a 100%. Agora e um fato marcado
+     * explicitamente, nao um palpite.</p>
+     */
+    private boolean folgaCompensatoria;
 
     // ── auditoria (Portaria 671) — ação do gestor que registra ──
     private BigDecimal latitude;          // reservado p/ app móvel futuro
@@ -117,4 +128,7 @@ public class PontoEletronico {
         int m = extraMinutos % 60;
         return String.format("%02d:%02d", h, m);
     }
+
+    public boolean isFolgaCompensatoria()          { return folgaCompensatoria; }
+    public void setFolgaCompensatoria(boolean v)   { this.folgaCompensatoria = v; }
 }

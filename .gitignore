@@ -8,3 +8,5 @@ target/
 
 # credenciais — nunca commitar
 src/main/resources/email.properties
+src/main/resources/agro.properties
+src/main/resources/db.properties

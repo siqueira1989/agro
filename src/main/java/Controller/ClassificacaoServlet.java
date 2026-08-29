@@ -61,8 +61,10 @@ public class ClassificacaoServlet extends HttpServlet {
                 out.flush();
             }
         } catch (SQLException e) {
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ClassificacaoServlet.class, "Falha tratada em ClassificacaoServlet.", e);
             writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
-                    "Erro ao carregar classificações: " + e.getMessage(), "page");
+                    "Erro ao carregar classificações: " + cod, "page");
         }
     }
 
@@ -110,8 +112,10 @@ public class ClassificacaoServlet extends HttpServlet {
             writeJson(response, HttpServletResponse.SC_OK, true,
                     "Classificação cadastrada com sucesso!", "page");
         } catch (Exception e) {
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ClassificacaoServlet.class, "Falha tratada em ClassificacaoServlet.", e);
             writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
-                    "Erro ao cadastrar: " + e.getMessage(), "modalClassificacaoCadastro");
+                    "Erro ao cadastrar: " + cod, "modalClassificacaoCadastro");
         }
     }
 
@@ -153,8 +157,10 @@ private void handleUpdate(HttpServletRequest request, HttpServletResponse respon
                 "Classificação atualizada com sucesso!", "page");
 
     } catch (Exception e) {
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ClassificacaoServlet.class, "Falha tratada em ClassificacaoServlet.", e);
         writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
-                "Erro ao atualizar: " + e.getMessage(), "modalClassificacaoAtualizar");
+                "Erro ao atualizar: " + cod, "modalClassificacaoAtualizar");
     }
 }
 
@@ -183,8 +189,10 @@ private void handleUpdate(HttpServletRequest request, HttpServletResponse respon
             writeJson(response, HttpServletResponse.SC_OK, true,
                     "Excluída com sucesso!", "page");
         } catch (Exception e) {
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ClassificacaoServlet.class, "Falha tratada em ClassificacaoServlet.", e);
             writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
-                    "Erro ao excluir: " + e.getMessage(), "modalClassificacaoExcluir");
+                    "Erro ao excluir: " + cod, "modalClassificacaoExcluir");
         }
     }
 

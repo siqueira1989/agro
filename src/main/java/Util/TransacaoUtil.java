@@ -20,14 +20,19 @@ public class TransacaoUtil {
             try {
                 conn.rollback();
             } catch (SQLException ex) {
-                ex.printStackTrace();
+                // P2-20: antes so imprimia a pilha e seguia. Um rollback que falha
+                // significa dados possivelmente inconsistentes: precisa ficar no log
+                // com severidade e codigo de ocorrencia.
+                Util.LogUtil.erro(TransacaoUtil.class,
+                        "ROLLBACK FALHOU — verifique a consistencia dos dados.", ex);
             }
             throw e;
         } finally {
             try {
                 conn.setAutoCommit(autoCommitOriginal);
             } catch (SQLException ex) {
-                ex.printStackTrace();
+                Util.LogUtil.aviso(TransacaoUtil.class,
+                        "Falha ao restaurar o autoCommit da conexao.", ex);
             }
         }
     }

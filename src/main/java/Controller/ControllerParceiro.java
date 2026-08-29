@@ -115,7 +115,8 @@ protected void doGet(HttpServletRequest request, HttpServletResponse response)
         out.print(gson.toJson(lista));
 
     } catch (Exception e) {
-        e.printStackTrace();
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControllerParceiro.class, "Falha tratada em ControllerParceiro.", e);
         writeJson(response,
                 HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
                 false,
@@ -194,8 +195,9 @@ System.out.println("acao:"+ acao);
 
         writeJson(response, HttpServletResponse.SC_OK, true, "Parceiro cadastrado com sucesso!", null);
     } catch (Exception e) {
-        e.printStackTrace();
-        System.out.println(" Erro gerencial do sistema" + e.getMessage());
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControllerParceiro.class, "Falha tratada em ControllerParceiro.", e);
+        System.out.println(" Erro gerencial do sistema" + cod);
         writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false, "Erro no cadastro",null);
     }
 }
@@ -228,8 +230,9 @@ System.out.println("acao:"+ acao);
 
         writeJson(response, HttpServletResponse.SC_OK, true, "Parceiro atualizado com sucesso!", null);
     } catch (Exception e) {
-        e.printStackTrace();
-        System.out.println(" Erro gerencial do sistema" + e.getMessage());
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControllerParceiro.class, "Falha tratada em ControllerParceiro.", e);
+        System.out.println(" Erro gerencial do sistema" + cod);
         writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false, "Erro no cadastro",null);
     }
 }
@@ -247,8 +250,9 @@ System.out.println("acao:"+ acao);
 
         writeJson(response, HttpServletResponse.SC_OK, true, "Parceiro Desativado com sucesso!", null);
     } catch (Exception e) {
-        e.printStackTrace();
-        System.out.println(" Erro gerencial do sistema" + e.getMessage());
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControllerParceiro.class, "Falha tratada em ControllerParceiro.", e);
+        System.out.println(" Erro gerencial do sistema" + cod);
         writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false, "Erro no cadastro",null);
     }
 }
@@ -274,8 +278,9 @@ System.out.println("acao:"+ acao);
         out.print(resultado.toString());
 
     } catch (Exception e) {
-        e.printStackTrace();
-        System.err.println("Erro ao obter dados de parceiros: " + e.getMessage());
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControllerParceiro.class, "Falha tratada em ControllerParceiro.", e);
+        System.err.println("Erro ao obter dados de parceiros: " + cod);
 
         // Erro formatado
         JsonObject erro = new JsonObject();

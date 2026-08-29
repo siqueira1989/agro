@@ -53,7 +53,8 @@ public class ControllerEstoque extends HttpServlet {
             }
             writeJson(resp, 400, false, "Ação inválida.");
         } catch (Exception e) {
-            e.printStackTrace();
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControllerEstoque.class, "Falha tratada em ControllerEstoque.", e);
             writeJson(resp, 500, false, "Erro ao carregar movimentações.");
         }
     }
@@ -74,8 +75,9 @@ public class ControllerEstoque extends HttpServlet {
         } catch (EstoqueInsuficienteException e) {
             writeJson(resp, 400, false, e.getMessage());
         } catch (Exception e) {
-            e.printStackTrace();
-            writeJson(resp, 500, false, "Erro interno: " + e.getMessage());
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControllerEstoque.class, "Falha tratada em ControllerEstoque.", e);
+            writeJson(resp, 500, false, "Erro interno: " + cod);
         }
     }
 

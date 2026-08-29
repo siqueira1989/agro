@@ -83,7 +83,9 @@ public class RelatorioExportServlet extends HttpServlet {
                     resp.sendError(HttpServletResponse.SC_BAD_REQUEST, "Módulo desconhecido: " + modulo);
             }
         } catch (SQLException e) {
-            resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Erro ao gerar relatório: " + e.getMessage());
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(RelatorioExportServlet.class, "Falha tratada em RelatorioExportServlet.", e);
+            resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Erro ao gerar relatório: " + cod);
         }
     }
 
@@ -160,7 +162,9 @@ public class RelatorioExportServlet extends HttpServlet {
             );
             JasperExportManager.exportReportToPdfStream(print, os);
         } catch (JRException e) {
-            throw new IOException("Erro ao gerar PDF: " + e.getMessage(), e);
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(RelatorioExportServlet.class, "Falha tratada em RelatorioExportServlet.", e);
+            throw new IOException("Erro ao gerar PDF: " + cod, e);
         }
     }
 
@@ -220,7 +224,9 @@ public class RelatorioExportServlet extends HttpServlet {
             );
             JasperExportManager.exportReportToPdfStream(print, os);
         } catch (JRException e) {
-            throw new IOException("Erro ao gerar PDF: " + e.getMessage(), e);
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(RelatorioExportServlet.class, "Falha tratada em RelatorioExportServlet.", e);
+            throw new IOException("Erro ao gerar PDF: " + cod, e);
         }
     }
 
@@ -281,7 +287,9 @@ public class RelatorioExportServlet extends HttpServlet {
             );
             JasperExportManager.exportReportToPdfStream(print, os);
         } catch (JRException e) {
-            throw new IOException("Erro ao gerar PDF: " + e.getMessage(), e);
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(RelatorioExportServlet.class, "Falha tratada em RelatorioExportServlet.", e);
+            throw new IOException("Erro ao gerar PDF: " + cod, e);
         }
     }
 

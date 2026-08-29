@@ -66,7 +66,9 @@ public class DespesasCustosServlet extends HttpServlet {
                 out.flush();
             }
         } catch (SQLException e) {
-            writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false, "Erro ao listar: " + e.getMessage(), "page");
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(DespesasCustosServlet.class, "Falha tratada em DespesasCustosServlet.", e);
+            writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false, "Erro ao listar: " + cod, "page");
         }
     }
 
@@ -122,7 +124,9 @@ public class DespesasCustosServlet extends HttpServlet {
 
             writeJson(response, HttpServletResponse.SC_OK, true, "Despesa cadastrada com sucesso!", "page");
         } catch (Exception e) {
-            writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false, "Erro ao cadastrar: " + e.getMessage(), "modalCadastro");
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(DespesasCustosServlet.class, "Falha tratada em DespesasCustosServlet.", e);
+            writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false, "Erro ao cadastrar: " + cod, "modalCadastro");
         }
     }
 
@@ -164,7 +168,9 @@ public class DespesasCustosServlet extends HttpServlet {
 
             writeJson(response, HttpServletResponse.SC_OK, true, "Despesa atualizada com sucesso!", "page");
         } catch (Exception e) {
-            writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false, "Erro ao atualizar: " + e.getMessage(), "modalAtualizacao");
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(DespesasCustosServlet.class, "Falha tratada em DespesasCustosServlet.", e);
+            writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false, "Erro ao atualizar: " + cod, "modalAtualizacao");
         }
     }
 
@@ -184,7 +190,9 @@ public class DespesasCustosServlet extends HttpServlet {
 
             writeJson(response, HttpServletResponse.SC_OK, true, "Excluída com sucesso!", "page");
         } catch (Exception e) {
-            writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false, "Erro ao excluir: " + e.getMessage(), "page");
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(DespesasCustosServlet.class, "Falha tratada em DespesasCustosServlet.", e);
+            writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false, "Erro ao excluir: " + cod, "page");
         }
     }
 

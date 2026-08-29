@@ -1,11 +1,10 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package Model.Dao;
 
-import Model.Model.*;
+import Model.Model.Alimento;
+import Model.Model.AlimentoClassificacao;
+import Model.Model.Classificacao;
 import Util.PostgresConnection;
+
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -13,197 +12,202 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Associação entre Alimento (cultura) e Classificação.
+ *
+ * <h3>Correções da auditoria de 29/08/2026</h3>
+ *
+ * <p><b>P0-4 — vazamento de conexão.</b> Seis métodos abriam a conexão fora de
+ * {@code try-with-resources}. Todos foram convertidos.</p>
+ *
+ * <p><b>P0-5 — {@code ExisteAssociacaoClassificacao} engolia a exceção</b> e
+ * devolvia {@code false}, o que o chamador entendia como "não existe a
+ * associação" — abrindo caminho para gravar duplicata.</p>
+ *
+ * <p><b>Novo achado durante a correção — ID adivinhado.</b> O cadastro de
+ * alimento com classificações fazia:</p>
+ * <pre>
+ * int numero = dao.RetornoIdAlimento();       // SELECT last_value FROM ..._seq
+ * alimentodao.addAlimento(alimentoObj);       // INSERT
+ * ...setIdproduto(numero + 1);                // "cuidado aqui"
+ * </pre>
+ * <p>Ou seja: lia o último valor da sequência e <b>chutava</b> que o próximo id
+ * seria ele mais um. Isso quebra em dois casos reais. Se dois usuários cadastram
+ * ao mesmo tempo, os dois calculam o mesmo número e as classificações de um vão
+ * parar no alimento do outro. E se a sequência tiver buracos — qualquer INSERT
+ * que falhou já consome um número —, o palpite aponta para um id inexistente e
+ * as classificações se perdem ou violam a chave estrangeira. Além disso, o
+ * alimento e suas classificações eram gravados sem transação: um erro no meio
+ * deixava o alimento cadastrado sem nenhuma classificação.</p>
+ *
+ * <p>{@link #cadastrarComClassificacoes} substitui tudo isso: um único INSERT
+ * com {@code RETURNING idproduto} devolve o id <b>real</b> gerado, e o alimento
+ * mais as associações são gravados numa só transação — ou entra tudo, ou não
+ * entra nada.</p>
+ */
 public class AlimentoClassificacaoDao {
 
-    //Adicionar o alimentoclassificacao da lista alimento
-    public void addAlimentoClassificacao(AlimentoClassificacao alimentoclassificacao) throws SQLException {
-        PostgresConnection conn = new PostgresConnection();
-        Connection conexao = conn.getConnection();
-        System.out.println("nivel 2");
-        try {
-            String sql = "INSERT INTO alimentoclassificacao("
-                    + "idproduto, idclassificacao)"
-                    + "VALUES (?,?)";
+    /**
+     * Cadastra o alimento e suas classificações atomicamente.
+     *
+     * @return o id realmente gerado pelo banco para o alimento
+     */
+    public int cadastrarComClassificacoes(Alimento alimento, List<Integer> idsClassificacao)
+            throws SQLException {
 
-            PreparedStatement stmt = conexao.prepareStatement(sql);
+        String sqlAlimento = "INSERT INTO alimento (nomeproduto, tipoproduto, situacaoproduto, "
+                           + "variedadealimento) VALUES (?, ?, ?, ?) RETURNING idproduto";
+        String sqlAssoc = "INSERT INTO alimentoclassificacao (idproduto, idclassificacao) VALUES (?, ?)";
+
+        try (Connection c = new PostgresConnection().getConnection()) {
+            boolean autoCommitOriginal = c.getAutoCommit();
+            c.setAutoCommit(false);
+            try {
+                int idProduto;
+                try (PreparedStatement st = c.prepareStatement(sqlAlimento)) {
+                    st.setString(1, alimento.getNomeproduto());
+                    st.setString(2, alimento.getTipoproduto());
+                    st.setBoolean(3, alimento.isSituacaoproduto());
+                    st.setString(4, alimento.getVariedadealimento());
+                    try (ResultSet rs = st.executeQuery()) {
+                        if (!rs.next()) throw new SQLException("O banco não devolveu o id do alimento.");
+                        idProduto = rs.getInt(1);
+                    }
+                }
+
+                if (idsClassificacao != null && !idsClassificacao.isEmpty()) {
+                    try (PreparedStatement st = c.prepareStatement(sqlAssoc)) {
+                        for (Integer idClass : idsClassificacao) {
+                            if (idClass == null) continue;
+                            st.setInt(1, idProduto);
+                            st.setInt(2, idClass);
+                            st.addBatch();
+                        }
+                        st.executeBatch();
+                    }
+                }
+
+                c.commit();
+                alimento.setIdproduto(idProduto);
+                return idProduto;
+
+            } catch (SQLException e) {
+                c.rollback();
+                throw e;
+            } finally {
+                c.setAutoCommit(autoCommitOriginal);
+            }
+        }
+    }
+
+    public void addAlimentoClassificacao(AlimentoClassificacao alimentoclassificacao) throws SQLException {
+        String sql = "INSERT INTO alimentoclassificacao (idproduto, idclassificacao) VALUES (?, ?)";
+
+        try (Connection conexao = new PostgresConnection().getConnection();
+             PreparedStatement stmt = conexao.prepareStatement(sql)) {
+
             stmt.setInt(1, alimentoclassificacao.getAlimento().getIdproduto());
             stmt.setInt(2, alimentoclassificacao.getClassificacao().getIdclassificacao());
             stmt.executeUpdate();
-        } catch (SQLException e) {
-            throw new RuntimeException("Erro ao adicionar o parceiro: " + e.getMessage(), e);
         }
     }
-    
-/*Modulo de verificação para retorno idproduto*/
-    
+
+    /**
+     * Último valor da sequência de alimento.
+     *
+     * @deprecated Nunca use para prever o próximo id: a leitura não é atômica em
+     *             relação ao INSERT e a sequência tem buracos. Use
+     *             {@link #cadastrarComClassificacoes}, que obtém o id real com
+     *             {@code RETURNING}.
+     */
+    @Deprecated
     public Integer RetornoIdAlimento() throws SQLException {
-        PostgresConnection conn = new PostgresConnection();
-        Connection conexao = conn.getConnection();
+        String sql = "SELECT last_value AS numero FROM public.produto_idproduto_seq";
 
-        Integer numero = null;
+        try (Connection conexao = new PostgresConnection().getConnection();
+             PreparedStatement stmt = conexao.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
 
-        try {
-            // Modificando a consulta SQL para retornar o 'idendereco' ao invés de contar os registros
-            String sql = "SELECT last_value as numero FROM public.produto_idproduto_seq";
-            PreparedStatement stmt = conexao.prepareStatement(sql);
-
-            // Definindo o valor do parâmetro da consulta
-            ResultSet rs = stmt.executeQuery();
-
-            if (rs.next()) {
-                // Atribuindo o valor de 'idendereco' à variável
-                numero = rs.getInt("numero");
-            }
-
-        } catch (SQLException e) {
-            System.out.println("Erro no nivel DAO: " + e.getMessage()); // Tratar exceções de forma adequada na sua aplicação
-        } finally {
-            if (conexao != null) {
-                conexao.close(); // Certifique-se de fechar a conexão para evitar vazamento de recursos
-            }
+            return rs.next() ? rs.getInt("numero") : null;
         }
-
-        return numero;
     }
 
-    /*metodo de Buscar classificacao por produto*/
+    /** Classificações já associadas a um alimento. */
     public List<AlimentoClassificacao> ClassificacaoAlimentoBuscaID(int idproduto) throws SQLException {
-        PostgresConnection conn = new PostgresConnection();
-        Connection conexao = conn.getConnection();
+        String sql = "SELECT a.idproduto, c.idclassificacao, a.nomeproduto, c.classificacao "
+                   + "FROM public.alimentoclassificacao ac "
+                   + "JOIN public.alimento a ON ac.idproduto = a.idproduto "
+                   + "JOIN public.classificacao c ON ac.idclassificacao = c.idclassificacao "
+                   + "WHERE a.idproduto = ? "
+                   + "ORDER BY a.idproduto, c.idclassificacao";
 
-        List<AlimentoClassificacao> alimentosclassificacaos = new ArrayList<>();
+        List<AlimentoClassificacao> lista = new ArrayList<>();
 
-        try {
-            String sql = "SELECT a.idproduto, c.idclassificacao, a.nomeproduto, c.classificacao "
-                    + "FROM public.alimentoclassificacao ac "
-                    + "JOIN public.alimento a ON ac.idproduto = a.idproduto "
-                    + "JOIN public.classificacao c ON ac.idclassificacao = c.idclassificacao "
-                    + "WHERE a.idproduto = ? "
-                    + "ORDER BY a.idproduto, c.idclassificacao";
+        try (Connection conexao = new PostgresConnection().getConnection();
+             PreparedStatement stmt = conexao.prepareStatement(sql)) {
 
-            PreparedStatement stmt = conexao.prepareStatement(sql);
             stmt.setInt(1, idproduto);
-            ResultSet rs = stmt.executeQuery();
-
-            while (rs.next()) {
-                AlimentoClassificacao alimentoclassificacao = new AlimentoClassificacao();
-                alimentoclassificacao.setAlimento(new Alimento());
-                alimentoclassificacao.setClassificacao(new Classificacao());
-
-                // >>> use os nomes simples, sem alias do SQL
-                alimentoclassificacao.getAlimento().setIdproduto(rs.getInt("idproduto"));
-                alimentoclassificacao.getAlimento().setNomeproduto(rs.getString("nomeproduto"));
-                alimentoclassificacao.getClassificacao().setIdclassificacao(rs.getInt("idclassificacao"));
-                alimentoclassificacao.getClassificacao().setClassificacao(rs.getString("classificacao"));
-
-                alimentosclassificacaos.add(alimentoclassificacao);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    AlimentoClassificacao ac = novo();
+                    ac.getAlimento().setIdproduto(rs.getInt("idproduto"));
+                    ac.getAlimento().setNomeproduto(rs.getString("nomeproduto"));
+                    ac.getClassificacao().setIdclassificacao(rs.getInt("idclassificacao"));
+                    ac.getClassificacao().setClassificacao(rs.getString("classificacao"));
+                    lista.add(ac);
+                }
             }
-        } catch (SQLException e) {
-            System.out.println("Erro na camada Dao: " + e.getMessage());
-            throw e;
-        } finally {
-            conexao.close();
         }
-
-        return alimentosclassificacaos;
+        return lista;
     }
-// Metodo para carregar modal
-/*
+
+    /** Classificações AINDA NÃO associadas ao alimento — alimenta o modal. */
     public List<AlimentoClassificacao> ClassificacaoAlimentoBuscaModalID(int idproduto) throws SQLException {
-        PostgresConnection conn = new PostgresConnection();
-        Connection conexao = conn.getConnection();
+        String sql = "SELECT c.idclassificacao, c.classificacao FROM classificacao c "
+                   + "WHERE NOT EXISTS (SELECT 1 FROM alimentoclassificacao ac "
+                   + "                  WHERE ac.idproduto = ? AND ac.idclassificacao = c.idclassificacao) "
+                   + "ORDER BY c.classificacao";
 
-        List<AlimentoClassificacao> alimentosclassificacaos = new ArrayList<>();
+        List<AlimentoClassificacao> lista = new ArrayList<>();
 
-        try {
-            String sql = "SELECT  c.idclassificacao,c.classificacao "
-                    + "FROM public.alimentoclassificacao ac "
-                    + "JOIN public.alimento a ON ac.idproduto = a.idproduto "
-                    + "JOIN public.classificacao c ON ac.idclassificacao = c.idclassificacao "
-                    + "WHERE NOT ac.idproduto = ?";
+        try (Connection conexao = new PostgresConnection().getConnection();
+             PreparedStatement stmt = conexao.prepareStatement(sql)) {
 
-            PreparedStatement stmt = conexao.prepareStatement(sql);
             stmt.setInt(1, idproduto);
-            ResultSet rs = stmt.executeQuery();
-
-            while (rs.next()) {
-                AlimentoClassificacao alimentoclassificacao = new AlimentoClassificacao();
-                alimentoclassificacao.setAlimento(new Alimento());
-                alimentoclassificacao.setClassificacao(new Classificacao());
-
-                // >>> use os nomes simples, sem alias do SQL
-                alimentoclassificacao.getClassificacao().setIdclassificacao(rs.getInt("idclassificacao"));
-                alimentoclassificacao.getClassificacao().setClassificacao(rs.getString("classificacao"));
-
-                alimentosclassificacaos.add(alimentoclassificacao);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    AlimentoClassificacao ac = novo();
+                    ac.getClassificacao().setIdclassificacao(rs.getInt("idclassificacao"));
+                    ac.getClassificacao().setClassificacao(rs.getString("classificacao"));
+                    lista.add(ac);
+                }
             }
-        } catch (SQLException e) {
-            System.out.println("Erro na camada Dao: " + e.getMessage());
-            throw e;
-        } finally {
-            conexao.close();
         }
-
-        return alimentosclassificacaos;
-    }
-    */
-    /* Ajuste necessário no método ClassificacaoAlimentoBuscaModalID */
-
-public List<AlimentoClassificacao> ClassificacaoAlimentoBuscaModalID(int idproduto) throws SQLException {
-    PostgresConnection conn = new PostgresConnection();
-    Connection conexao = conn.getConnection();
-
-    List<AlimentoClassificacao> alimentosclassificacaos = new ArrayList<>();
-
-    try {
-        String sql = "SELECT c.idclassificacao, c.classificacao " +
-                     "FROM classificacao c " +
-                     "WHERE NOT EXISTS (" +
-                     "    SELECT 1 FROM alimentoclassificacao ac " +
-                     "    WHERE ac.idproduto = ? AND ac.idclassificacao = c.idclassificacao" +
-                     ")";
-
-        PreparedStatement stmt = conexao.prepareStatement(sql);
-        stmt.setInt(1, idproduto);
-        ResultSet rs = stmt.executeQuery();
-
-        while (rs.next()) {
-            AlimentoClassificacao alimentoclassificacao = new AlimentoClassificacao();
-            alimentoclassificacao.setAlimento(new Alimento());
-            alimentoclassificacao.setClassificacao(new Classificacao());
-
-            alimentoclassificacao.getClassificacao().setIdclassificacao(rs.getInt("idclassificacao"));
-            alimentoclassificacao.getClassificacao().setClassificacao(rs.getString("classificacao"));
-
-            alimentosclassificacaos.add(alimentoclassificacao);
-        }
-    } catch (SQLException e) {
-        System.out.println("Erro na camada Dao: " + e.getMessage());
-        throw e;
-    } finally {
-        conexao.close();
+        return lista;
     }
 
-    return alimentosclassificacaos;
-}
+    /** A associação já existe? Antes devolvia false quando o banco falhava. */
+    public boolean ExisteAssociacaoClassificacao(AlimentoClassificacao alimentoclassificacao)
+            throws SQLException {
 
-    /*----------------------------Verificação de  dados duplicados na classificação--------------------------*/
-    public boolean ExisteAssociacaoClassificacao (AlimentoClassificacao alimentoclassificacao) throws SQLException{
-          PostgresConnection conn = new PostgresConnection();
-        Connection conexao = conn.getConnection();
-        try {
-             String sql = "SELECT COUNT(*) FROM alimentoclassificacao WHERE idproduto = ? AND idclassificacao = ?";
-         PreparedStatement stmt = conexao.prepareStatement(sql);
+        String sql = "SELECT 1 FROM alimentoclassificacao WHERE idproduto = ? "
+                   + "AND idclassificacao = ? LIMIT 1";
 
-        stmt.setInt(1, alimentoclassificacao.getAlimento().getIdproduto() );
-        stmt.setInt(2, alimentoclassificacao.getClassificacao().getIdclassificacao());
-         ResultSet rs = stmt.executeQuery();
-            return rs.next() && rs.getInt(1) > 0;
-     } catch (Exception e) {
-            System.err.println("erro no sistema"+ e.getMessage());
-     }
-         return false;
- }
-  
+        try (Connection conexao = new PostgresConnection().getConnection();
+             PreparedStatement stmt = conexao.prepareStatement(sql)) {
+
+            stmt.setInt(1, alimentoclassificacao.getAlimento().getIdproduto());
+            stmt.setInt(2, alimentoclassificacao.getClassificacao().getIdclassificacao());
+            try (ResultSet rs = stmt.executeQuery()) {
+                return rs.next();
+            }
+        }
+    }
+
+    private AlimentoClassificacao novo() {
+        AlimentoClassificacao ac = new AlimentoClassificacao();
+        ac.setAlimento(new Alimento());
+        ac.setClassificacao(new Classificacao());
+        return ac;
+    }
 }
-/*------------------- Verificação ja existe mesma classificação no mesmo alimento------------------*/

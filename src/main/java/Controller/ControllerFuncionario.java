@@ -250,11 +250,15 @@ public class ControllerFuncionario extends HttpServlet {
                     "Funcionário cadastrado com sucesso!", "page");
 
         } catch (SQLException e) {
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControllerFuncionario.class, "Falha tratada em ControllerFuncionario.", e);
             writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
-                    "Erro ao cadastrar funcionário: " + e.getMessage(), "modalCadastroFuncionario");
+                    "Erro ao cadastrar funcionário: " + cod, "modalCadastroFuncionario");
         } catch (Exception e) {
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControllerFuncionario.class, "Falha tratada em ControllerFuncionario.", e);
             writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
-                    "Erro inesperado ao cadastrar funcionário: " + e.getMessage(), "modalCadastroFuncionario");
+                    "Erro inesperado ao cadastrar funcionário: " + cod, "modalCadastroFuncionario");
         }
     }
 
@@ -363,11 +367,15 @@ public class ControllerFuncionario extends HttpServlet {
                     "Funcionário atualizado com sucesso!", "page");
 
         } catch (SQLException e) {
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControllerFuncionario.class, "Falha tratada em ControllerFuncionario.", e);
             writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
-                    "Erro ao atualizar funcionário: " + e.getMessage(), "modalAtualizarFuncionario");
+                    "Erro ao atualizar funcionário: " + cod, "modalAtualizarFuncionario");
         } catch (Exception e) {
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControllerFuncionario.class, "Falha tratada em ControllerFuncionario.", e);
             writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
-                    "Erro inesperado ao atualizar funcionário: " + e.getMessage(), "modalAtualizarFuncionario");
+                    "Erro inesperado ao atualizar funcionário: " + cod, "modalAtualizarFuncionario");
         }
     }
 
@@ -403,8 +411,10 @@ public class ControllerFuncionario extends HttpServlet {
             writeJson(response, HttpServletResponse.SC_OK, true, mensagem, "page");
 
         } catch (SQLException e) {
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControllerFuncionario.class, "Falha tratada em ControllerFuncionario.", e);
             writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
-                    "Erro ao alterar situação do funcionário: " + e.getMessage(), "modalFuncionarioExcluir");
+                    "Erro ao alterar situação do funcionário: " + cod, "modalFuncionarioExcluir");
         }
     }
 
@@ -433,8 +443,10 @@ public class ControllerFuncionario extends HttpServlet {
             }
 
         } catch (SQLException e) {
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControllerFuncionario.class, "Falha tratada em ControllerFuncionario.", e);
             writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
-                    "Erro ao buscar funcionário por CPF: " + e.getMessage(), "page");
+                    "Erro ao buscar funcionário por CPF: " + cod, "page");
         }
     }
 
@@ -466,8 +478,10 @@ public class ControllerFuncionario extends HttpServlet {
             }
 
         } catch (SQLException e) {
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControllerFuncionario.class, "Falha tratada em ControllerFuncionario.", e);
             writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
-                    "Erro ao obter ID do funcionário: " + e.getMessage(), "page");
+                    "Erro ao obter ID do funcionário: " + cod, "page");
         }
     }
 
@@ -498,8 +512,10 @@ public class ControllerFuncionario extends HttpServlet {
             out.flush();
 
         } catch (SQLException e) {
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControllerFuncionario.class, "Falha tratada em ControllerFuncionario.", e);
             writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
-                    "Erro ao contar funcionários: " + e.getMessage(), "page");
+                    "Erro ao contar funcionários: " + cod, "page");
         }
     }
 
@@ -587,8 +603,10 @@ public class ControllerFuncionario extends HttpServlet {
             writeJson(response, HttpServletResponse.SC_BAD_REQUEST, false,
                     "Tipo de funcionário inválido.", "page");
         } catch (SQLException e) {
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControllerFuncionario.class, "Falha tratada em ControllerFuncionario.", e);
             writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
-                    "Erro ao carregar funcionários: " + e.getMessage(), "page");
+                    "Erro ao carregar funcionários: " + cod, "page");
         }
     }
 

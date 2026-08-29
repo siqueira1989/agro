@@ -42,7 +42,9 @@ public class ControllerMaquina extends HttpServlet {
             boolean somenteAtivas = "true".equalsIgnoreCase(req.getParameter("ativas"));
             out.print(gson.toJson(dao.listar(somenteAtivas)));
         } catch (Exception e) {
-            e.printStackTrace(); writeJson(resp, 500, false, "Erro ao carregar maquinário.");
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControllerMaquina.class, "Falha tratada em ControllerMaquina.", e);
+writeJson(resp, 500, false, "Erro ao carregar maquinário.");
         }
     }
 
@@ -61,7 +63,9 @@ public class ControllerMaquina extends HttpServlet {
                 default: writeJson(resp, 400, false, "Ação inválida.");
             }
         } catch (Exception e) {
-            e.printStackTrace(); writeJson(resp, 500, false, "Erro interno: " + e.getMessage());
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControllerMaquina.class, "Falha tratada em ControllerMaquina.", e);
+writeJson(resp, 500, false, "Erro interno: " + cod);
         }
     }
 

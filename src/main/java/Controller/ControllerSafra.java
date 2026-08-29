@@ -65,7 +65,9 @@ public class ControllerSafra extends HttpServlet {
             }
             out.print(gson.toJson(dao.listar()));
         } catch (Exception e) {
-            e.printStackTrace(); writeJson(resp, 500, false, "Erro ao carregar safra: " + e.getMessage());
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControllerSafra.class, "Falha tratada em ControllerSafra.", e);
+writeJson(resp, 500, false, "Erro ao carregar safra: " + cod);
         }
     }
 
@@ -89,9 +91,13 @@ public class ControllerSafra extends HttpServlet {
                 default: writeJson(resp, 400, false, "Ação inválida.");
             }
         } catch (SafraDAO.AreaInvalidaException e) {
-            writeJson(resp, 400, false, e.getMessage());
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControllerSafra.class, "Falha tratada em ControllerSafra.", e);
+            writeJson(resp, 400, false, cod);
         } catch (Exception e) {
-            e.printStackTrace(); writeJson(resp, 500, false, "Erro interno: " + e.getMessage());
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControllerSafra.class, "Falha tratada em ControllerSafra.", e);
+writeJson(resp, 500, false, "Erro interno: " + cod);
         }
     }
 

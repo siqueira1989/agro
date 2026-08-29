@@ -84,8 +84,9 @@ public class ControllerCLT extends HttpServlet {
                 out.print(gson.toJson(lista));
             }
         } catch (Exception e) {
-            e.printStackTrace();
-            writeJson(resp, 500, false, "Erro: " + e.getMessage());
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControllerCLT.class, "Falha tratada em ControllerCLT.", e);
+            writeJson(resp, 500, false, "Erro: " + cod);
         }
     }
 
@@ -180,7 +181,9 @@ public class ControllerCLT extends HttpServlet {
                 default -> writeJson(resp, 400, false, "Ação inválida: " + acao);
             }
         } catch (Exception e) {
-            writeJson(resp, 500, false, "Erro interno: " + e.getMessage());
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControllerCLT.class, "Falha tratada em ControllerCLT.", e);
+            writeJson(resp, 500, false, "Erro interno: " + cod);
         }
     }
 

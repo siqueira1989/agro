@@ -152,14 +152,18 @@ public class PontoEletronicoDAO {
                 + "FROM ponto_eletronico pe "
                 + "JOIN pessoa p ON p.idpessoa = pe.idpessoa "
                 + "WHERE pe.idpessoa = ? "
-                + "AND TO_CHAR(pe.dataregistro,'YYYY-MM') = ? "
+                // Antes: TO_CHAR(dataregistro,'YYYY-MM') = ?. Funcao sobre a coluna
+                // impede o uso do indice; trocado por intervalo de datas.
+                + "AND pe.dataregistro >= ? AND pe.dataregistro <= ? "
                 + "ORDER BY pe.dataregistro";
+        java.time.YearMonth ym = java.time.YearMonth.parse(periodo);
         List<PontoEletronico> lista = new ArrayList<>();
         PostgresConnection pc = new PostgresConnection();
         try (Connection c = pc.getConnection();
              PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setInt(1, idFuncionario);
-            ps.setString(2, periodo);
+            ps.setDate(2, Date.valueOf(ym.atDay(1)));
+            ps.setDate(3, Date.valueOf(ym.atEndOfMonth()));
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) lista.add(mapRow(rs));
             }
@@ -337,6 +341,9 @@ public class PontoEletronicoDAO {
         p.setExtraMinutos(rs.getInt("extra_minutos"));
         p.setMinutosNoturnos(rs.getInt("minutos_noturnos"));
         p.setObservacao(rs.getString("observacao"));
+        // P1-13: coluna criada pela migração V21.
+        try { p.setFolgaCompensatoria(rs.getBoolean("folga_compensatoria")); }
+        catch (SQLException ignorada) { p.setFolgaCompensatoria(false); }
         p.setLatitude(rs.getBigDecimal("latitude"));
         p.setLongitude(rs.getBigDecimal("longitude"));
         p.setIpOrigem(rs.getString("ip_origem"));

@@ -61,13 +61,28 @@ public class DiarioCampoDAO {
                 String status = statusAtual(c, d.getIdDiario());
                 if ("CONCLUIDA".equals(status)) throw new SQLException("Diário concluído não pode ser editado.");
                 atualizarCabecalho(c, d);
-                for (String t : new String[]{"diario_maquina", "diario_insumo"}) {
-                    try (PreparedStatement st = c.prepareStatement("DELETE FROM " + t + " WHERE iddiario=?")) {
-                        st.setInt(1, d.getIdDiario()); st.executeUpdate();
-                    }
+
+                try (PreparedStatement st = c.prepareStatement(
+                        "DELETE FROM diario_maquina WHERE iddiario=?")) {
+                    st.setInt(1, d.getIdDiario()); st.executeUpdate();
+                }
+
+                // P1-7: o DELETE apagava TODAS as linhas de diario_insumo, inclusive
+                // as marcadas baixado=true. A movimentação de estoque continuava no
+                // extrato, mas o vínculo com o diário sumia — e uma nova finalização
+                // baixava o mesmo insumo outra vez. Linhas já baixadas ficam.
+                try (PreparedStatement st = c.prepareStatement(
+                        "DELETE FROM diario_insumo WHERE iddiario=? AND baixado = false")) {
+                    st.setInt(1, d.getIdDiario()); st.executeUpdate();
                 }
                 for (DiarioMaquina m : d.getMaquinas()) inserirMaquina(c, d.getIdDiario(), m);
-                for (DiarioInsumo i : d.getInsumos()) inserirInsumo(c, d.getIdDiario(), i);
+                for (DiarioInsumo i : d.getInsumos()) {
+                    // Não reinserir um insumo cuja baixa já foi feita: a linha
+                    // preservada acima continua valendo (P1-7).
+                    if (!insumoJaBaixado(c, d.getIdDiario(), i.getIdInsumo())) {
+                        inserirInsumo(c, d.getIdDiario(), i);
+                    }
+                }
                 // PLANEJADA continua sem custo (previsão); EM_ANDAMENTO/CONCLUIDA calculam.
                 if (calculaCusto(d.getStatus())) recalcularCustos(c, d.getIdDiario()); else zerarCustos(c, d.getIdDiario());
                 c.commit();
@@ -204,15 +219,39 @@ public class DiarioCampoDAO {
         // Mão de obra
         for (Object[] f : carregarFuncBrutos(c, idDiario)) {
             int id = (int) f[0]; String tipo = (String) f[1]; BigDecimal horas = (BigDecimal) f[2];
+            BigDecimal valorContratado = (BigDecimal) f[4];
             int idpessoa = (int) f[5];
+            LocalDate dataExec = (LocalDate) f[6];
             BigDecimal custoHora = BigDecimal.ZERO, custo;
+
             if ("CLT".equalsIgnoreCase(tipo)) {
                 custoHora = custoHoraCLT(c, idpessoa);
                 custo = custoHora.multiply(nz(horas)).setScale(2, RoundingMode.HALF_UP);
+
             } else if ("DIARISTA".equalsIgnoreCase(tipo)) {
-                custo = valorDiaria(c, idpessoa);
+                // P1-6: a diária é por PESSOA e por DIA, não por lançamento. Se o
+                // diarista trabalhou em três atividades no mesmo dia, antes eram
+                // cobradas três diárias. Agora a diária é rateada entre elas.
+                BigDecimal diaria = valorDiaria(c, idpessoa);
+                int lancamentosNoDia = contarLancamentosNoDia(c, idpessoa, dataExec, "DIARISTA");
+                custo = diaria.divide(BigDecimal.valueOf(Math.max(lancamentosNoDia, 1)),
+                                      2, RoundingMode.HALF_UP);
+
             } else if ("EMPREITA".equalsIgnoreCase(tipo)) {
-                custo = valorFixoEmpreita(c, idpessoa);
+                // P1-6: usava funcionarioempreita.valorfixoacordado — o valor do
+                // CONTRATO INTEIRO — em cada atividade. Um empreiteiro lançado em
+                // cinco atividades custava cinco vezes o contrato, inflando custo
+                // por hectare, custo por planta e o rateio por talhão da Safra.
+                // Passa a usar o valor acordado PARA ESTA ATIVIDADE, que a coluna
+                // valor_contratado já gravava e ninguém lia.
+                custo = nz(valorContratado).setScale(2, RoundingMode.HALF_UP);
+                if (custo.signum() == 0) {
+                    Util.LogUtil.aviso(DiarioCampoDAO.class,
+                            "Empreita sem valor_contratado no diário " + idDiario
+                          + " (pessoa " + idpessoa + "): custo lançado como zero. "
+                          + "Informe o valor acordado para a atividade.", null);
+                }
+
             } else {
                 custo = BigDecimal.ZERO;
             }
@@ -290,12 +329,75 @@ public class DiarioCampoDAO {
         }
     }
 
+    /**
+     * Altera o status do diário respeitando as transições válidas
+     * (P1-7 da auditoria de 29/08/2026).
+     *
+     * <h4>O que este método fazia antes</h4>
+     * <p>Um {@code UPDATE} cru, sem validar nada. Isso abria dois buracos reais:</p>
+     *
+     * <p><b>1. Concluir sem custo e sem baixa.</b> Ir de PLANEJADA direto para
+     * CONCLUIDA por aqui mantinha o custo zerado (a criação chamou
+     * {@code zerarCustos}) e <b>não baixava o insumo</b>. A consolidação da
+     * Safra, que soma apenas {@code status='CONCLUIDA'}, incorporava a atividade
+     * valendo zero.</p>
+     *
+     * <p><b>2. Baixa de estoque em duplicidade.</b> Voltar de CONCLUIDA para
+     * EM_ANDAMENTO reabria o diário; ao editá-lo, {@code atualizarCompleto}
+     * apagava as linhas de {@code diario_insumo} — inclusive as marcadas
+     * {@code baixado=true} — e, ao finalizar de novo, o estoque era baixado
+     * outra vez pelas mesmas quantidades.</p>
+     *
+     * <h4>Regras agora</h4>
+     * <ul>
+     *   <li>CONCLUIDA só é atingida por {@link #finalizar(int)}, que recalcula
+     *       custos e faz a baixa dentro de uma transação;</li>
+     *   <li>diário CONCLUIDA não volta atrás: estornar exige decisão explícita,
+     *       não um clique de mudança de status;</li>
+     *   <li>demais transições continuam livres.</li>
+     * </ul>
+     */
     public void definirStatus(int idDiario, String status) throws SQLException {
-        try (Connection c = new PostgresConnection().getConnection();
-             PreparedStatement st = c.prepareStatement("UPDATE diario_campo SET status=? WHERE iddiario=?")) {
-            st.setString(1, status); st.setInt(2, idDiario); st.executeUpdate();
+        String novo = status == null ? "" : status.trim().toUpperCase();
+
+        if ("CONCLUIDA".equals(novo)) {
+            throw new SQLException(
+                "Para concluir a atividade use a ação Finalizar: é ela que recalcula "
+              + "os custos e dá baixa nos insumos.");
+        }
+        if (!TRANSICOES_PERMITIDAS.containsKey(novo)) {
+            throw new SQLException("Status inválido: " + status + ".");
+        }
+
+        try (Connection c = new PostgresConnection().getConnection()) {
+            String atual = statusAtual(c, idDiario);
+            if (atual == null) throw new SQLException("Diário não encontrado.");
+            if (atual.equals(novo)) return;
+
+            if ("CONCLUIDA".equals(atual)) {
+                throw new SQLException(
+                    "Diário concluído não pode voltar para " + novo + ". O estoque já foi "
+                  + "baixado; reabrir exigiria estorno das movimentações.");
+            }
+            if (!TRANSICOES_PERMITIDAS.get(novo).contains(atual)) {
+                throw new SQLException("Transição de status inválida: " + atual + " para " + novo + ".");
+            }
+
+            try (PreparedStatement st = c.prepareStatement(
+                    "UPDATE diario_campo SET status=? WHERE iddiario=?")) {
+                st.setString(1, novo);
+                st.setInt(2, idDiario);
+                st.executeUpdate();
+            }
         }
     }
+
+    /** Status de origem aceitos para cada status de destino. */
+    private static final Map<String, java.util.Set<String>> TRANSICOES_PERMITIDAS = Map.of(
+        "PLANEJADA",    java.util.Set.of("EM_ANDAMENTO"),
+        "EM_ANDAMENTO", java.util.Set.of("PLANEJADA"),
+        "CANCELADA",    java.util.Set.of("PLANEJADA", "EM_ANDAMENTO")
+    );
 
     /* ===================== CONSULTAS ===================== */
 
@@ -452,7 +554,10 @@ public class DiarioCampoDAO {
     private BigDecimal custoHoraCLT(Connection c, int idpessoa) throws SQLException {
         BigDecimal salario = BigDecimal.ZERO; int carga = 8;
         try {
-            Vinculo v = vinculoDAO.buscarAtivo(idpessoa);
+            // P1-8: era buscarAtivo(idpessoa), que abria OUTRA conexão dentro
+            // desta transação — uma por funcionário da atividade — e lia fora
+            // dela. Agora reaproveita a conexão corrente.
+            Vinculo v = vinculoDAO.buscarAtivo(c, idpessoa);
             if (v != null) { salario = nz(v.getSalarioMensal()); carga = v.getCargaHorariaDiaria() > 0 ? v.getCargaHorariaDiaria() : 8; }
         } catch (SQLException ignore) {}
         if (salario.signum() == 0) {
@@ -463,6 +568,27 @@ public class DiarioCampoDAO {
         }
         if (salario.signum() == 0) return BigDecimal.ZERO;
         return salario.divide(new BigDecimal(carga).multiply(DIAS_UTEIS_MES), 2, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Quantos lançamentos deste tipo a pessoa tem na mesma data, em diários não
+     * cancelados. É o divisor do rateio da diária (P1-6).
+     */
+    private int contarLancamentosNoDia(Connection c, int idpessoa, LocalDate data, String tipo)
+            throws SQLException {
+        if (data == null) return 1;
+        String sql = "SELECT COUNT(*) FROM diario_funcionario df "
+                   + "JOIN diario_campo d ON d.iddiario = df.iddiario "
+                   + "WHERE df.idpessoa = ? AND df.data_execucao = ? "
+                   + "AND upper(df.tipo_funcionario) = ? AND d.status <> 'CANCELADA'";
+        try (PreparedStatement st = c.prepareStatement(sql)) {
+            st.setInt(1, idpessoa);
+            st.setDate(2, Date.valueOf(data));
+            st.setString(3, tipo);
+            try (ResultSet rs = st.executeQuery()) {
+                return rs.next() ? Math.max(rs.getInt(1), 1) : 1;
+            }
+        }
     }
 
     private BigDecimal valorDiaria(Connection c, int idpessoa) throws SQLException {
@@ -502,6 +628,17 @@ public class DiarioCampoDAO {
         return null;
     }
 
+    /** A baixa deste insumo neste diário já foi efetivada? (P1-7) */
+    private boolean insumoJaBaixado(Connection c, int idDiario, int idInsumo) throws SQLException {
+        try (PreparedStatement st = c.prepareStatement(
+                "SELECT 1 FROM diario_insumo WHERE iddiario=? AND id_insumo=? AND baixado=true LIMIT 1")) {
+            st.setInt(1, idDiario); st.setInt(2, idInsumo);
+            try (ResultSet rs = st.executeQuery()) {
+                return rs.next();
+            }
+        }
+    }
+
     private String statusAtual(Connection c, int idDiario) throws SQLException {
         try (PreparedStatement st = c.prepareStatement("SELECT status FROM diario_campo WHERE iddiario=?")) {
             st.setInt(1, idDiario); ResultSet rs = st.executeQuery();
@@ -519,9 +656,16 @@ public class DiarioCampoDAO {
 
     private List<Object[]> carregarFuncBrutos(Connection c, int idDiario) throws SQLException {
         List<Object[]> l = new ArrayList<>();
-        try (PreparedStatement st = c.prepareStatement("SELECT id, tipo_funcionario, horas_trabalhadas, custo_hora, valor_contratado, idpessoa FROM diario_funcionario WHERE iddiario=?")) {
-            st.setInt(1, idDiario); ResultSet rs = st.executeQuery();
-            while (rs.next()) l.add(new Object[]{ rs.getInt(1), rs.getString(2), rs.getBigDecimal(3), rs.getBigDecimal(4), rs.getBigDecimal(5), rs.getInt(6) });
+        try (PreparedStatement st = c.prepareStatement(
+                "SELECT id, tipo_funcionario, horas_trabalhadas, custo_hora, valor_contratado, "
+              + "idpessoa, data_execucao FROM diario_funcionario WHERE iddiario=?")) {
+            st.setInt(1, idDiario);
+            try (ResultSet rs = st.executeQuery()) {
+                while (rs.next()) l.add(new Object[]{
+                    rs.getInt(1), rs.getString(2), rs.getBigDecimal(3), rs.getBigDecimal(4),
+                    rs.getBigDecimal(5), rs.getInt(6),
+                    rs.getDate(7) != null ? rs.getDate(7).toLocalDate() : null });
+            }
         }
         return l;
     }

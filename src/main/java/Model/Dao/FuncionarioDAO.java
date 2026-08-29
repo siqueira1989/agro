@@ -39,7 +39,7 @@ public class FuncionarioDAO {
     private void bindCampos(PreparedStatement stmt, Funcionario f) throws SQLException {
         stmt.setString(1, f.getNomePessoa());
         stmt.setString(2, f.getUsuarioPessoa());
-        stmt.setString(3, f.getSenhaPessoa());
+        stmt.setString(3, Util.SenhaUtil.hashOuVazio(f.getSenhaPessoa()));  // P0-2
         stmt.setString(4, f.getNivelPessoa());
         stmt.setBoolean(5, f.isSituacaoPessoa());
         stmt.setString(6, f.getEmailPessoa());
@@ -90,8 +90,10 @@ public class FuncionarioDAO {
     public void updateFuncionario(Funcionario funcionario) throws SQLException {
         // UPDATE via tabela pai funciona com herança PG: o PG roteia para a tabela
         // filho correta automaticamente ao fazer UPDATE na hierarquia.
+        // P0-2: senha em branco no formulario mantem a atual, em vez de apaga-la.
         String sql = "UPDATE funcionario SET "
-                + "nomepessoa = ?, usuariopessoa = ?, senhapessoa = ?, "
+                + "nomepessoa = ?, usuariopessoa = ?, "
+                + "senhapessoa = COALESCE(NULLIF(?, ''), senhapessoa), "
                 + "nivelpessoa = ?, situacaopessoa = ?, emailpessoa = ?, "
                 + "telefonepessoa = ?, cpfpf = ?, datanascimentopf = ?, "
                 + "numero = ?, complemento = ?, cep = ?, "
@@ -123,7 +125,7 @@ public class FuncionarioDAO {
                 rs.getInt("idpessoa"),
                 rs.getString("nomepessoa"),
                 rs.getString("usuariopessoa"),
-                rs.getString("senhapessoa"),
+                null /* P0-2: a senha nunca sai do banco */,
                 rs.getString("nivelpessoa"),
                 rs.getBoolean("situacaopessoa"),
                 rs.getString("emailpessoa"),

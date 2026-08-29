@@ -116,39 +116,43 @@ public class ControllerAlimento extends HttpServlet {
                 return;
             }
 
-            // Gera o próximo ID
-            int numero = alimentoclassificacaodao.RetornoIdAlimento();
-            System.out.println("Número gerado: " + numero);
-
-            // Cadastra o alimento
             Alimento alimentoObj = new Alimento();
             alimentoObj.setNomeproduto(alimento);
             alimentoObj.setTipoproduto(tipo);
             alimentoObj.setVariedadealimento(variedade);
             alimentoObj.setSituacaoproduto(true);
+
             if (alimentodao.VerificarDadosAlimento(alimentoObj)) {
                 writeJson(response, HttpServletResponse.SC_BAD_REQUEST, false, "Alimento ja cadastrado.", "ModalCadastroAlimento");
                 return;
             }
 
-            alimentodao.addAlimento(alimentoObj);
-
-            // Associa as classificações ao alimento
+            // Antes: lia last_value da sequencia e assumia que o proximo id seria
+            // "numero + 1" (havia ate um comentario "cuidado aqui"). Dois cadastros
+            // simultaneos calculavam o mesmo numero e as classificacoes de um iam
+            // parar no alimento do outro; e qualquer buraco na sequencia apontava
+            // para um id inexistente. Agora o INSERT devolve o id real com
+            // RETURNING, e alimento + classificacoes entram na mesma transacao.
+            java.util.List<Integer> idsClassificacao = new java.util.ArrayList<>();
             for (String classificacaoId : classificacoes) {
-                AlimentoClassificacao alimentoClassificacao = new AlimentoClassificacao();
-                alimentoClassificacao.setClassificacao(new Classificacao());
-                alimentoClassificacao.getClassificacao().setIdclassificacao(Integer.parseInt(classificacaoId));
-
-                alimentoClassificacao.setAlimento(new Alimento());
-                alimentoClassificacao.getAlimento().setIdproduto(numero + 1); // cuidado aqui
-
-                alimentoclassificacaodao.addAlimentoClassificacao(alimentoClassificacao);
+                try {
+                    idsClassificacao.add(Integer.valueOf(classificacaoId.trim()));
+                } catch (NumberFormatException ex) {
+                    writeJson(response, HttpServletResponse.SC_BAD_REQUEST, false,
+                            "Classificação inválida informada.", "ModalCadastroAlimento");
+                    return;
+                }
             }
+
+            alimentoclassificacaodao.cadastrarComClassificacoes(alimentoObj, idsClassificacao);
 
             writeJson(response, HttpServletResponse.SC_OK, true, "Alimento cadastrado com sucesso!", "page");
         } catch (Exception e) {
+            // P1-15: o detalhe tecnico (nome de tabela, coluna, constraint) fica so
+            // no log; o usuario recebe um codigo para citar ao suporte.
+            String cod = Util.LogUtil.erro(ControllerAlimento.class, "Falha ao cadastrar alimento.", e);
             writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
-                    "Erro ao cadastrar: " + e.getMessage(), "ModalCadastroAlimento");
+                    Util.LogUtil.mensagemUsuario("cadastrar o alimento", cod), "ModalCadastroAlimento");
         }
     }
 
@@ -181,8 +185,10 @@ public class ControllerAlimento extends HttpServlet {
             writeJson(response, HttpServletResponse.SC_OK, true,
                     "Atualizado com sucesso!", "page");
         } catch (Exception e) {
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControllerAlimento.class, "Falha tratada em ControllerAlimento.", e);
             writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
-                    "Erro ao atualizar: " + e.getMessage(), "page");
+                    "Erro ao atualizar: " + cod, "page");
         }
     }
 
@@ -212,8 +218,10 @@ public class ControllerAlimento extends HttpServlet {
             writeJson(response, HttpServletResponse.SC_OK, true,
                     "Excluída com sucesso!", "page");
         } catch (IOException | NumberFormatException | SQLException e) {
+            // P1-15: detalhe tecnico so no log.
+            String cod = Util.LogUtil.erro(ControllerAlimento.class, "Falha ao excluir classificação.", e);
             writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
-                    "Erro ao excluir: " + e.getMessage(), "modalClassificacaoExcluir");
+                    Util.LogUtil.mensagemUsuario("excluir a classificação", cod), "modalClassificacaoExcluir");
         }
     }
 
@@ -242,8 +250,10 @@ public class ControllerAlimento extends HttpServlet {
                 out.flush();
             }
         } catch (SQLException e) {
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControllerAlimento.class, "Falha tratada em ControllerAlimento.", e);
             writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
-                    "Erro ao carregar alimentos: " + e.getMessage(), "page");
+                    "Erro ao carregar alimentos: " + cod, "page");
         }
     }
 
@@ -275,8 +285,10 @@ public class ControllerAlimento extends HttpServlet {
             }
 
         } catch (SQLException e) {
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControllerAlimento.class, "Falha tratada em ControllerAlimento.", e);
             writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
-                    "Erro ao carregar classificação do alimento: " + e.getMessage(), "page");
+                    "Erro ao carregar classificação do alimento: " + cod, "page");
         }
     }
 
@@ -312,8 +324,10 @@ public class ControllerAlimento extends HttpServlet {
             }
 
         } catch (SQLException e) {
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControllerAlimento.class, "Falha tratada em ControllerAlimento.", e);
             writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
-                    "Erro ao carregar classificação do alimento: " + e.getMessage(), "page");
+                    "Erro ao carregar classificação do alimento: " + cod, "page");
         }
     }
     
@@ -358,9 +372,10 @@ public class ControllerAlimento extends HttpServlet {
         writeJson(response, HttpServletResponse.SC_OK, true, "Classificações associadas com sucesso!", "page");
 
     } catch (Exception e) {
-        e.printStackTrace();
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControllerAlimento.class, "Falha tratada em ControllerAlimento.", e);
         writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false,
-                "Erro ao associar classificações: " + e.getMessage(), "page");
+                "Erro ao associar classificações: " + cod, "page");
     }
 }
 

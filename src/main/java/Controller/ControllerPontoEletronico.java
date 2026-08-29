@@ -77,8 +77,10 @@ public class ControllerPontoEletronico extends HttpServlet {
                 }
             }
         } catch (Exception e) {
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControllerPontoEletronico.class, "Falha tratada em ControllerPontoEletronico.", e);
             resp.setStatus(500);
-            out.write("{\"ok\":false,\"msg\":\"Erro interno: " + esc(e.getMessage()) + "\"}");
+            out.write("{\"ok\":false,\"msg\":\"Erro interno: " + esc(cod) + "\"}");
         }
     }
 
@@ -109,8 +111,10 @@ public class ControllerPontoEletronico extends HttpServlet {
                 }
             }
         } catch (Exception e) {
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControllerPontoEletronico.class, "Falha tratada em ControllerPontoEletronico.", e);
             resp.setStatus(500);
-            out.write("{\"ok\":false,\"msg\":\"Erro: " + esc(e.getMessage()) + "\"}");
+            out.write("{\"ok\":false,\"msg\":\"Erro: " + esc(cod) + "\"}");
         }
     }
 
@@ -168,13 +172,20 @@ public class ControllerPontoEletronico extends HttpServlet {
         if (ua != null && ua.length() > 255) ua = ua.substring(0, 255);
         p.setUserAgent(ua);
 
+        // P2-27: antes, sem sessao, registradoPor ficava nulo e o ponto era
+        // gravado assim mesmo. O projeto cita a Portaria 671 do MTE (ver
+        // Util.HashUtil), que exige rastreabilidade — um registro de ponto sem
+        // autor nao sustenta a auditoria que o hash pretende garantir.
+        // Com o AuthFilter cobrindo /* (P0-1) chegar aqui sem sessao ja nao
+        // deveria acontecer; esta verificacao e a segunda barreira.
         jakarta.servlet.http.HttpSession session = req.getSession(false);
-        if (session != null) {
-            Object u = session.getAttribute("usuarioLogado");
-            if (u instanceof Model.Model.Pessoa) {
-                p.setRegistradoPor(((Model.Model.Pessoa) u).getIdPessoa());
-            }
+        Object u = session != null ? session.getAttribute("usuarioLogado") : null;
+        if (!(u instanceof Model.Model.Pessoa)) {
+            throw new IllegalStateException(
+                "Registro de ponto exige usuario autenticado: a Portaria 671 do MTE "
+              + "requer identificacao de quem efetuou o lancamento.");
         }
+        p.setRegistradoPor(((Model.Model.Pessoa) u).getIdPessoa());
     }
 
     /** Edita um registro de ponto existente (correção de horários/data). */
@@ -192,7 +203,9 @@ public class ControllerPontoEletronico extends HttpServlet {
         try {
             pontoDAO.atualizarPorId(p);
         } catch (SQLException e) {
-            if (e.getMessage() != null && e.getMessage().contains("uk_ponto_funcionario_dia")) {
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControllerPontoEletronico.class, "Falha tratada em ControllerPontoEletronico.", e);
+            if (cod != null && cod.contains("uk_ponto_funcionario_dia")) {
                 return Map.of("ok", false,
                         "msg", "Já existe um registro de ponto nessa data para este funcionário.");
             }

@@ -198,7 +198,7 @@
 
                 <!-- BOTÕES -->
                 <div class="text-end mb-5">
-                    <a href="http://localhost:8080/agro/view/admin/parceiro.jsp" class="btn btn-secondary">
+                    <a href="<%=request.getContextPath()%>/view/admin/parceiro.jsp" class="btn btn-secondary">
                         <i class="fas fa-arrow-left"></i> Voltar
                     </a>
 

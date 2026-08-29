@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.10.0/css/bootstrap-datepicker3.min.css">
 
 <!-- CSS customizado -->
-<link href="../../CSS/estilo.css" rel="stylesheet">
+<link href="<%=request.getContextPath()%>/CSS/estilo.css" rel="stylesheet">
 
 <!-- jQuery (necessário para DataTables e AJAX) -->
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
@@ -30,8 +30,10 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.10.0/js/bootstrap-datepicker.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.10.0/locales/bootstrap-datepicker.pt-BR.min.js"></script>
 
-<!-- JS customizado (sempre por último) -->
-<script src="../../JS/main.js?<%= System.currentTimeMillis()%>"></script>
-
-<!-- Contexto JSP global — usado por main.js em qualquer página -->
+<!-- P2-23: o contexto precisa existir ANTES de main.js, que agora monta todas
+     as URLs de AJAX a partir dele. Antes esta linha vinha depois do script e
+     main.js usava '/agro/...' fixo em 35 chamadas. -->
 <script>window.CTX = '<%=request.getContextPath()%>';</script>
+
+<!-- JS customizado (sempre por último) -->
+<script src="<%=request.getContextPath()%>/JS/main.js?<%= System.currentTimeMillis()%>"></script>

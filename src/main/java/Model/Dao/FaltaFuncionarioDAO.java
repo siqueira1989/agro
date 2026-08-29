@@ -59,14 +59,49 @@ public class FaltaFuncionarioDAO {
         return lista;
     }
 
+    /**
+     * Faltas injustificadas na competência.
+     *
+     * <p>O filtro era {@code TO_CHAR(datafalta,'YYYY-MM') = ?}. Aplicar função
+     * sobre a coluna impede o uso de índice: o PostgreSQL precisava ler a tabela
+     * inteira e converter cada data. Trocado por um intervalo de datas, que usa
+     * o índice {@code idx_falta_pessoa_data} criado na migração V21.</p>
+     */
     public int contarInjustificadas(int idFuncionario, String periodo) throws SQLException {
+        java.time.YearMonth ym = java.time.YearMonth.parse(periodo);
         String sql = "SELECT COUNT(*) FROM falta_funcionario "
-                + "WHERE idpessoa=? AND TO_CHAR(datafalta,'YYYY-MM')=? AND justificada=false";
-        PostgresConnection pc = new PostgresConnection();
-        try (Connection c = pc.getConnection();
+                + "WHERE idpessoa=? AND datafalta >= ? AND datafalta <= ? AND justificada=false";
+        try (Connection c = new PostgresConnection().getConnection();
              PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setInt(1, idFuncionario);
-            ps.setString(2, periodo);
+            ps.setDate(2, java.sql.Date.valueOf(ym.atDay(1)));
+            ps.setDate(3, java.sql.Date.valueOf(ym.atEndOfMonth()));
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return rs.getInt(1);
+            }
+        }
+        return 0;
+    }
+
+    /**
+     * Quantas semanas da competência tiveram pelo menos uma falta injustificada.
+     *
+     * <p>Cada uma dessas semanas faz perder o descanso semanal remunerado. O
+     * cálculo do CLT urbano não descontava DSR nenhum (P1-9); o rural já
+     * descontava, mas com a contagem feita em Java. A regra passa a ser a mesma
+     * nos dois, resolvida aqui pelo banco com {@code date_trunc('week', ...)},
+     * que agrupa de segunda a domingo.</p>
+     */
+    public int contarSemanasComFaltaInjustificada(int idFuncionario, String periodo) throws SQLException {
+        java.time.YearMonth ym = java.time.YearMonth.parse(periodo);
+        String sql = "SELECT COUNT(DISTINCT date_trunc('week', datafalta)) "
+                   + "FROM falta_funcionario "
+                   + "WHERE idpessoa=? AND datafalta >= ? AND datafalta <= ? AND justificada=false";
+        try (Connection c = new PostgresConnection().getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, idFuncionario);
+            ps.setDate(2, java.sql.Date.valueOf(ym.atDay(1)));
+            ps.setDate(3, java.sql.Date.valueOf(ym.atEndOfMonth()));
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) return rs.getInt(1);
             }

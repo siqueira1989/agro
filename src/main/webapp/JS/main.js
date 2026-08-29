@@ -1,4 +1,63 @@
 /******************************************************************************************************/
+/* CONFIGURACAO GLOBAL — introduzida pela auditoria de 29/08/2026 (P2-23 e P2-25)                      */
+/******************************************************************************************************/
+
+/**
+ * Caminho do contexto da aplicacao, descoberto em tempo de execucao.
+ *
+ * ANTES: 35 chamadas AJAX usavam a URL absoluta '/ControllerX'. Publicar o
+ * sistema como ROOT ou com qualquer outro nome de contexto quebrava todas de
+ * uma vez. Agora o caminho vem do proprio endereco da pagina.
+ *
+ * A pagina sempre esta em <contexto>/view/admin/... ou <contexto>/login.jsp,
+ * entao o primeiro segmento do caminho e o contexto (ou vazio, se ROOT).
+ */
+const AGRO_CTX = (function () {
+    // Preferencia: o valor injetado pelo servidor em pagina/importacao.html
+    // (<%=request.getContextPath()%>), que e sempre exato.
+    if (typeof window.CTX === 'string') return window.CTX;
+
+    // Fallback para paginas que nao incluem importacao.html (login.jsp):
+    // deduz o contexto do proprio endereco.
+    var partes = window.location.pathname.split('/').filter(Boolean);
+    var pastasDaApp = ['view', 'pagina', 'js', 'css'];
+    if (partes.length === 0 || pastasDaApp.indexOf(partes[0].toLowerCase()) >= 0) return '';
+    if (partes[0].toLowerCase().endsWith('.jsp')) return '';
+    return '/' + partes[0];
+})();
+
+/**
+ * Sessao expirada — tratamento unico para todas as chamadas AJAX (P0-1).
+ *
+ * Com o AuthFilter passando a cobrir /*, uma chamada sem sessao agora recebe
+ * 401 com JSON em vez do HTML da tela de login. Sem este interceptador, o
+ * jQuery tentaria interpretar HTML como dados e o usuario veria um erro de
+ * parse incompreensivel. Aqui a resposta correta e clara: voltar ao login,
+ * preservando a pagina em que a pessoa estava.
+ */
+$(document).ajaxError(function (evento, xhr) {
+    if (xhr && xhr.status === 401) {
+        var destino = encodeURIComponent(window.location.pathname + window.location.search);
+        window.location.href = AGRO_CTX + '/login.jsp?redirect=' + destino;
+    }
+});
+
+/** Monta a URL de um endpoint do backend a partir do contexto atual. */
+function agroUrl(caminho) {
+    return AGRO_CTX + (caminho.charAt(0) === '/' ? caminho : '/' + caminho);
+}
+
+/**
+ * Traducao do DataTables — uma unica origem (P2-25).
+ *
+ * ANTES conviviam tres URLs: 1.11.5/pt-BR.json, 2.1.6/pt-BR.json e
+ * 1.11.5/pt_BR.json. Esta ultima, com underscore, NAO existe no CDN: as quatro
+ * tabelas que a usavam (Areas, Maquinas, Safras e Diario) recebiam 404 e caiam
+ * silenciosamente para os rotulos em ingles.
+ */
+const DT_IDIOMA_URL = DT_IDIOMA_URL;
+
+/******************************************************************************************************/
 /* MÓDULO GERAL — funções utilitárias compartilhadas por todas as páginas                            */
 /******************************************************************************************************/
 
@@ -236,7 +295,7 @@ function CarregarClassificacao() {
         "serverSide": false,
 
         "ajax": {
-            "url": "/agro/ClassificacaoServlet",
+            "url": AGRO_CTX + "/ClassificacaoServlet",
             "method": "GET",
             "dataSrc": ""
         },
@@ -256,7 +315,7 @@ function CarregarClassificacao() {
             }
         ],
         "language": {
-            "url": 'https://cdn.datatables.net/plug-ins/2.1.6/i18n/pt-BR.json'
+            "url": DT_IDIOMA_URL
         }
     });
 }
@@ -280,7 +339,7 @@ function salvarClassificacao() {
     const classificacao = $('#classificacao').val();
 
     $.ajax({
-        url: '/agro/ClassificacaoServlet',
+        url: AGRO_CTX + '/ClassificacaoServlet',
         method: 'POST',
         data: {
             classificacao: classificacao,
@@ -313,7 +372,7 @@ function atualizarClassificacao() {
         return;
     }
     $.ajax({
-        url: '/agro/ClassificacaoServlet',
+        url: AGRO_CTX + '/ClassificacaoServlet',
         method: 'POST',
         data: {
             id: id,
@@ -343,7 +402,7 @@ function atualizarClassificacao() {
 function excluirClassificacao() {
     const id = $('#exclusaoId').val();
     $.ajax({
-        url: '/agro/ClassificacaoServlet',
+        url: AGRO_CTX + '/ClassificacaoServlet',
         method: 'POST',
         data: {id: id,
             acao: 'delete'
@@ -409,7 +468,7 @@ function CarregarDadosDespesasCustos() {
         "processing": false,
         "serverSide": false,
         "ajax": {
-            "url": "/agro/DespesasCustosServlet", // URL da servlet para buscar os dados
+            "url": AGRO_CTX + "/DespesasCustosServlet", // URL da servlet para buscar os dados
             "method": "GET",
             "dataSrc": "" // Define que os dados virão no formato de array
         },
@@ -439,7 +498,7 @@ function CarregarDadosDespesasCustos() {
             }
         ],
         "language": {
-            "url": 'https://cdn.datatables.net/plug-ins/2.1.6/i18n/pt-BR.json' // Tradução para o Português
+            "url": DT_IDIOMA_URL // Tradução para o Português
         }
     });
 }
@@ -448,7 +507,7 @@ function CarregarDadosDespesasCustos() {
 function excluirDespesasCustos() {
     var id = $('#exclusaoId').val();
     $.ajax({
-        url: '/agro/DespesasCustosServlet',
+        url: AGRO_CTX + '/DespesasCustosServlet',
         method: 'POST',
         data: {
             acao: 'delete',
@@ -473,7 +532,7 @@ function excluirDespesasCustos() {
 /** Envia POST para atualizar os dados de uma despesa/custo. Usado em: despesascustos.jsp */
 function atualizarDespesasCustos(id, despesa, unidade, valor, tipo) {
     $.ajax({
-        url: '/agro/DespesasCustosServlet',
+        url: AGRO_CTX + '/DespesasCustosServlet',
         method: 'POST',
         data: {
             acao: 'update',
@@ -503,7 +562,7 @@ function atualizarDespesasCustos(id, despesa, unidade, valor, tipo) {
 /** Envia POST para criar nova despesa/custo via DespesasCustosServlet. Usado em: despesascustos.jsp */
 function salvarDespesasCustos(despesa, unidade, valor, tipo) {
     $.ajax({
-        url: '/agro/DespesasCustosServlet',
+        url: AGRO_CTX + '/DespesasCustosServlet',
         method: 'POST',
         data: {
             acao: 'create',
@@ -586,7 +645,7 @@ function salvarAlimento() {
     };
 
     $.ajax({
-        url: '/agro/ControllerAlimento',
+        url: AGRO_CTX + '/ControllerAlimento',
         method: 'POST',
         contentType: 'application/json',
         data: JSON.stringify(data),
@@ -636,7 +695,7 @@ function atualizarAlimento() {
 
     };
     $.ajax({
-        url: '/agro/ControllerAlimento',
+        url: AGRO_CTX + '/ControllerAlimento',
         method: 'POST',
         contentType: 'application/json',
         data: JSON.stringify(data),
@@ -645,7 +704,7 @@ function atualizarAlimento() {
             mostrarAlerta(resp.msg || 'Atualizada atualizada com sucesso!', 'success', '#alerta');
             sessionStorage.setItem("mensagemAlerta", resp.msg || 'Alimento atualizado com sucesso!');
             sessionStorage.setItem("tipoAlerta", "success");
-            window.location.href = "http://localhost:8080/agro/view/admin/alimento.jsp";
+            window.location.href = AGRO_CTX + "/view/admin/alimento.jsp";  // P2-23: era URL absoluta com localhost
             //$('#tabelaalimentos').DataTable().ajax.reload();
         },
         error: function (xhr) {
@@ -662,7 +721,7 @@ function atualizarAlimento() {
 /** Popula o select #SelectClassificacao com todas as classificações disponíveis. Usado em: alimento.jsp (modal de cadastro) */
 function CarregarClassificacaoModal() {
     $.ajax({
-        url: '/agro/ClassificacaoServlet',
+        url: AGRO_CTX + '/ClassificacaoServlet',
         method: 'GET',
         dataType: 'json',
         success: function (classificacoes) {
@@ -683,7 +742,7 @@ function CarregarClassificacaoModal() {
 function CarregarClassificacaoModalAtualizar(idproduto) {
     // Faz a requisição AJAX separada antes e injeta os dados manualmente
     $.ajax({
-        url: '/agro/ControllerAlimento',
+        url: AGRO_CTX + '/ControllerAlimento',
         method: 'POST',
         contentType: 'application/json; charset=utf-8',
         dataType: 'json',
@@ -714,7 +773,7 @@ function CarregarClassificacaoModalAtualizar(idproduto) {
  */
 function editarAlimento(id) {
     $.ajax({
-        url: '/agro/ControllerAlimento',
+        url: AGRO_CTX + '/ControllerAlimento',
         method: 'GET',
         data: {id: id},
         dataType: 'json',
@@ -748,7 +807,7 @@ function CarregarAlimento() {
         "serverSide": false,
 
         "ajax": {
-            "url": "/agro/ControllerAlimento",
+            "url": AGRO_CTX + "/ControllerAlimento",
             "method": "GET",
             "dataSrc": ""
         },
@@ -777,7 +836,7 @@ function CarregarAlimento() {
             }
         ],
         "language": {
-            "url": 'https://cdn.datatables.net/plug-ins/2.1.6/i18n/pt-BR.json'
+            "url": DT_IDIOMA_URL
         }
     });
 }
@@ -793,7 +852,7 @@ function CarregarClassificacaoAtualizarAlimento(idproduto) {
 
     // Faz a requisição AJAX separada antes e injeta os dados manualmente
     $.ajax({
-        url: '/agro/ControllerAlimento',
+        url: AGRO_CTX + '/ControllerAlimento',
         method: 'POST',
         contentType: 'application/json; charset=utf-8',
         dataType: 'json',
@@ -817,7 +876,7 @@ function CarregarClassificacaoAtualizarAlimento(idproduto) {
                     {data: "idproduto", visible: false}
                 ],
                 language: {
-                    url: 'https://cdn.datatables.net/plug-ins/2.1.6/i18n/pt-BR.json'
+                    url: DT_IDIOMA_URL
                 }
             });
         },
@@ -853,7 +912,7 @@ function salvarClassificacaoModalAtualizacaoAlimento() {
     console.log("📦 Enviando dados do modal:", data);
 
     $.ajax({
-        url: '/agro/ControllerAlimento',
+        url: AGRO_CTX + '/ControllerAlimento',
         method: 'POST',
         contentType: 'application/json; charset=utf-8',
         dataType: 'json',
@@ -892,7 +951,7 @@ function badgeTipoParceiro(tipo) {
 /** Inicializa/recarrega o DataTable de parceiros via ControllerParceiro. Usado em: parceiro.jsp */
 function CarregarParceiros() {
 
-    const url = "/agro/ControllerParceiro" + (filtroTipoParceiro ? "?tipo=" + filtroTipoParceiro : "");
+    const url = AGRO_CTX + "/ControllerParceiro" + (filtroTipoParceiro ? "?tipo=" + filtroTipoParceiro : "");
     // Já inicializada: atualiza a URL (filtro por tipo) e recarrega sem destruir.
     if ($.fn.DataTable.isDataTable('#tabelaParceiros')) {
         $('#tabelaParceiros').DataTable().ajax.url(url).load(null, false);
@@ -951,7 +1010,7 @@ function CarregarParceiros() {
             }
         ],
         "language": {
-            "url": 'https://cdn.datatables.net/plug-ins/2.1.6/i18n/pt-BR.json'
+            "url": DT_IDIOMA_URL
         }
     });
 }
@@ -1002,7 +1061,7 @@ $(document).on("click", "#btnConfirmarDesativar", function () {
         return;
 
     $.ajax({
-        url: `/agro/ControllerParceiro`,
+        url: `/ControllerParceiro`,
         method: "POST",
         contentType: "application/json",
         data: JSON.stringify({
@@ -1028,7 +1087,7 @@ $(document).on("click", "#btnConfirmarDesativar", function () {
 /** Carrega totais (total/ativos/inativos) e atualiza os badges de resumo na tela. Usado em: parceiro.jsp */
 function carregarResumoParceiros() {
     $.ajax({
-        url: "/agro/ControllerParceiro?acao=dados", // importante!
+        url: AGRO_CTX + "/ControllerParceiro?acao=dados", // importante!
         method: "get",
         dataType: "json",
         success: function (dados) {
@@ -1090,7 +1149,7 @@ function salvarParceiroModal() {
     }
 
     $.ajax({
-        url: "/agro/ControllerParceiro",
+        url: AGRO_CTX + "/ControllerParceiro",
         method: "POST",
         contentType: "application/json; charset=utf-8",
         dataType: "json",
@@ -1112,7 +1171,7 @@ function salvarParceiroModal() {
 /** Busca os dados de um parceiro por id e preenche o formulário para edição. Usado em: CadastroParceiro.jsp (modo update via ?id=) */
 function carregarDadosParceiro(id) {
   $.ajax({
-    url: `/agro/ControllerParceiro?id=${id}`,
+    url: `/ControllerParceiro?id=${id}`,
     method: "GET",
     dataType: "json",
     success: function (parceiro) {
@@ -1186,7 +1245,7 @@ function salvarParceiroCreateOuUpdate()
   }
 
   $.ajax({
-      url: "/agro/ControllerParceiro",
+      url: AGRO_CTX + "/ControllerParceiro",
   method: "POST",
   contentType: "application/json; charset=utf-8",
   dataType: "json",
@@ -1199,12 +1258,12 @@ function salvarParceiroCreateOuUpdate()
           let msgSucesso =resp.msg || "Parceiro cadastrado com sucesso!";
            sessionStorage.setItem("mensagemAlerta", msgSucesso);
       sessionStorage.setItem("tipoAlerta", "success");
-      window.location.href = "/agro/view/admin/parceiro.jsp";
+      window.location.href = "/view/admin/parceiro.jsp";
       }else{
           let msgSucesso =resp.msg || "Parceiro atualizado com sucesso!";
            sessionStorage.setItem("mensagemAlerta", msgSucesso);
       sessionStorage.setItem("tipoAlerta", "success");
-      window.location.href = "/agro/view/admin/parceiro.jsp";
+      window.location.href = "/view/admin/parceiro.jsp";
       }
     
      
@@ -1395,7 +1454,7 @@ function initFuncionarioCadastro() {
   var editId = urlParams.get('id');
   if (editId) {
     $.ajax({
-      url: (window.__ctxPath || '') + '/ControllerFuncionario?id=' + editId,
+      url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerFuncionario?id=' + editId,
       method: 'GET',
       dataType: 'json',
       success: function (f) {
@@ -1534,7 +1593,7 @@ function initFuncionarioCadastro() {
       atualizarBotaoSalvar();
       return;
     }
-    $.getJSON((window.__ctxPath || '') + '/ControllerFuncionario',
+    $.getJSON((window.__ctxPath || '') + AGRO_CTX + '/ControllerFuncionario',
       { existe: campo, valor: valor, excluir: editId })
       .done(function (r) {
         var existe = !!(r && r.existe);
@@ -1664,7 +1723,7 @@ function initFuncionarioCadastro() {
       };
 
       $.ajax({
-        url: (window.__ctxPath || '') + '/ControllerFuncionario',
+        url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerFuncionario',
         method: 'POST',
         contentType: 'application/json; charset=utf-8',
         dataType: 'json',
@@ -1924,7 +1983,7 @@ $(document).ready(function () {
 
     // Pré-requisito: alimento precisa de ao menos uma Classificação cadastrada.
     window.__classifCount = null;
-    $.getJSON('/agro/ClassificacaoServlet', function (cs) { window.__classifCount = (cs || []).length; });
+    $.getJSON(AGRO_CTX + '/ClassificacaoServlet', function (cs) { window.__classifCount = (cs || []).length; });
 
     $('#modalFormulario').on('show.bs.modal', function (e) {
         if (window.__classifCount === 0) {
@@ -2071,7 +2130,7 @@ $(document).ready(function () {
             return;
         }
         $.ajax({
-            url: CTX + '/ControllerParceiro?cnpj=' + cnpj,
+            url: CTX + AGRO_CTX + '/ControllerParceiro?cnpj=' + cnpj,
             method: 'GET', dataType: 'json',
             success: function (res) {
                 $('#spinner-cnpj').addClass('d-none');
@@ -2129,7 +2188,7 @@ $(document).ready(function () {
         const id      = parseInt($('#situacaoId').val());
         const novaSit = $('#situacaoNova').val() === 'true';
         $.ajax({
-            url: CTX + '/ControllerFuncionario',
+            url: CTX + AGRO_CTX + '/ControllerFuncionario',
             method: 'POST', contentType: 'application/json',
             data: JSON.stringify({ acao: 'delete', id: id, situacao: novaSit }),
             success: function (res) {
@@ -2155,7 +2214,7 @@ let dadosFuncionarios  = [];
  */
 function CarregarFuncionarios() {
     $.ajax({
-        url: CTX + '/ControllerFuncionario',
+        url: CTX + AGRO_CTX + '/ControllerFuncionario',
         method: 'GET', dataType: 'json',
         success: function (lista) {
             dadosFuncionarios = Array.isArray(lista) ? lista : [];
@@ -2182,7 +2241,7 @@ function CarregarFuncionarios() {
                           render: function (_, __, row) { return botoesAcaoColaborador(row); }
                         }
                     ],
-                    language: { url: 'https://cdn.datatables.net/plug-ins/1.11.5/i18n/pt-BR.json' },
+                    language: { url: DT_IDIOMA_URL },
                     order: [[1, 'asc']],
                     columnDefs: [{ targets: -1, className: 'text-center' }]
                 });
@@ -2295,7 +2354,7 @@ function salvarEdicao() {
         complemento: $('#editComplemento').val()
     };
     $.ajax({
-        url: CTX + '/ControllerFuncionario',
+        url: CTX + AGRO_CTX + '/ControllerFuncionario',
         method: 'POST', contentType: 'application/json',
         data: JSON.stringify(payload),
         success: function (res) {
@@ -2317,7 +2376,13 @@ function abrirModalSituacao(id, nome, situacaoAtual) {
     const novaSit = !situacaoAtual;
     $('#situacaoNova').val(novaSit);
     const acao = novaSit ? 'reativar' : 'desativar';
-    $('#textoConfirmacaoSituacao').html('Deseja <strong>' + acao + '</strong> o funcionário <strong>' + nome + '</strong>?');
+    // P2-22: o nome vem do banco. Antes era concatenado dentro de .html(), o que
+    // executava qualquer marcacao gravada no cadastro (XSS armazenado). Agora a
+    // marcacao e fixa e o dado entra por .text(), que nunca interpreta HTML.
+    $('#textoConfirmacaoSituacao')
+        .html('Deseja <strong class="js-acao"></strong> o funcionário <strong class="js-nome"></strong>?')
+        .find('.js-acao').text(acao).end()
+        .find('.js-nome').text(nome);
     $('#modalSituacao').modal('show');
 }
 
@@ -2363,7 +2428,7 @@ function initPerfilDiarista() {
 
 function carregarPerfilDiarista(id, periodo) {
     $.ajax({
-        url: (window.__ctxPath || '') + '/ControllerDiarista?acao=perfil&id=' + id + '&periodo=' + periodo,
+        url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerDiarista?acao=perfil&id=' + id + '&periodo=' + periodo,
         method: 'GET', dataType: 'json',
         success: function (data) {
             renderHeaderDiarista(data);
@@ -2508,7 +2573,7 @@ function marcarValeDescontadoDiarista(idVale) {
 
 function postDiarista(payload, onOk, alertaSel) {
     $.ajax({
-        url: (window.__ctxPath || '') + '/ControllerDiarista',
+        url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerDiarista',
         method: 'POST', contentType: 'application/json; charset=utf-8',
         data: JSON.stringify(payload), dataType: 'json',
         success: function (r) {
@@ -2547,7 +2612,7 @@ function initPerfilEmpreita() {
 
 function carregarPerfilEmpreita(id, periodo) {
     $.ajax({
-        url: (window.__ctxPath || '') + '/ControllerEmpreita?acao=perfil&id=' + id + '&periodo=' + periodo,
+        url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerEmpreita?acao=perfil&id=' + id + '&periodo=' + periodo,
         method: 'GET', dataType: 'json',
         success: function (data) {
             renderHeaderEmpreita(data);
@@ -2711,7 +2776,7 @@ function marcarValeDescontadoEmpreita(idVale) {
 
 function postEmpreita(payload, onOk, alertaSel) {
     $.ajax({
-        url: (window.__ctxPath || '') + '/ControllerEmpreita',
+        url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerEmpreita',
         method: 'POST', contentType: 'application/json; charset=utf-8',
         data: JSON.stringify(payload), dataType: 'json',
         success: function (r) {
@@ -2749,7 +2814,7 @@ function initPerfilProducao() {
 
 function carregarPerfilProducao(id, periodo) {
     $.ajax({
-        url: (window.__ctxPath || '') + '/ControllerProducao?acao=perfil&id=' + id + '&periodo=' + periodo,
+        url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerProducao?acao=perfil&id=' + id + '&periodo=' + periodo,
         method: 'GET', dataType: 'json',
         success: function (data) {
             window.__idProducao = data.funcionario ? data.funcionario.idPessoa : id;
@@ -2968,7 +3033,7 @@ function marcarValeDescontadoProducao(idVale) {
 
 function postProducao(payload, onOk, alertaSel) {
     $.ajax({
-        url: (window.__ctxPath || '') + '/ControllerProducao',
+        url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerProducao',
         method: 'POST', contentType: 'application/json; charset=utf-8',
         data: JSON.stringify(payload), dataType: 'json',
         success: function (r) {
@@ -3004,7 +3069,7 @@ function abrirModalPagamento() {
     $('#pgBanco,#pgAgencia,#pgConta,#pgChavePix,#pgObs').val('');
     $('#alertaPagamento').addClass('d-none');
     if (ctx.tipo === 'CLT' && ctx.periodo) {
-        $.getJSON((window.__ctxPath || '') + '/ControllerPagamento', { acao: 'prazoclt', periodo: ctx.periodo })
+        $.getJSON((window.__ctxPath || '') + AGRO_CTX + '/ControllerPagamento', { acao: 'prazoclt', periodo: ctx.periodo })
             .done(function (r) {
                 if (r && r.ok) $('#pgPrazoInfo').text('Prazo CLT: pagar até ' + formatDataBR(r.prazo) +
                     ' (5º dia útil do mês seguinte).').removeClass('d-none');
@@ -3029,7 +3094,7 @@ function salvarPagamento() {
         banco: $('#pgBanco').val(), agencia: $('#pgAgencia').val(), conta: $('#pgConta').val(),
         chavepix: $('#pgChavePix').val() };
     $.ajax({
-        url: (window.__ctxPath || '') + '/ControllerPagamento', method: 'POST',
+        url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerPagamento', method: 'POST',
         contentType: 'application/json; charset=utf-8', data: JSON.stringify(payload), dataType: 'json',
         success: function (r) {
             if (r.ok) { $('#modalPagamento').modal('hide'); mostrarAlerta(r.msg, 'success', '#alerta', 3000); carregarPagamentos(); }
@@ -3042,7 +3107,7 @@ function salvarPagamento() {
 function carregarPagamentos() {
     var ctx = window.__pgCtx || {};
     if (!ctx.id || !$('#bodyPagamentos').length) return;
-    $.getJSON((window.__ctxPath || '') + '/ControllerPagamento', { acao: 'listar', id: ctx.id, periodo: ctx.periodo })
+    $.getJSON((window.__ctxPath || '') + AGRO_CTX + '/ControllerPagamento', { acao: 'listar', id: ctx.id, periodo: ctx.periodo })
         .done(function (lista) {
             var tbody = $('#bodyPagamentos').empty();
             if (!lista || !lista.length) {
@@ -3066,7 +3131,7 @@ function carregarPagamentos() {
 function excluirPagamento(id) {
     if (!confirm('Excluir este pagamento?')) return;
     $.ajax({
-        url: (window.__ctxPath || '') + '/ControllerPagamento', method: 'POST',
+        url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerPagamento', method: 'POST',
         contentType: 'application/json; charset=utf-8',
         data: JSON.stringify({ acao: 'excluir', idpagamento: id }), dataType: 'json',
         success: function () { carregarPagamentos(); }
@@ -3130,7 +3195,7 @@ function initPerfilCLT() {
 
 function carregarPerfilCLT(idFuncionario, periodo) {
     $.ajax({
-        url: (window.__ctxPath || '') + '/ControllerCLT?acao=perfil&id=' + idFuncionario + '&periodo=' + periodo,
+        url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerCLT?acao=perfil&id=' + idFuncionario + '&periodo=' + periodo,
         method: 'GET',
         dataType: 'json',
         success: function (data) {
@@ -3347,7 +3412,7 @@ function salvarPontoCLT(idFuncionario) {
     if (editId) payload.idponto = editId;
 
     $.ajax({
-        url: (window.__ctxPath || '') + '/ControllerPontoEletronico',
+        url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerPontoEletronico',
         method: 'POST', contentType: 'application/json; charset=utf-8',
         data: JSON.stringify(payload), dataType: 'json',
         success: function (r) {
@@ -3384,7 +3449,7 @@ function editarPontoCLT(idPonto) {
 function excluirPontoCLT(idPonto) {
     if (!confirm('Excluir este registro de ponto?')) return;
     $.ajax({
-        url: (window.__ctxPath || '') + '/ControllerPontoEletronico',
+        url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerPontoEletronico',
         method: 'POST', contentType: 'application/json; charset=utf-8',
         data: JSON.stringify({ acao: 'excluir_ponto', idponto: idPonto }), dataType: 'json',
         success: function (r) {
@@ -3409,7 +3474,7 @@ function salvarFaltaCLT(idFuncionario) {
     var data = $('#faltaData').val();
     if (!data) { mostrarAlerta('Informe a data.', 'warning', '#alertaFalta', 3000); return; }
     $.ajax({
-        url: (window.__ctxPath || '') + '/ControllerCLT',
+        url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerCLT',
         method: 'POST', contentType: 'application/json; charset=utf-8',
         data: JSON.stringify({
             acao: 'registrarFalta', idpessoa: parseInt(idFuncionario),
@@ -3431,7 +3496,7 @@ function salvarFaltaCLT(idFuncionario) {
 function excluirFaltaCLT(idFalta) {
     if (!confirm('Remover esta falta?')) return;
     $.ajax({
-        url: (window.__ctxPath || '') + '/ControllerCLT',
+        url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerCLT',
         method: 'POST', contentType: 'application/json; charset=utf-8',
         data: JSON.stringify({ acao: 'excluirFalta', idfalta: idFalta }), dataType: 'json',
         success: function (r) {
@@ -3448,7 +3513,7 @@ function salvarValeCLT(idFuncionario) {
         mostrarAlerta('Informe valor e data.', 'warning', '#alertaVale', 3000); return;
     }
     $.ajax({
-        url: (window.__ctxPath || '') + '/ControllerCLT',
+        url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerCLT',
         method: 'POST', contentType: 'application/json; charset=utf-8',
         data: JSON.stringify({
             acao: 'registrarVale', idpessoa: parseInt(idFuncionario),
@@ -3470,7 +3535,7 @@ function salvarValeCLT(idFuncionario) {
 function excluirValeCLT(idVale) {
     if (!confirm('Excluir este vale?')) return;
     $.ajax({
-        url: (window.__ctxPath || '') + '/ControllerCLT',
+        url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerCLT',
         method: 'POST', contentType: 'application/json; charset=utf-8',
         data: JSON.stringify({ acao: 'excluirVale', idvale: idVale }), dataType: 'json',
         success: function (r) {
@@ -3483,7 +3548,7 @@ function excluirValeCLT(idVale) {
 function marcarValeDescontadoCLT(idVale) {
     if (!confirm('Marcar este vale como descontado?')) return;
     $.ajax({
-        url: (window.__ctxPath || '') + '/ControllerCLT',
+        url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerCLT',
         method: 'POST', contentType: 'application/json; charset=utf-8',
         data: JSON.stringify({ acao: 'marcarValeDescontado', idvale: idVale }), dataType: 'json',
         success: function (r) {
@@ -3499,7 +3564,7 @@ function salvarSalarioCLT(idFuncionario) {
         mostrarAlerta('Informe um salário válido.', 'warning', '#alertaSalario', 3000); return;
     }
     $.ajax({
-        url: (window.__ctxPath || '') + '/ControllerCLT',
+        url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerCLT',
         method: 'POST', contentType: 'application/json; charset=utf-8',
         data: JSON.stringify({
             acao: 'atualizarSalario', idpessoa: parseInt(idFuncionario),
@@ -3528,7 +3593,7 @@ function desligarVinculoCLT(idFuncionario) {
     var iso = converterDataParaISO((data || '').trim());
     var motivo = prompt('Motivo do desligamento (opcional):', '') || '';
     $.ajax({
-        url: (window.__ctxPath || '') + '/ControllerCLT',
+        url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerCLT',
         method: 'POST', contentType: 'application/json; charset=utf-8',
         data: JSON.stringify({ acao: 'desligarvinculo', idpessoa: parseInt(idFuncionario),
                                datafim: iso, motivo: motivo }),
@@ -3548,7 +3613,7 @@ function readmitirVinculoCLT(idFuncionario) {
     var iso = converterDataParaISO((data || '').trim());
     var cargo = prompt('Cargo no novo vínculo:', $('#cargoMatricula').text().split(' · ')[0] || '') || '';
     $.ajax({
-        url: (window.__ctxPath || '') + '/ControllerCLT',
+        url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerCLT',
         method: 'POST', contentType: 'application/json; charset=utf-8',
         data: JSON.stringify({ acao: 'readmitir', idpessoa: parseInt(idFuncionario),
                                dataadmissao: iso, cargo: cargo }),
@@ -3565,7 +3630,7 @@ function readmitirVinculoCLT(idFuncionario) {
 function alterarStatus(status) {
     if (!window.__idCLT) return;
     $.ajax({
-        url: (window.__ctxPath || '') + '/ControllerCLT',
+        url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerCLT',
         method: 'POST', contentType: 'application/json; charset=utf-8',
         data: JSON.stringify({ acao: 'atualizarStatus', idpessoa: window.__idCLT, statusemprego: status }),
         dataType: 'json',
@@ -3584,7 +3649,7 @@ function calcularFechamentoCLT(idFuncionario, periodo) {
     if (!confirm('Calcular o fechamento de ' + periodo + '? Os vales pendentes do mês serão marcados como descontados.')) return;
     $('#btnCalcular').prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i>Calculando...');
     $.ajax({
-        url: (window.__ctxPath || '') + '/ControllerCLT',
+        url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerCLT',
         method: 'POST', contentType: 'application/json; charset=utf-8',
         data: JSON.stringify({ acao: 'calcularFechamento', idpessoa: parseInt(idFuncionario), periodo: periodo }),
         dataType: 'json',
@@ -3657,14 +3722,14 @@ $(document).ready(function () {
         mostrarAlerta(msg, sessionStorage.getItem('tipoAlerta') || 'success', '#alertPage');
         sessionStorage.removeItem('mensagemAlerta'); sessionStorage.removeItem('tipoAlerta');
     }
-    $('#tabelaAreas').DataTable({ language: { url: 'https://cdn.datatables.net/plug-ins/1.11.5/i18n/pt_BR.json' } });
+    $('#tabelaAreas').DataTable({ language: { url: DT_IDIOMA_URL } });
     apCarregarLista();
     autoRefreshTabela('areas', apCarregarLista, 15000);
 });
 
 function apCarregarLista() {
     var tabela = $('#tabelaAreas').DataTable();
-    $.get(CTX + '/ControllerAreaProducao', function (dados) {
+    $.get(CTX + AGRO_CTX + '/ControllerAreaProducao', function (dados) {
         tabela.clear();  // limpa só quando os dados chegam (sem flash de tabela vazia)
         dados.forEach(function (a) {
             var badge = a.situacao ? '<span class="badge bg-success">Ativa</span>' : '<span class="badge bg-secondary">Inativa</span>';
@@ -3693,7 +3758,7 @@ function apAbrirDesativar(id, situacao, nome) {
 $(document).on('click', '#btnConfirmarDesativarArea', function () {
     if (areaParaDesativar == null) return;
     $.ajax({
-        url: CTX + '/ControllerAreaProducao', method: 'POST', contentType: 'application/json',
+        url: CTX + AGRO_CTX + '/ControllerAreaProducao', method: 'POST', contentType: 'application/json',
         data: JSON.stringify({ acao: 'desativar', idareaproducao: areaParaDesativar, situacao: areaSituacaoAtual }),
         success: function (res) {
             $('#modalDesativarArea').modal('hide');
@@ -3710,7 +3775,7 @@ $(document).ready(function () {
     $('#cepArea').mask('00000-000');
     $('#cepArea').on('blur', function () { preencherEnderecoViaCep($(this).val()); });
 
-    $.getJSON(CTX + '/ControllerAreaProducao?alimentos=1', function (lista) {
+    $.getJSON(CTX + AGRO_CTX + '/ControllerAreaProducao?alimentos=1', function (lista) {
         apAlimentosCache = lista;
         apAddQuadraRow();  // começa com uma linha
     });
@@ -3762,7 +3827,7 @@ function apSalvarCadastro() {
     }
     if (quadras.length === 0) { mostrarAlerta('Cadastre ao menos uma quadra (com nome).', 'danger', '#alertFormArea'); return; }
     $.ajax({
-        url: CTX + '/ControllerAreaProducao', method: 'POST', contentType: 'application/json',
+        url: CTX + AGRO_CTX + '/ControllerAreaProducao', method: 'POST', contentType: 'application/json',
         data: JSON.stringify(payload),
         success: function (res) {
             if (res.ok) {
@@ -3782,7 +3847,7 @@ $(document).ready(function () {
     $('#cepAreaEdit').mask('00000-000');
     $('#cepAreaEdit').on('blur', function () { preencherEnderecoViaCep($(this).val()); });
 
-    $.getJSON(CTX + '/ControllerAreaProducao?id=' + id, function (a) {
+    $.getJSON(CTX + AGRO_CTX + '/ControllerAreaProducao?id=' + id, function (a) {
         $('#propEdit').val(a.PropriedadeAreaProducao);
         $('#proprietEdit').val(a.ProprietarioAreaProducao);
         $('#siglaEdit').val(a.SiglasAreaProducao);
@@ -3801,7 +3866,7 @@ $(document).ready(function () {
 
 /** Popula um select de tipo de planta (mantém a 1ª opção). */
 function apCarregarAlimentos($sel) {
-    $.getJSON(CTX + '/ControllerAreaProducao?alimentos=1', function (lista) {
+    $.getJSON(CTX + AGRO_CTX + '/ControllerAreaProducao?alimentos=1', function (lista) {
         $sel.find('option:not(:first)').remove();
         lista.forEach(function (a) { $sel.append('<option value="' + a.id + '">' + a.nome + '</option>'); });
     });
@@ -3809,7 +3874,7 @@ function apCarregarAlimentos($sel) {
 function apCarregarQuadrasEdit(id) {
     // Carrega TODAS as quadras (ativas e inativas) — a quadra desativada não é
     // excluída; permanece visível com o status e pode ser reativada.
-    $.getJSON(CTX + '/ControllerAreaProducao?quadras=' + id + '&ativas=false', function (lista) {
+    $.getJSON(CTX + AGRO_CTX + '/ControllerAreaProducao?quadras=' + id + '&ativas=false', function (lista) {
         var $b = $('#quadrasEditBody').empty();
         if (!lista.length) { $b.append('<tr><td colspan="6" class="text-center text-muted py-2">Sem quadras.</td></tr>'); return; }
         lista.forEach(function (q) {
@@ -3837,7 +3902,7 @@ function apAtualizarArea() {
         mostrarAlerta('Propriedade, proprietário e sigla são obrigatórios.', 'danger', '#alertFormAreaEdit'); return;
     }
     $.ajax({
-        url: CTX + '/ControllerAreaProducao', method: 'POST', contentType: 'application/json', data: JSON.stringify(payload),
+        url: CTX + AGRO_CTX + '/ControllerAreaProducao', method: 'POST', contentType: 'application/json', data: JSON.stringify(payload),
         success: function (res) {
             if (res.ok) {
                 sessionStorage.setItem('mensagemAlerta', res.msg); sessionStorage.setItem('tipoAlerta', 'success');
@@ -3853,7 +3918,7 @@ function apAddQuadraEdit() {
     if (!nome) { mostrarAlerta('Informe o nome da quadra.', 'danger', '#alertQuadra'); return; }
     var payload = { acao: 'addquadra', idareaproducao: id, nomeQuadra: nome, numeroPlantas: parseInt($('#addQuadraPlantas').val()) || 0, areaHa: parseFloat($('#addQuadraArea').val()) || 0, idAlimento: parseInt($('#addQuadraAlimento').val()) || 0 };
     $.ajax({
-        url: CTX + '/ControllerAreaProducao', method: 'POST', contentType: 'application/json', data: JSON.stringify(payload),
+        url: CTX + AGRO_CTX + '/ControllerAreaProducao', method: 'POST', contentType: 'application/json', data: JSON.stringify(payload),
         success: function (res) { if (res.ok) { window.location.reload(); } else { mostrarAlerta(res.msg, 'danger', '#alertQuadra'); } },
         error: function () { mostrarAlerta('Erro ao adicionar quadra.', 'danger', '#alertQuadra'); }
     });
@@ -3861,7 +3926,7 @@ function apAddQuadraEdit() {
 function apDesativarQuadra(idQuadra) {
     if (!confirm('Desativar esta quadra? Os dados são preservados e a quadra pode ser reativada.')) return;
     $.ajax({
-        url: CTX + '/ControllerAreaProducao', method: 'POST', contentType: 'application/json',
+        url: CTX + AGRO_CTX + '/ControllerAreaProducao', method: 'POST', contentType: 'application/json',
         data: JSON.stringify({ acao: 'desativarquadra', idquadra: idQuadra }),
         success: function () { window.location.reload(); },
         error: function () { mostrarAlerta('Erro ao desativar quadra.', 'danger', '#alertQuadra'); }
@@ -3869,7 +3934,7 @@ function apDesativarQuadra(idQuadra) {
 }
 function apAtivarQuadra(idQuadra) {
     $.ajax({
-        url: CTX + '/ControllerAreaProducao', method: 'POST', contentType: 'application/json',
+        url: CTX + AGRO_CTX + '/ControllerAreaProducao', method: 'POST', contentType: 'application/json',
         data: JSON.stringify({ acao: 'ativarquadra', idquadra: idQuadra }),
         success: function () { window.location.reload(); },
         error: function () { mostrarAlerta('Erro ao reativar quadra.', 'danger', '#alertQuadra'); }
@@ -3880,7 +3945,7 @@ function apAtivarQuadra(idQuadra) {
 $(document).ready(function () {
     if (!$('#detalheArea').length) return;
     var id = apGetParam('id');
-    $.getJSON(CTX + '/ControllerAreaProducao?id=' + id, function (a) {
+    $.getJSON(CTX + AGRO_CTX + '/ControllerAreaProducao?id=' + id, function (a) {
         $('#detProp').text(a.PropriedadeAreaProducao);
         $('#detProp2').text(a.PropriedadeAreaProducao || '');
         $('#detPropriet').text(a.ProprietarioAreaProducao);
@@ -3891,7 +3956,7 @@ $(document).ready(function () {
         $('#detComplemento').text(a.complemento || '—');
         $('#detSituacao').html(a.situacao ? '<span class="badge bg-success">Ativa</span>' : '<span class="badge bg-secondary">Inativa</span>');
     });
-    $.getJSON(CTX + '/ControllerAreaProducao?quadras=' + id + '&ativas=false', function (lista) {
+    $.getJSON(CTX + AGRO_CTX + '/ControllerAreaProducao?quadras=' + id + '&ativas=false', function (lista) {
         var $b = $('#detQuadrasBody').empty();
         if (!lista.length) { $b.append('<tr><td colspan="4" class="text-center text-muted py-2">Sem quadras.</td></tr>'); return; }
         lista.forEach(function (q) {
@@ -3964,7 +4029,7 @@ function dcAtualizarResponsavel() {
 /** Recarrega a lista de funcionários conforme a data (só vínculos ativos na data) e atualiza os selects. */
 function dcRecarregarFuncsPorData() {
     var data = $('#dcData').val();
-    var url = CTX + '/ControllerDiarioCampo?funcionarios=1' + (data ? '&data=' + data : '');
+    var url = CTX + AGRO_CTX + '/ControllerDiarioCampo?funcionarios=1' + (data ? '&data=' + data : '');
     $.getJSON(url, function (fs) {
         dcCacheFunc = fs; dcOptFunc = '<option value="">Selecione</option>';
         fs.forEach(function (f) { dcOptFunc += '<option value="' + f.idPessoa + '" data-tipo="' + f.tipo + '" data-ref="' + (f.custoRef || 0) + '">' + f.nome + ' (' + f.tipo + ')</option>'; });
@@ -3997,24 +4062,24 @@ function dcInit(areaId) {
     dcAreaId = areaId;
     $('#dcData').val(new Date().toISOString().slice(0, 10));
 
-    dcTalhaoPromise = $.getJSON(CTX + '/ControllerAreaProducao?quadras=' + areaId, function (qs) {
+    dcTalhaoPromise = $.getJSON(CTX + AGRO_CTX + '/ControllerAreaProducao?quadras=' + areaId, function (qs) {
         dcCacheTalhao = qs; dcOptTalhao = '';
         qs.forEach(function (q) { dcOptTalhao += '<option value="' + q.idQuadra + '">' + q.nomeQuadra + '</option>'; });
         $('#dcTalhao').html(dcOptTalhao || '<option value="">(sem talhões)</option>');
     });
-    $.getJSON(CTX + '/ControllerAreaProducao?alimentos=1', function (as) {
+    $.getJSON(CTX + AGRO_CTX + '/ControllerAreaProducao?alimentos=1', function (as) {
         dcCulturaMap = {}; as.forEach(function (a) { dcCulturaMap[a.id] = a.nome; });
     });
     dcCarregarTipos();
-    dcFuncPromise = $.getJSON(CTX + '/ControllerDiarioCampo?funcionarios=1', function (fs) {
+    dcFuncPromise = $.getJSON(CTX + AGRO_CTX + '/ControllerDiarioCampo?funcionarios=1', function (fs) {
         dcCacheFunc = fs; dcOptFunc = '<option value="">Selecione</option>';
         fs.forEach(function (f) { dcOptFunc += '<option value="' + f.idPessoa + '" data-tipo="' + f.tipo + '" data-ref="' + (f.custoRef || 0) + '">' + f.nome + ' (' + f.tipo + ')</option>'; });
         $('#dcResponsavel').html(dcOptFunc);
     });
-    $.getJSON(CTX + '/ControllerInsumo', function (is) { dcCacheIns = is.filter(function (i) { return i.situacao; }); });
-    $.getJSON(CTX + '/ControllerMaquina?ativas=true', function (ms) { dcCacheMaq = ms; });
+    $.getJSON(CTX + AGRO_CTX + '/ControllerInsumo', function (is) { dcCacheIns = is.filter(function (i) { return i.situacao; }); });
+    $.getJSON(CTX + AGRO_CTX + '/ControllerMaquina?ativas=true', function (ms) { dcCacheMaq = ms; });
     // Existe ao menos uma safra? (pré-requisito para lançar atividades)
-    $.getJSON(CTX + '/ControllerSafra', function (ls) { dcTemSafra = Array.isArray(ls) && ls.length > 0; });
+    $.getJSON(CTX + AGRO_CTX + '/ControllerSafra', function (ls) { dcTemSafra = Array.isArray(ls) && ls.length > 0; });
 
     dcCarregarLista();
     autoRefreshTabela('diario', dcCarregarLista, 15000);
@@ -4066,7 +4131,7 @@ function dcInit(areaId) {
 }
 
 function dcCarregarTipos() {
-    $.getJSON(CTX + '/ControllerDiarioCampo?tiposatividade=1', function (ts) {
+    $.getJSON(CTX + AGRO_CTX + '/ControllerDiarioCampo?tiposatividade=1', function (ts) {
         dcCacheTipos = ts; dcOptTipo = '';
         ts.forEach(function (t) { dcOptTipo += '<option value="' + t.idTipo + '">' + t.nome + '</option>'; });
         $('#dcTipo').html(dcOptTipo);
@@ -4093,7 +4158,7 @@ function dcResolverSafra() {
     var data = $('#dcData').val();
     dcSafraResolvida = false;
     if (!idq || !data) { $('#dcSafraNome').text('—'); return; }
-    $.getJSON(CTX + '/ControllerSafra?resolver=' + idq + '&data=' + data, function (r) {
+    $.getJSON(CTX + AGRO_CTX + '/ControllerSafra?resolver=' + idq + '&data=' + data, function (r) {
         if (r && r.idSafra) {
             // Safra válida só se NÃO estiver finalizada (finalizada bloqueia lançamento).
             dcSafraResolvida = (r.status !== 'FINALIZADA');
@@ -4122,7 +4187,7 @@ function dcRefiltrarInsumos() {
 
 function dcCarregarLista() {
     var st = $('#dcFiltroStatus').val();
-    var url = CTX + '/ControllerDiarioCampo?area=' + dcAreaId + (st ? '&status=' + st : '');
+    var url = CTX + AGRO_CTX + '/ControllerDiarioCampo?area=' + dcAreaId + (st ? '&status=' + st : '');
     $.getJSON(url, function (lista) {
         var $b = $('#dcTabelaBody').empty();
         var pend = 0, concl = 0, custo = 0, planejadas = [];
@@ -4251,7 +4316,7 @@ function dcSalvarAgendar() {
         funcionarios: [], maquinas: [], insumos: []
     };
     $.ajax({
-        url: CTX + '/ControllerDiarioCampo', method: 'POST', contentType: 'application/json; charset=utf-8',
+        url: CTX + AGRO_CTX + '/ControllerDiarioCampo', method: 'POST', contentType: 'application/json; charset=utf-8',
         data: JSON.stringify(payload),
         success: function (res) {
             if (res.ok) { $('#modalAgendarDiario').modal('hide'); mostrarAlerta(res.msg + (res.numeroDiario ? ' (' + res.numeroDiario + ')' : ''), 'success', '#alertPerfil'); dcCarregarLista(); }
@@ -4414,7 +4479,7 @@ function dcSalvar() {
         return;
     }
     $.ajax({
-        url: CTX + '/ControllerDiarioCampo', method: 'POST', contentType: 'application/json; charset=utf-8',
+        url: CTX + AGRO_CTX + '/ControllerDiarioCampo', method: 'POST', contentType: 'application/json; charset=utf-8',
         data: JSON.stringify(payload),
         success: function (res) {
             if (res.ok) {
@@ -4432,7 +4497,7 @@ function dcSalvar() {
 
 /** Carrega um diário existente no formulário para edição. */
 function dcEditar(id) {
-    $.getJSON(CTX + '/ControllerDiarioCampo?id=' + id, function (d) {
+    $.getJSON(CTX + AGRO_CTX + '/ControllerDiarioCampo?id=' + id, function (d) {
         dcResetForm();
         dcFuncEditavel = false;
         $('#btnAddFunc').addClass('d-none');
@@ -4500,7 +4565,7 @@ function dcSalvarExecucao() {
     });
     if (!funcionarios.length) { $('#alertDiario').removeClass('d-none').addClass('alert-danger').text('Adicione ao menos um funcionário para a execução.'); return; }
     $.ajax({
-        url: CTX + '/ControllerDiarioCampo', method: 'POST', contentType: 'application/json; charset=utf-8',
+        url: CTX + AGRO_CTX + '/ControllerDiarioCampo', method: 'POST', contentType: 'application/json; charset=utf-8',
         data: JSON.stringify({ acao: 'addexecucao', iddiario: iddiario, dataExecucao: dataExec, funcionarios: funcionarios }),
         success: function (res) {
             if (res.ok) { mostrarAlerta(res.msg, 'success', '#alertPerfil'); dcCarregarLista(); dcEditar(iddiario); }
@@ -4511,7 +4576,7 @@ function dcSalvarExecucao() {
 }
 
 function dcVerDetalhe(id) {
-    $.getJSON(CTX + '/ControllerDiarioCampo?id=' + id, function (d) {
+    $.getJSON(CTX + AGRO_CTX + '/ControllerDiarioCampo?id=' + id, function (d) {
         $('#ddNumero').text(d.numeroDiario || '');
         var h = '<div class="row g-2 mb-2">' +
             '<div class="col-4"><small class="text-muted">Data</small><div>' + (d.data || '—') + '</div></div>' +
@@ -4544,7 +4609,7 @@ function dcVerDetalhe(id) {
 function dcFinalizar(id) {
     if (!confirm('Finalizar a atividade? Isso calcula os custos e dá baixa no estoque dos insumos.')) return;
     $.ajax({
-        url: CTX + '/ControllerDiarioCampo', method: 'POST', contentType: 'application/json',
+        url: CTX + AGRO_CTX + '/ControllerDiarioCampo', method: 'POST', contentType: 'application/json',
         data: JSON.stringify({ acao: 'finalizar', iddiario: id }),
         success: function (res) { $('#modalDetalheDiario').modal('hide'); mostrarAlerta(res.msg, res.ok ? 'success' : 'danger', '#alertPerfil'); dcCarregarLista(); },
         error: function (xhr) { var m = 'Erro ao finalizar.'; try { m = JSON.parse(xhr.responseText).msg || m; } catch (e) {} mostrarAlerta(m, 'danger', '#alertPerfil'); $('#modalDetalheDiario').modal('hide'); }
@@ -4555,7 +4620,7 @@ function dcAddTipo() {
     var nome = prompt('Nome do novo tipo de atividade:');
     if (!nome || !nome.trim()) return;
     $.ajax({
-        url: CTX + '/ControllerDiarioCampo', method: 'POST', contentType: 'application/json; charset=utf-8',
+        url: CTX + AGRO_CTX + '/ControllerDiarioCampo', method: 'POST', contentType: 'application/json; charset=utf-8',
         data: JSON.stringify({ acao: 'addtipoatividade', nome: nome.trim() }),
         success: function () { dcCarregarTipos(); }
     });
@@ -4566,7 +4631,7 @@ function dcAddTipo() {
 /******************************************************************************************************/
 $(document).ready(function () {
     if (!$('#tabelaMaquinas').length) return;
-    $('#tabelaMaquinas').DataTable({ language: { url: 'https://cdn.datatables.net/plug-ins/1.11.5/i18n/pt_BR.json' } });
+    $('#tabelaMaquinas').DataTable({ language: { url: DT_IDIOMA_URL } });
     mqCarregar();
     autoRefreshTabela('maquinas', mqCarregar, 15000);
     $('#mqTipo').on('change', mqToggleBlocos);
@@ -4603,7 +4668,7 @@ function mqToggleBlocos() {
 }
 function mqCarregar() {
     var t = $('#tabelaMaquinas').DataTable();
-    $.get(CTX + '/ControllerMaquina', function (lista) {
+    $.get(CTX + AGRO_CTX + '/ControllerMaquina', function (lista) {
         t.clear();  // limpa só quando os dados chegam (sem flash de tabela vazia)
         lista.forEach(function (m) {
             t.row.add([m.nome, m.tipo, m.marca || '—', m.identificacao || '—',
@@ -4623,7 +4688,7 @@ function mqNovo() {
     mqToggleBlocos(); $('#modalMaquina').modal('show');
 }
 function mqEditar(id) {
-    $.getJSON(CTX + '/ControllerMaquina?id=' + id, function (m) {
+    $.getJSON(CTX + AGRO_CTX + '/ControllerMaquina?id=' + id, function (m) {
         $('#alertaMaquina').addClass('d-none').text(''); $('#modalMaquinaTitulo').html('<i class="fas fa-pen-to-square me-2"></i>Editar Maquinário');
         $('#mqId').val(m.idMaquina); $('#mqNome').val(m.nome); $('#mqTipo').val(m.tipo);
         $('#mqMarca').val(m.marca || ''); $('#mqIdent').val(m.identificacao || '');
@@ -4640,12 +4705,12 @@ function mqSalvar() {
         depreciacaoHora: parseFloat($('#mqDeprec').val()) || 0, custoHora: parseFloat($('#mqCustoHora').val()) || 0,
         custoKm: parseFloat($('#mqCustoKm').val()) || 0, situacao: true };
     if (!data.nome) { $('#alertaMaquina').removeClass('d-none').addClass('alert-danger').text('Informe o nome.'); return; }
-    $.ajax({ url: CTX + '/ControllerMaquina', method: 'POST', contentType: 'application/json; charset=utf-8', data: JSON.stringify(data),
+    $.ajax({ url: CTX + AGRO_CTX + '/ControllerMaquina', method: 'POST', contentType: 'application/json; charset=utf-8', data: JSON.stringify(data),
         success: function (res) { if (res.ok) { $('#modalMaquina').modal('hide'); mostrarAlerta(res.msg, 'success', '#alerta'); mqCarregar(); } else $('#alertaMaquina').removeClass('d-none').addClass('alert-danger').text(res.msg); },
         error: function (xhr) { var m = 'Erro ao salvar.'; try { m = JSON.parse(xhr.responseText).msg || m; } catch (e) {} $('#alertaMaquina').removeClass('d-none').addClass('alert-danger').text(m); } });
 }
 function mqToggle(id, situacao) {
-    $.ajax({ url: CTX + '/ControllerMaquina', method: 'POST', contentType: 'application/json', data: JSON.stringify({ acao: 'delete', idMaquina: id, situacao: situacao }),
+    $.ajax({ url: CTX + AGRO_CTX + '/ControllerMaquina', method: 'POST', contentType: 'application/json', data: JSON.stringify({ acao: 'delete', idMaquina: id, situacao: situacao }),
         success: function (res) { mostrarAlerta(res.msg, 'info', '#alerta'); mqCarregar(); },
         error: function () { mostrarAlerta('Erro ao alterar situação.', 'danger', '#alerta'); } });
 }
@@ -4662,13 +4727,13 @@ function sfBadge(s) {
 
 $(document).ready(function () {
     if (!$('#tabelaSafras').length) return;
-    $('#tabelaSafras').DataTable({ language: { url: 'https://cdn.datatables.net/plug-ins/1.11.5/i18n/pt_BR.json' } });
-    $.getJSON(CTX + '/ControllerSafra?culturas=1', function (cs) {
+    $('#tabelaSafras').DataTable({ language: { url: DT_IDIOMA_URL } });
+    $.getJSON(CTX + AGRO_CTX + '/ControllerSafra?culturas=1', function (cs) {
         sfOptCultura = '<option value="">—</option>';
         cs.forEach(function (c) { sfOptCultura += '<option value="' + c.id + '">' + c.nome + '</option>'; });
     });
-    $.getJSON(CTX + '/ControllerSafra?talhoes=1', function (ts) { sfCacheTalhoes = ts; });
-    $.getJSON(CTX + '/ControllerAreaProducao', function (as) { sfCacheAreas = as; });
+    $.getJSON(CTX + AGRO_CTX + '/ControllerSafra?talhoes=1', function (ts) { sfCacheTalhoes = ts; });
+    $.getJSON(CTX + AGRO_CTX + '/ControllerAreaProducao', function (as) { sfCacheAreas = as; });
     sfCarregar();
     autoRefreshTabela('safras', sfCarregar, 15000);
     $('#btnNovaSafra').on('click', sfNovo);
@@ -4678,7 +4743,7 @@ $(document).ready(function () {
 
 function sfCarregar() {
     var t = $('#tabelaSafras').DataTable();
-    $.get(CTX + '/ControllerSafra', function (lista) {
+    $.get(CTX + AGRO_CTX + '/ControllerSafra', function (lista) {
         t.clear();  // limpa só quando os dados chegam (sem flash de tabela vazia)
         lista.forEach(function (s) {
             var periodo = (s.dataInicial ? formatarData(s.dataInicial) : '') + ' a ' + (s.dataFinal ? formatarData(s.dataFinal) : '');
@@ -4725,7 +4790,7 @@ function sfNovo() {
     $('#modalSafra').modal('show');
 }
 function sfEditar(id) {
-    $.getJSON(CTX + '/ControllerSafra?id=' + id, function (s) {
+    $.getJSON(CTX + AGRO_CTX + '/ControllerSafra?id=' + id, function (s) {
         $('#alertaSafra').addClass('d-none').text(''); $('#modalSafraTitulo').html('<i class="fas fa-pen-to-square me-2"></i>Editar Safra');
         $('#sfCultura').html(sfOptCultura); $('#sfArea').html(sfOptAreas());
         $('#sfId').val(s.idSafra); $('#sfNome').val(s.nome);
@@ -4765,7 +4830,7 @@ function sfSalvar() {
     if (!payload.nome || !payload.idAreaProducao || !payload.dataInicial || !payload.dataFinal) {
         $('#alertaSafra').removeClass('d-none').addClass('alert-danger').text('Nome, Área de Produção e datas são obrigatórios.'); return;
     }
-    $.ajax({ url: CTX + '/ControllerSafra', method: 'POST', contentType: 'application/json; charset=utf-8', data: JSON.stringify(payload),
+    $.ajax({ url: CTX + AGRO_CTX + '/ControllerSafra', method: 'POST', contentType: 'application/json; charset=utf-8', data: JSON.stringify(payload),
         success: function (res) { if (res.ok) { $('#modalSafra').modal('hide'); mostrarAlerta(res.msg, 'success', '#alerta'); sfCarregar(); } else $('#alertaSafra').removeClass('d-none').addClass('alert-danger').text(res.msg); },
         error: function (xhr) { var m = 'Erro ao salvar safra.'; try { m = JSON.parse(xhr.responseText).msg || m; } catch (e) {} $('#alertaSafra').removeClass('d-none').addClass('alert-danger').text(m); } });
 }
@@ -4776,7 +4841,7 @@ function sfSalvar() {
 $(document).ready(function () {
     if (!$('#resumoSafra').length) return;
     var id = new URLSearchParams(window.location.search).get('id');
-    $.getJSON(CTX + '/ControllerSafra?resumo=' + id, function (r) {
+    $.getJSON(CTX + AGRO_CTX + '/ControllerSafra?resumo=' + id, function (r) {
         if (!r || !r.safra) return;
         var s = r.safra;
         $('#rsNome').text(s.nome || ''); $('#rsStatus').html(sfBadge(s.status));
@@ -4850,7 +4915,7 @@ $(document).ready(function () {
     if (!$('#tabelaFolha').length) return;
 
     tabelaFolha = $('#tabelaFolha').DataTable({
-        language: { url: 'https://cdn.datatables.net/plug-ins/1.11.5/i18n/pt_BR.json' },
+        language: { url: DT_IDIOMA_URL },
         paging: false
     });
 
@@ -4859,7 +4924,7 @@ $(document).ready(function () {
     $('#periodoVer').val(mesAtual);
 
     // Pré-requisito: a Folha depende de Funcionários cadastrados.
-    $.getJSON(CTX + '/ControllerFuncionario', function (fs) {
+    $.getJSON(CTX + AGRO_CTX + '/ControllerFuncionario', function (fs) {
         if (!(fs || []).length) {
             preReqAlerta('#alertPage', 'Para gerar a Folha de Pagamento é preciso ter <strong>Funcionários</strong> cadastrados.',
                 CTX + '/view/admin/ColaboCadastro.jsp', 'Cadastrar Funcionário');
@@ -4882,7 +4947,7 @@ function gerarFolha() {
     let btn = $('#btnGerarFolha');
     btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i>Gerando...');
     $.ajax({
-        url: CTX + '/ControleColaborador',
+        url: CTX + AGRO_CTX + '/ControleColaborador',
         method: 'POST', contentType: 'application/json',
         data: JSON.stringify({ acao: 'gerarfolha', periodo: periodo }),
         success: function (res) {
@@ -4900,7 +4965,7 @@ function gerarFolha() {
 /** Consulta o ControleColaborador e popula o DataTable #tabelaFolha com os lançamentos do período. Usado em: folhapagamento.jsp */
 function verFolha(periodo) {
     if (!periodo) return;
-    $.get(CTX + '/ControleColaborador?periodo=' + periodo, function (dados) {
+    $.get(CTX + AGRO_CTX + '/ControleColaborador?periodo=' + periodo, function (dados) {
         tabelaFolha.clear();
         let total = 0;
         dados.forEach(function (fp) {
@@ -4922,7 +4987,7 @@ function verFolha(periodo) {
 function folhaExportar(tipo) {
     let periodo = $('#periodoVer').val();
     if (!periodo) { mostrarAlerta('Selecione o período para exportar.', 'warning', '#alertPage'); return; }
-    window.location.href = CTX + '/RelatorioExportServlet?tipo=' + tipo + '&modulo=folhapagamento&periodo=' + periodo;
+    window.location.href = CTX + AGRO_CTX + '/RelatorioExportServlet?tipo=' + tipo + '&modulo=folhapagamento&periodo=' + periodo;
 }
 
 /* ========== pontoeletronico.jsp ========== */
@@ -4959,7 +5024,7 @@ const DIAS_SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
 /** Popula o select #selFuncionario com todos os funcionários ativos. Usado em: pontoeletronico.jsp */
 function pontoCFuncionarios() {
-    $.get(CTX + '/ControllerPontoEletronico?tipo=funcionarios', function (lista) {
+    $.get(CTX + AGRO_CTX + '/ControllerPontoEletronico?tipo=funcionarios', function (lista) {
         if (!(lista || []).length) {
             preReqAlerta('#alerta', 'Para usar o Ponto Eletrônico é preciso ter ao menos um <strong>Funcionário</strong> cadastrado.',
                 CTX + '/view/admin/ColaboCadastro.jsp', 'Cadastrar Funcionário');
@@ -4991,7 +5056,7 @@ function buscar() {
 
 /** Busca o espelho de ponto do funcionário no período e popula a tabela #corpoEspelho. Usado em: pontoeletronico.jsp */
 function carregarEspelho(id, periodo) {
-    $.get(CTX + '/ControllerPontoEletronico?tipo=pontos&idfuncionario=' + id + '&periodo=' + periodo, function (lista) {
+    $.get(CTX + AGRO_CTX + '/ControllerPontoEletronico?tipo=pontos&idfuncionario=' + id + '&periodo=' + periodo, function (lista) {
         const tbody = $('#corpoEspelho').empty();
         let totMin = 0, totExt = 0;
         if (!lista.length) {
@@ -5029,7 +5094,7 @@ function carregarEspelho(id, periodo) {
 
 /** Busca e exibe as marcações do funcionário no dia de hoje no painel #pontoHoje. Usado em: pontoeletronico.jsp */
 function carregarPontoHoje(id) {
-    $.get(CTX + '/ControllerPontoEletronico?tipo=pontos&idfuncionario=' + id + '&periodo=' + getPeriodo(), function (lista) {
+    $.get(CTX + AGRO_CTX + '/ControllerPontoEletronico?tipo=pontos&idfuncionario=' + id + '&periodo=' + getPeriodo(), function (lista) {
         const hoje = new Date().toISOString().slice(0, 10);
         const reg  = lista.find(r => r.dataRegistro === hoje);
         const div  = $('#pontoHoje');
@@ -5049,7 +5114,7 @@ function carregarPontoHoje(id) {
 
 /** Busca as faltas do funcionário no período e popula a tabela #corpoFaltas. Usado em: pontoeletronico.jsp */
 function carregarFaltas(id, periodo) {
-    $.get(CTX + '/ControllerPontoEletronico?tipo=faltas&idfuncionario=' + id + '&periodo=' + periodo, function (lista) {
+    $.get(CTX + AGRO_CTX + '/ControllerPontoEletronico?tipo=faltas&idfuncionario=' + id + '&periodo=' + periodo, function (lista) {
         const tbody = $('#corpoFaltas').empty();
         if (!lista.length) {
             tbody.html('<tr><td colspan="4" class="text-center text-muted">Nenhuma falta.</td></tr>');
@@ -5075,7 +5140,7 @@ function carregarFaltas(id, periodo) {
 
 /** Busca os vales do funcionário no período e popula a tabela #corpoVales com total acumulado. Usado em: pontoeletronico.jsp */
 function carregarVales(id, periodo) {
-    $.get(CTX + '/ControllerPontoEletronico?tipo=vales&idfuncionario=' + id + '&periodo=' + periodo, function (lista) {
+    $.get(CTX + AGRO_CTX + '/ControllerPontoEletronico?tipo=vales&idfuncionario=' + id + '&periodo=' + periodo, function (lista) {
         const tbody = $('#corpoVales').empty();
         if (!lista.length) {
             tbody.html('<tr><td colspan="4" class="text-center text-muted">Nenhum vale.</td></tr>');
@@ -5206,7 +5271,7 @@ function preencherFechamento(f) {
 /** Função central de envio AJAX para ControllerPontoEletronico; chama onOk em sucesso ou onFail em erro de rede. Usado em: pontoeletronico.jsp */
 function pontoPost(payload, onOk, onFail) {
     $.ajax({
-        url: CTX + '/ControllerPontoEletronico',
+        url: CTX + AGRO_CTX + '/ControllerPontoEletronico',
         method: 'POST', contentType: 'application/json',
         data: JSON.stringify(payload),
         success: function (res) {
@@ -5264,7 +5329,7 @@ function badgeCategoriaInsumo(cat) {
 /** Recarrega a DataTable de insumos aplicando o filtro de categoria. */
 function CarregarInsumos() {
     const cat = $("#filtroCategoria").val() || "";
-    const url = "/agro/ControllerInsumo" + (cat ? "?categoria=" + cat : "");
+    const url = AGRO_CTX + "/ControllerInsumo" + (cat ? "?categoria=" + cat : "");
     // Já inicializada: atualiza a URL (filtro categoria) e recarrega sem destruir.
     if ($.fn.DataTable.isDataTable('#tabelaInsumos')) {
         $('#tabelaInsumos').DataTable().ajax.url(url).load(null, false);
@@ -5300,13 +5365,13 @@ function CarregarInsumos() {
                 }
             }
         ],
-        "language": { "url": 'https://cdn.datatables.net/plug-ins/2.1.6/i18n/pt-BR.json' }
+        "language": { "url": DT_IDIOMA_URL }
     });
 }
 
 /** Cards de resumo do estoque. */
 function carregarResumoEstoque() {
-    $.getJSON("/agro/ControllerInsumo?acao=dados", function (d) {
+    $.getJSON(AGRO_CTX + "/ControllerInsumo?acao=dados", function (d) {
         $("#cardTotalInsumos").text(d.total);
         $("#cardAbaixoMinimo").text(d.abaixoMinimo);
         $("#cardValorEstoque").text("R$ " + formatBRLnum(d.valorEstoque));
@@ -5324,7 +5389,7 @@ function popularUnidades(grandeza, selecionada) {
 
 /** Carrega os parceiros tipo insumo num select. cb(lista) é chamado após carregar. */
 function carregarFornecedoresInsumo(selectId, incluirVazio, cb) {
-    $.getJSON("/agro/ControllerInsumo?acao=fornecedores", function (lista) {
+    $.getJSON(AGRO_CTX + "/ControllerInsumo?acao=fornecedores", function (lista) {
         lista = lista || [];
         const $s = $("#" + selectId).empty();
         if (incluirVazio) $s.append('<option value="">— nenhum —</option>');
@@ -5354,7 +5419,7 @@ function dcAtualizarHintFornecedor(lista) {
 function abrirModalEditarInsumo(id) {
     $("#alertaInsumo").addClass("d-none").text("");
     $("#modalInsumoTitulo").html('<i class="fas fa-pen-to-square me-2"></i>Editar Insumo');
-    $.getJSON("/agro/ControllerInsumo?id=" + id, function (i) {
+    $.getJSON(AGRO_CTX + "/ControllerInsumo?id=" + id, function (i) {
         $("#insId").val(i.idInsumo);
         $("#insNome").val(i.nome);
         $("#insCategoria").val(i.categoria);
@@ -5385,7 +5450,7 @@ function salvarInsumo() {
     };
     if (!data.nome) { $("#alertaInsumo").removeClass("d-none").addClass("alert-danger").text("Informe o nome."); return; }
     $.ajax({
-        url: "/agro/ControllerInsumo", method: "POST", contentType: "application/json; charset=utf-8",
+        url: AGRO_CTX + "/ControllerInsumo", method: "POST", contentType: "application/json; charset=utf-8",
         data: JSON.stringify(data),
         success: function (resp) {
             $("#modalInsumo").modal("hide");
@@ -5402,7 +5467,7 @@ function salvarInsumo() {
 
 function toggleInsumo(id, situacaoAtual) {
     $.ajax({
-        url: "/agro/ControllerInsumo", method: "POST", contentType: "application/json; charset=utf-8",
+        url: AGRO_CTX + "/ControllerInsumo", method: "POST", contentType: "application/json; charset=utf-8",
         data: JSON.stringify({ acao: "delete", idInsumo: id, situacao: situacaoAtual }),
         success: function (resp) {
             mostrarAlerta(resp.msg || "Situação alterada.", "info", "#alerta");
@@ -5426,7 +5491,7 @@ function abrirEntrada() {
         preReqAlerta('#alerta', 'Para registrar uma Entrada é preciso ter ao menos um <strong>Insumo</strong> cadastrado.', null);
         return;
     }
-    $.getJSON("/agro/ControllerInsumo?acao=fornecedores", function (forns) {
+    $.getJSON(AGRO_CTX + "/ControllerInsumo?acao=fornecedores", function (forns) {
         if (!(forns || []).length) {
             preReqAlerta('#alerta', 'Para registrar uma Entrada é preciso de ao menos um <strong>Parceiro do tipo Insumo</strong> (fornecedor).',
                 CTX + '/view/admin/CadastroParceiro.jsp', 'Cadastrar Parceiro');
@@ -5454,7 +5519,7 @@ function salvarEntrada() {
     };
     if (!data.idInsumo || data.quantidade <= 0) { $("#alertaEntrada").removeClass("d-none").addClass("alert-danger").text("Insumo e quantidade (>0) obrigatórios."); return; }
     $.ajax({
-        url: "/agro/ControllerEstoque", method: "POST", contentType: "application/json; charset=utf-8",
+        url: AGRO_CTX + "/ControllerEstoque", method: "POST", contentType: "application/json; charset=utf-8",
         data: JSON.stringify(data),
         success: function (resp) {
             $("#modalEntrada").modal("hide");
@@ -5497,7 +5562,7 @@ function salvarSaida() {
     };
     if (!data.idInsumo || data.quantidade <= 0) { $("#alertaSaida").removeClass("d-none").addClass("alert-danger").text("Insumo e quantidade (>0) obrigatórios."); return; }
     $.ajax({
-        url: "/agro/ControllerEstoque", method: "POST", contentType: "application/json; charset=utf-8",
+        url: AGRO_CTX + "/ControllerEstoque", method: "POST", contentType: "application/json; charset=utf-8",
         data: JSON.stringify(data),
         success: function (resp) {
             $("#modalSaida").modal("hide");
@@ -5515,7 +5580,7 @@ function salvarSaida() {
 function verMovimentos(id, nome) {
     $("#movInsumoNome").text(nome || "");
     const $b = $("#bodyMovimentos").html('<tr><td colspan="7" class="text-center text-muted py-3">Carregando...</td></tr>');
-    $.getJSON("/agro/ControllerEstoque?acao=movimentos&idinsumo=" + id, function (lista) {
+    $.getJSON(AGRO_CTX + "/ControllerEstoque?acao=movimentos&idinsumo=" + id, function (lista) {
         if (!lista.length) { $b.html('<tr><td colspan="7" class="text-center text-muted py-3">Sem movimentações.</td></tr>'); return; }
         $b.empty();
         lista.forEach(function (m) {

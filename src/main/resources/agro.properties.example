@@ -1,0 +1,48 @@
+# ---------------------------------------------------------------------------
+# Configuracao do Agro Tech One
+#
+# Copie este arquivo como "agro.properties" e preencha os valores reais.
+# NUNCA versione o arquivo preenchido: ele esta no .gitignore.
+#
+# Em producao, coloque-o FORA do WAR, em uma destas opcoes:
+#   1. $CATALINA_BASE/conf/agro.properties        (recomendado)
+#   2. -Dagro.config=/etc/agro/agro.properties    (na inicializacao da JVM)
+#   3. variavel de ambiente AGRO_CONFIG=/etc/agro/agro.properties
+#
+# Qualquer chave pode ser sobrescrita individualmente por propriedade de
+# sistema, ex.: -Ddb.password=...
+# ---------------------------------------------------------------------------
+
+# --- Banco de dados --------------------------------------------------------
+db.url=jdbc:postgresql://localhost:5432/agro
+db.user=agro_app
+db.password=TROQUE_ESTA_SENHA
+db.driver=org.postgresql.Driver
+
+# --- Pool de conexoes (Util/ConnectionPool) --------------------------------
+# Numero maximo de conexoes simultaneas. Mantenha abaixo do max_connections
+# do PostgreSQL, reservando espaco para outras aplicacoes e para o psql.
+db.pool.size=10
+# Tempo maximo de espera por uma conexao livre, em milissegundos.
+db.pool.timeoutMs=10000
+db.pool.validationTimeoutSeconds=2
+
+# --- Migracoes de esquema (Util/SchemaMigrator) ----------------------------
+# true  = aplica automaticamente os scripts de db/migration ainda nao aplicados
+# false = apenas registra no log quais estao pendentes
+db.migrate.onStartup=true
+
+# --- Seguranca -------------------------------------------------------------
+# Converte automaticamente, no primeiro boot, as senhas em texto puro que
+# ainda existirem na tabela pessoa para PBKDF2 com salt. Depois de rodar uma
+# vez com sucesso, pode ser deixado em true sem custo (nao ha o que converter).
+seguranca.migrarSenhasNoBoot=true
+# Custo do PBKDF2. Aumente com o tempo, conforme o hardware melhorar.
+seguranca.pbkdf2.iteracoes=210000
+
+# --- SMTP (ja lido por Util/EmailUtil) -------------------------------------
+mail.smtp.host=smtp.gmail.com
+mail.smtp.port=587
+mail.smtp.user=
+mail.smtp.pass=
+mail.admin.emails=

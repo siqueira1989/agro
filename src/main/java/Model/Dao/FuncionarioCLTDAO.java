@@ -13,7 +13,8 @@ import java.util.List;
 public class FuncionarioCLTDAO {
 
     private static final String COLS =
-        "idpessoa, nomepessoa, usuariopessoa, senhapessoa, nivelpessoa, situacaopessoa, "
+        // P0-2: senhapessoa foi retirada da lista — nenhuma consulta de leitura traz o hash.
+        "idpessoa, nomepessoa, usuariopessoa, nivelpessoa, situacaopessoa, "
       + "emailpessoa, telefonepessoa, cpfpf, datanascimentopf, numero, complemento, cep, "
       + "matriculafuncionario, tipofuncionario, cargofuncionario, "
       + "datainiciofuncionario, datafimfuncionario, salariomensal, valorhoraextra, "
@@ -86,7 +87,7 @@ public class FuncionarioCLTDAO {
             rs.getInt("idpessoa"),
             rs.getString("nomepessoa"),
             rs.getString("usuariopessoa"),
-            rs.getString("senhapessoa"),
+            null /* P0-2: a senha nunca sai do banco */,
             rs.getString("nivelpessoa"),
             rs.getBoolean("situacaopessoa"),
             rs.getString("emailpessoa"),

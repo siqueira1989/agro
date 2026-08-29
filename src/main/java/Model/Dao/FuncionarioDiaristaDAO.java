@@ -11,7 +11,7 @@ import java.sql.*;
 public class FuncionarioDiaristaDAO {
 
     public FuncionarioDiarista getById(int id) throws SQLException {
-        String sql = "SELECT idpessoa, nomepessoa, usuariopessoa, senhapessoa, nivelpessoa, "
+        String sql = "SELECT idpessoa, nomepessoa, usuariopessoa, nivelpessoa, "   // P0-2: sem senhapessoa
                 + "situacaopessoa, emailpessoa, telefonepessoa, cpfpf, datanascimentopf, numero, "
                 + "complemento, cep, matriculafuncionario, cargofuncionario, datainiciofuncionario, "
                 + "datafimfuncionario, valorpordia FROM funcionariodiarista WHERE idpessoa=?";
@@ -22,7 +22,7 @@ public class FuncionarioDiaristaDAO {
                 if (!rs.next()) return null;
                 FuncionarioDiarista f = new FuncionarioDiarista(
                         rs.getInt("idpessoa"), rs.getString("nomepessoa"), rs.getString("usuariopessoa"),
-                        rs.getString("senhapessoa"), rs.getString("nivelpessoa"), rs.getBoolean("situacaopessoa"),
+                        null /* P0-2: a senha nunca sai do banco */, rs.getString("nivelpessoa"), rs.getBoolean("situacaopessoa"),
                         rs.getString("emailpessoa"), rs.getString("telefonepessoa"), rs.getString("cep"),
                         rs.getInt("numero"), rs.getString("complemento"), rs.getString("cpfpf"),
                         rs.getDate("datanascimentopf") != null ? rs.getDate("datanascimentopf").toLocalDate() : null,

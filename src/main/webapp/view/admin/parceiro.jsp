@@ -82,7 +82,7 @@
             <!-- HEADER + BOTÃO -->
             <div class="row mb-3">
                 <div class="col text-end">
-                     <a href="http://localhost:8080/agro/view/admin/CadastroParceiro.jsp" class="btn btn-success">
+                     <a href="<%=request.getContextPath()%>/view/admin/CadastroParceiro.jsp" class="btn btn-success">
                           <i class="fas fa-user-plus"></i> Cadastrar Parceiro
                     </a>
                 </div>

@@ -88,7 +88,8 @@ public class ControllerInsumo extends HttpServlet {
             out.print(gson.toJson(insumoDAO.listar(categoria, situacao)));
 
         } catch (Exception e) {
-            e.printStackTrace();
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControllerInsumo.class, "Falha tratada em ControllerInsumo.", e);
             writeJson(resp, 500, false, "Erro ao carregar insumos.");
         }
     }
@@ -108,8 +109,9 @@ public class ControllerInsumo extends HttpServlet {
                 default -> writeJson(resp, 400, false, "Ação inválida.");
             }
         } catch (Exception e) {
-            e.printStackTrace();
-            writeJson(resp, 500, false, "Erro interno: " + e.getMessage());
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControllerInsumo.class, "Falha tratada em ControllerInsumo.", e);
+            writeJson(resp, 500, false, "Erro interno: " + cod);
         }
     }
 

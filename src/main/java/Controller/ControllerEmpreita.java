@@ -62,8 +62,9 @@ public class ControllerEmpreita extends HttpServlet {
             }
             handlePerfil(req, resp, out);
         } catch (Exception e) {
-            e.printStackTrace();
-            writeJson(resp, 500, false, "Erro: " + e.getMessage());
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControllerEmpreita.class, "Falha tratada em ControllerEmpreita.", e);
+            writeJson(resp, 500, false, "Erro: " + cod);
         }
     }
 
@@ -126,8 +127,9 @@ public class ControllerEmpreita extends HttpServlet {
                 default -> writeJson(resp, 400, false, "Ação inválida.");
             }
         } catch (Exception e) {
-            e.printStackTrace();
-            writeJson(resp, 500, false, "Erro interno: " + e.getMessage());
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControllerEmpreita.class, "Falha tratada em ControllerEmpreita.", e);
+            writeJson(resp, 500, false, "Erro interno: " + cod);
         }
     }
 

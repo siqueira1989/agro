@@ -1,0 +1,13 @@
+-- ===========================================================================
+-- V1 — Baseline
+--
+-- Este arquivo existe para fechar a lacuna de numeracao apontada na auditoria
+-- de 29/08/2026 (P2-18): a pasta comecava em V2 e nao havia V1.
+--
+-- Ele e intencionalmente vazio. O esquema inicial completo esta em
+-- sql_sistema/agro_banco_completo.sql, que e o dump usado para criar o banco
+-- do zero. Em bancos que ja existiam antes do controle de versao,
+-- Util.SchemaMigrator marca V1 a V19 como aplicadas automaticamente
+-- (baseline) e so executa da V20 em diante.
+-- ===========================================================================
+SELECT 1;

@@ -45,6 +45,14 @@ public class FolhaCalculoRuralService {
     /** Calcula o fechamento mensal rural (sem persistir). */
     public FechamentoFolha calcularFechamento(FuncionarioCLT f, String periodo)
             throws java.sql.SQLException {
+        return calcularFechamento(f, periodo, 0);
+    }
+
+    /**
+     * @param dependentes numero de dependentes para a deducao do IRRF (P1-9)
+     */
+    public FechamentoFolha calcularFechamento(FuncionarioCLT f, String periodo, int dependentes)
+            throws java.sql.SQLException {
 
         int id = f.getIdPessoa();
         YearMonth ym = YearMonth.parse(periodo);
@@ -53,8 +61,13 @@ public class FolhaCalculoRuralService {
 
         // Termos do VÍNCULO que cobre o período (fonte da verdade); se não
         // houver, usa os dados de funcionarioclt como transição.
-        Model.Model.Vinculo vinc = vinculoDAO.buscarPorData(id, primeiroDia);
-        int diasUteis  = contarDiasUteis(ym);
+        // P1-12: era buscarPorData(id, primeiroDia). Funcionario admitido no dia
+        // 10 nao tinha vinculo valido no dia 1, entao vinc ficava null, o calculo
+        // caia no fallback de funcionarioclt ou em ZERO e o mes da admissao saia
+        // com FOLHA ZERADA. Agora basta o vinculo se sobrepor ao periodo.
+        Model.Model.Vinculo vinc = vinculoDAO.buscarPorPeriodo(id, primeiroDia, ultimoDia);
+        // P1-10/P1-11: dias uteis vem do servico unico e ja descontam feriados.
+        int diasUteis  = ParametrosFolhaService.diasUteis(ym);
         int jornadaHrs = (vinc != null ? vinc.getCargaHorariaDiaria() : f.getCargaHorariaDiaria());
         if (jornadaHrs <= 0) jornadaHrs = 8;
 
@@ -111,14 +124,17 @@ public class FolhaCalculoRuralService {
         for (Map.Entry<LocalDate, List<LocalDate>> e : semanas.entrySet()) {
             LocalDate seg = e.getKey();
 
-            // Folga compensatória: algum dia útil (seg–sáb) dentro do mês sem ponto e sem falta
+            // P1-13: a folga compensatoria era DEDUZIDA de "existe um dia entre
+            // segunda e sabado sem ponto e sem falta". Como quase ninguem tem
+            // ponto no sabado, praticamente toda semana era dada como compensada
+            // e o domingo trabalhado deixava de ser pago a 100%. Agora a folga e
+            // um registro explicito no ponto do dia.
             boolean folga = false;
             for (int i = 0; i < 6; i++) {                 // seg..sáb
                 LocalDate dia = seg.plusDays(i);
                 if (dia.isBefore(primeiroDia) || dia.isAfter(ultimoDia)) continue;
-                boolean temPonto = pontoPorDia.containsKey(dia);
-                boolean temFalta = faltaInjustPorDia.containsKey(dia);
-                if (!temPonto && !temFalta) { folga = true; break; }
+                PontoEletronico pd = pontoPorDia.get(dia);
+                if (pd != null && pd.isFolgaCompensatoria()) { folga = true; break; }
             }
 
             // DSR: semana com falta injustificada
@@ -153,12 +169,11 @@ public class FolhaCalculoRuralService {
                 : (f.getSalarioMensal() != null ? f.getSalarioMensal() : BigDecimal.ZERO);
         BigDecimal vheCadastrado = (vinc != null) ? vinc.getValorHoraExtra() : f.getValorHoraExtra();
 
-        BigDecimal valorDia = diasUteis > 0
-                ? salario.divide(BigDecimal.valueOf(diasUteis), 4, RoundingMode.HALF_UP)
-                : BigDecimal.ZERO;
-        BigDecimal valorHora = jornadaHrs > 0
-                ? valorDia.divide(BigDecimal.valueOf(jornadaHrs), 4, RoundingMode.HALF_UP)
-                : BigDecimal.ZERO;
+        // P1-9: para salario mensal o valor-dia legal e salario/30 (CLT art. 64),
+        // nao salario/diasUteis. Com o divisor antigo, cada falta descontava
+        // ~4,5% do salario em vez dos ~3,3% devidos.
+        BigDecimal valorDia  = ParametrosFolhaService.valorDiaFolha(salario);
+        BigDecimal valorHora = ParametrosFolhaService.valorHoraFolha(salario, jornadaHrs);
 
         // Hora extra normal: valor cadastrado se houver; senão hora × 1,5
         BigDecimal valorHoraExtra = (vheCadastrado != null
@@ -178,13 +193,27 @@ public class FolhaCalculoRuralService {
         BigDecimal descontoDsr = valorDia.multiply(BigDecimal.valueOf(semanasComFalta))
                 .setScale(2, RoundingMode.HALF_UP);
 
-        // Ganhos de produção/empreita (dias em modo alternativo) somam ao bruto
+        // PENDENCIA ABERTA (P1-14 da auditoria, mantida por decisao do cliente):
+        // nos dias em modo alternativo o codigo deixa de contar falta e hora
+        // extra, mas NAO abate o dia do salario mensal — o funcionario recebe o
+        // dia pelo salario e novamente pela producao/empreita. Se for premio de
+        // produtividade, esta correto e basta documentar; se nao for, e pagamento
+        // em duplicidade. A ser validado com o RH/contabilidade.
         BigDecimal bruto = salario.add(valorExtraNormal).add(valorExtra100).add(valorAdicNoturno)
                 .add(valorProducao).add(valorEmpreita)
                 .setScale(2, RoundingMode.HALF_UP);
-        BigDecimal liquido = bruto.subtract(descontoFaltas).subtract(descontoDsr)
-                .subtract(totalVales).setScale(2, RoundingMode.HALF_UP);
-        if (liquido.compareTo(BigDecimal.ZERO) < 0) liquido = BigDecimal.ZERO;
+
+        // Remuneracao efetiva do mes: e sobre ela que INSS e IRRF incidem.
+        BigDecimal remuneracao = bruto.subtract(descontoFaltas).subtract(descontoDsr)
+                .max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
+
+        // P1-9: nao havia INSS, IRRF nem FGTS — o "liquido" era so bruto - vales.
+        EncargosService.Encargos enc =
+                EncargosService.calcular(remuneracao, dependentes, primeiroDia);
+
+        BigDecimal liquido = remuneracao
+                .subtract(enc.inss()).subtract(enc.irrf()).subtract(totalVales)
+                .max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
 
         // ── monta VO ──
         FechamentoFolha fc = new FechamentoFolha();
@@ -209,6 +238,11 @@ public class FolhaCalculoRuralService {
         fc.setMinutosExtra100(minutosExtra100);
         fc.setValorProducao(valorProducao.setScale(2, RoundingMode.HALF_UP));
         fc.setValorEmpreita(valorEmpreita.setScale(2, RoundingMode.HALF_UP));
+        fc.setDescontoInss(enc.inss());
+        fc.setDescontoIrrf(enc.irrf());
+        fc.setFgtsDeposito(enc.fgts());
+        fc.setDependentes(dependentes);
+        fc.setEncargosConfiaveis(enc.tabelaConfiavel());
         return fc;
     }
 
@@ -216,12 +250,13 @@ public class FolhaCalculoRuralService {
         return BigDecimal.valueOf(minutos).divide(C60, 4, RoundingMode.HALF_UP);
     }
 
+    /**
+     * @deprecated P1-11: era uma copia da mesma regra que existia em
+     *             {@code FolhaCalculoService}, e ambas ignoravam feriados.
+     *             Use {@link ParametrosFolhaService#diasUteis(YearMonth)}.
+     */
+    @Deprecated
     private int contarDiasUteis(YearMonth ym) {
-        int count = 0;
-        for (int d = 1; d <= ym.lengthOfMonth(); d++) {
-            DayOfWeek dow = LocalDate.of(ym.getYear(), ym.getMonthValue(), d).getDayOfWeek();
-            if (dow != DayOfWeek.SATURDAY && dow != DayOfWeek.SUNDAY) count++;
-        }
-        return count;
+        return ParametrosFolhaService.diasUteis(ym);
     }
 }

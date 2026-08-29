@@ -93,8 +93,9 @@ public class ControllerDiarioCampo extends HttpServlet {
                     intOrNull(req.getParameter("cultura")), intOrNull(req.getParameter("tipo")),
                     req.getParameter("status"), req.getParameter("de"), req.getParameter("ate"))));
         } catch (Exception e) {
-            e.printStackTrace();
-            writeJson(resp, 500, false, "Erro ao carregar diários: " + e.getMessage());
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControllerDiarioCampo.class, "Falha tratada em ControllerDiarioCampo.", e);
+            writeJson(resp, 500, false, "Erro ao carregar diários: " + cod);
         }
     }
 
@@ -118,8 +119,9 @@ public class ControllerDiarioCampo extends HttpServlet {
         } catch (EstoqueInsuficienteException e) {
             writeJson(resp, 400, false, e.getMessage());
         } catch (Exception e) {
-            e.printStackTrace();
-            writeJson(resp, 500, false, "Erro interno: " + e.getMessage());
+            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
+            String cod = Util.LogUtil.erro(ControllerDiarioCampo.class, "Falha tratada em ControllerDiarioCampo.", e);
+            writeJson(resp, 500, false, "Erro interno: " + cod);
         }
     }
 

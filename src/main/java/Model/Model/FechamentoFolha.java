@@ -30,6 +30,16 @@ public class FechamentoFolha {
     private BigDecimal valorProducao        = BigDecimal.ZERO;
     private BigDecimal valorEmpreita        = BigDecimal.ZERO;
 
+    // Encargos legais — P1-9 da auditoria de 29/08/2026. Antes o liquido era
+    // simplesmente "bruto - vales": nao havia INSS, IRRF nem FGTS.
+    private BigDecimal descontoInss         = BigDecimal.ZERO;
+    private BigDecimal descontoIrrf         = BigDecimal.ZERO;
+    /** FGTS e encargo do EMPREGADOR: nao desconta do liquido, mas compoe o custo. */
+    private BigDecimal fgtsDeposito         = BigDecimal.ZERO;
+    private int        dependentes;
+    /** false quando a tabela de INSS/IRRF usada esta vencida (ver EncargosService). */
+    private boolean    encargosConfiaveis   = true;
+
     public int getIdFechamento()                         { return idFechamento; }
     public void setIdFechamento(int v)                   { this.idFechamento = v; }
 
@@ -95,6 +105,21 @@ public class FechamentoFolha {
 
     public BigDecimal getValorEmpreita()                 { return valorEmpreita; }
     public void setValorEmpreita(BigDecimal v)           { this.valorEmpreita = v; }
+
+    public BigDecimal getDescontoInss()                  { return descontoInss; }
+    public void setDescontoInss(BigDecimal v)            { this.descontoInss = v; }
+
+    public BigDecimal getDescontoIrrf()                  { return descontoIrrf; }
+    public void setDescontoIrrf(BigDecimal v)            { this.descontoIrrf = v; }
+
+    public BigDecimal getFgtsDeposito()                  { return fgtsDeposito; }
+    public void setFgtsDeposito(BigDecimal v)            { this.fgtsDeposito = v; }
+
+    public int getDependentes()                          { return dependentes; }
+    public void setDependentes(int v)                    { this.dependentes = v; }
+
+    public boolean isEncargosConfiaveis()                { return encargosConfiaveis; }
+    public void setEncargosConfiaveis(boolean v)         { this.encargosConfiaveis = v; }
 
     public String getNoturnoFormatado() {
         return String.format("%02d:%02d", minutosNoturnos / 60, minutosNoturnos % 60);

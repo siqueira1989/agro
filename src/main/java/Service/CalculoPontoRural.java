@@ -23,6 +23,18 @@ public final class CalculoPontoRural {
     /** Banda de tolerância diária do Art. 58 §1º (10 minutos). */
     public static final int TOLERANCIA_DIARIA_MIN = 10;
 
+    /**
+     * Teto de jornada plausível para um dia: 16 horas (P2-26 da auditoria de
+     * 29/08/2026).
+     *
+     * <p>O tratamento de virada de meia-noite somava 24 h sempre que a saída era
+     * menor que a entrada. Um erro de digitação — entrada 17:00, saída 08:00 —
+     * virava <b>15 horas trabalhadas</b> em silêncio, gerando 7 horas extras
+     * indevidas na folha. Acima deste teto o registro é rejeitado, porque é
+     * muito mais provável ser engano de digitação do que jornada real.</p>
+     */
+    public static final int JORNADA_MAXIMA_MIN = 16 * 60;
+
     private CalculoPontoRural() { }
 
     /**
@@ -35,6 +47,8 @@ public final class CalculoPontoRural {
     public static void calcular(PontoEletronico p, TipoAtividadeRural atividade, int jornadaMin) {
         if (atividade == null) atividade = TipoAtividadeRural.LAVOURA;
 
+        validarSequencia(p);
+
         int total = 0;
         int noturno = 0;
 
@@ -45,6 +59,14 @@ public final class CalculoPontoRural {
         noturno += atividade.minutosNoturnos(p.getEntrada2(), p.getSaida2());
 
         total = Math.max(0, total);
+
+        // P2-26: barra jornada implausivel em vez de aceitar em silencio.
+        if (total > JORNADA_MAXIMA_MIN) {
+            throw new IllegalArgumentException(
+                "Jornada de " + (total / 60) + "h" + String.format("%02d", total % 60)
+              + " no dia " + p.getDataRegistro() + " excede o limite de 16 horas. "
+              + "Verifique os horários — provavelmente a entrada e a saída estão trocadas.");
+        }
 
         // Extra bruto = trabalho além da jornada. Tolerância: se a diferença
         // (para mais ou para menos) couber na banda de 10 min, desconsidera.
@@ -58,6 +80,27 @@ public final class CalculoPontoRural {
         p.setTotalMinutos(total);
         p.setExtraMinutos(extra);
         p.setMinutosNoturnos(noturno);
+    }
+
+    /**
+     * Confere a ordem das batidas antes de calcular (P2-26).
+     *
+     * <p>Sem esta checagem, um segundo período que comece antes do fim do
+     * primeiro passava despercebido e o total do dia saía inflado.</p>
+     */
+    private static void validarSequencia(PontoEletronico p) {
+        if (p.getSaida1() != null && p.getEntrada2() != null
+                && p.getEntrada2().isBefore(p.getSaida1())) {
+            throw new IllegalArgumentException(
+                "O segundo período começa antes do fim do primeiro (saída "
+              + p.getSaida1() + ", entrada " + p.getEntrada2() + "). Corrija os horários.");
+        }
+        if (p.getEntrada1() == null && p.getSaida1() != null) {
+            throw new IllegalArgumentException("Há saída sem entrada correspondente no primeiro período.");
+        }
+        if (p.getEntrada2() == null && p.getSaida2() != null) {
+            throw new IllegalArgumentException("Há saída sem entrada correspondente no segundo período.");
+        }
     }
 
     /** Minutos de um intervalo, tratando saída &lt; entrada como virada de dia. */

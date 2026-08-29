@@ -72,12 +72,29 @@ public class VinculoDAO {
     }
 
     /** Vínculo ativo (sem desligamento) da pessoa, ou null. */
+    private static final String SQL_ATIVO =
+        "SELECT " + COLS + " FROM vinculo_empregaticio "
+      + "WHERE idpessoa=? AND data_desligamento IS NULL "
+      + "ORDER BY id_vinculo DESC LIMIT 1";
+
     public Vinculo buscarAtivo(int idPessoa) throws SQLException {
-        String sql = "SELECT " + COLS + " FROM vinculo_empregaticio "
-                   + "WHERE idpessoa=? AND data_desligamento IS NULL "
-                   + "ORDER BY id_vinculo DESC LIMIT 1";
-        try (Connection c = new PostgresConnection().getConnection();
-             PreparedStatement ps = c.prepareStatement(sql)) {
+        try (Connection c = new PostgresConnection().getConnection()) {
+            return buscarAtivo(c, idPessoa);
+        }
+    }
+
+    /**
+     * Versão que reaproveita uma conexão já aberta (P1-8 da auditoria de
+     * 29/08/2026).
+     *
+     * <p>{@code DiarioCampoDAO.custoHoraCLT} chamava {@link #buscarAtivo(int)}
+     * de dentro de uma transação em andamento. Isso abria <b>uma conexão nova
+     * por funcionário</b> da atividade — somado à ausência de pool, era caminho
+     * direto para esgotar o banco — e ainda lia fora da transação, sem enxergar
+     * o que ainda não tinha sido comitado.</p>
+     */
+    public Vinculo buscarAtivo(Connection c, int idPessoa) throws SQLException {
+        try (PreparedStatement ps = c.prepareStatement(SQL_ATIVO)) {
             ps.setInt(1, idPessoa);
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() ? mapear(rs) : null;
@@ -100,6 +117,32 @@ public class VinculoDAO {
      * Vínculo ao qual uma data pertence: admissao &lt;= data &lt;= coalesce(deslig, hoje).
      * Como os períodos não se sobrepõem, resolve um único vínculo.
      */
+    /**
+     * Vínculo vigente em QUALQUER dia dentro do período (P1-12).
+     *
+     * <p>{@code FolhaCalculoRuralService} buscava o vínculo sempre no dia 1º do
+     * mês. Um funcionário admitido no dia 10 não tinha vínculo válido no dia 1º,
+     * então o cálculo caía no fallback e gerava <b>folha zerada no mês da
+     * admissão</b>. Este método aceita o mês inteiro: basta o vínculo se
+     * sobrepor ao período em pelo menos um dia.</p>
+     */
+    public Vinculo buscarPorPeriodo(int idPessoa, LocalDate inicio, LocalDate fim) throws SQLException {
+        String sql = "SELECT " + COLS + " FROM vinculo_empregaticio "
+                   + "WHERE idpessoa=? "
+                   + "AND (data_admissao IS NULL OR data_admissao <= ?) "
+                   + "AND (data_desligamento IS NULL OR data_desligamento >= ?) "
+                   + "ORDER BY data_admissao DESC NULLS LAST, id_vinculo DESC LIMIT 1";
+        try (Connection c = new PostgresConnection().getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, idPessoa);
+            ps.setDate(2, Date.valueOf(fim));      // admitido ate o FIM do periodo
+            ps.setDate(3, Date.valueOf(inicio));   // desligado a partir do INICIO
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? mapear(rs) : null;
+            }
+        }
+    }
+
     public Vinculo buscarPorData(int idPessoa, LocalDate data) throws SQLException {
         String sql = "SELECT " + COLS + " FROM vinculo_empregaticio "
                    + "WHERE idpessoa=? "

@@ -1,45 +1,59 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package Util;
 
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.SQLException;
 
+/**
+ * Ponto único de obtenção de conexões com o PostgreSQL.
+ *
+ * <p><b>O que mudou (P0-3 e P0-4 da auditoria de 29/08/2026).</b></p>
+ * <ul>
+ *   <li>A URL, o usuário e a senha <b>saíram do código-fonte</b>. Antes estavam
+ *       escritos aqui e versionados no Git; agora vêm de {@link ConfigUtil}
+ *       (arquivo externo ou propriedade de sistema).</li>
+ *   <li>{@link #getConnection()} não abre mais uma conexão nova a cada chamada:
+ *       pega uma emprestada do {@link ConnectionPool}. Como o objeto devolvido é
+ *       um proxy cujo {@code close()} devolve a conexão ao pool, <b>todo o
+ *       código de DAO existente continua válido sem alteração</b> — e passa a
+ *       liberar o recurso corretamente quando envolvido em
+ *       {@code try-with-resources}.</li>
+ * </ul>
+ *
+ * <p>A classe permanece instanciável com {@code new PostgresConnection()} para
+ * não quebrar os 28 DAOs que já a usam dessa forma.</p>
+ */
+public class PostgresConnection {
 
-
-   public class PostgresConnection {
-
-    // URL do banco de dados, incluindo o nome do banco
-    private static final String URL = "jdbc:postgresql://localhost:5432/agro";
-    
-    // Nome de usuário e senha do banco de dados
-    private static final String USER = "postgres"; // Substitua pelo seu usuário do PostgreSQL
-    private static final String PASSWORD = "15975328"; // Substitua pela sua senha do PostgreSQL
-
-
+    /**
+     * Empresta uma conexão do pool.
+     *
+     * <p>Use sempre dentro de {@code try-with-resources}:</p>
+     * <pre>{@code
+     * try (Connection c = new PostgresConnection().getConnection();
+     *      PreparedStatement st = c.prepareStatement(SQL)) {
+     *     ...
+     * }
+     * }</pre>
+     *
+     * @throws SQLException se o pool estiver esgotado ou o banco inacessível
+     */
     public Connection getConnection() throws SQLException {
-        try {
-            // Tenta carregar o driver JDBC do PostgreSQL
-            Class.forName("org.postgresql.Driver");
-        } catch (ClassNotFoundException e) {
-            throw new SQLException("Driver PostgreSQL não encontrado!", e);
-        }
-
-        // Retorna uma conexão para o banco de dados
-        return DriverManager.getConnection(URL, USER, PASSWORD);
+        return ConnectionPool.getInstance().emprestar();
     }
 
- 
+    /**
+     * Devolve a conexão ao pool.
+     *
+     * @deprecated Prefira {@code try-with-resources}, que já faz isso mesmo
+     *             quando ocorre exceção. Mantido apenas para compatibilidade.
+     */
+    @Deprecated
     public static void closeConnection(Connection connection) {
-        if (connection != null) {
-            try {
-                connection.close();
-            } catch (SQLException e) {
-                System.err.println("Erro ao fechar a conexão: " + e.getMessage());
-            }
+        if (connection == null) return;
+        try {
+            connection.close();
+        } catch (SQLException e) {
+            LogUtil.aviso(PostgresConnection.class, "Falha ao devolver a conexão ao pool.", e);
         }
     }
 }

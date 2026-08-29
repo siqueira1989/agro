@@ -13,21 +13,21 @@ public class ParceiroDAO {
 	/*Cadastrar de parceiro*/
 	
     public void addParceiro(Parceiro parceiro) throws SQLException {
-    	 PostgresConnection conn = new PostgresConnection();
-		 Connection conexao= conn.getConnection();
-		 System.out.println("nivel 2");
-        try {
-        	 String sql = "INSERT INTO parceiro ("
+        // P0-4: a conexao era aberta fora do try e NUNCA fechada.
+        // P0-5: a SQLException era engolida e o servlet respondia "sucesso".
+        String sql = "INSERT INTO parceiro ("
             + "nomepessoa, usuariopessoa, senhapessoa, nivelpessoa, "
             + "situacaopessoa, emailpessoa,cep ,numero, complemento, "
             + "telefonepessoa, cnpjPessoaCnpj, razaosocialpessoacnpj, "
             + "inscricaoestadualpessoacnpj, siteparceiro, tipo_parceiro) "
             + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
-        	PreparedStatement stmt = conexao.prepareStatement(sql);
-           stmt.setString(1, parceiro.getNomePessoa());
+        try (Connection conexao = new PostgresConnection().getConnection();
+             PreparedStatement stmt = conexao.prepareStatement(sql)) {
+
+            stmt.setString(1, parceiro.getNomePessoa());
             stmt.setString(2, parceiro.getUsuarioPessoa());
-            stmt.setString(3, parceiro.getSenhaPessoa());
+            stmt.setString(3, Util.SenhaUtil.hashOuVazio(parceiro.getSenhaPessoa()));  // P0-2
             stmt.setString(4, parceiro.getNivelPessoa());
             stmt.setBoolean(5, parceiro.isSituacaoPessoa());
             stmt.setString(6, parceiro.getEmailPessoa());
@@ -41,23 +41,19 @@ public class ParceiroDAO {
             stmt.setString(14, parceiro.getSiteparceiro());
             stmt.setString(15, Model.Model.TipoParceiro.normalizar(parceiro.getTipoParceiro()));
             stmt.executeUpdate();
-        } catch (SQLException e) {
-             e.printStackTrace();
-           System.out.println("Erro ao listar os parceiros: " + e.getMessage());
         }
-    
     }
     /*Lista por id*/
     public Parceiro getParceiroById(int id) throws SQLException {
         Parceiro parceiro = null;
-        PostgresConnection conn = new PostgresConnection();
-        Connection conexao = conn.getConnection();
-    
+        String sql = "SELECT * FROM parceiro where idPessoa = ?";
 
-        try  {
-        	 String sql = "SELECT * FROM parceiro where idPessoa = ?";
-        	  PreparedStatement stmt = conexao.prepareStatement(sql);
-        	 stmt.setInt(1, id);
+        // P0-4: fechava so no finally do metodo; agora try-with-resources cobre
+        // tambem o PreparedStatement e o ResultSet.
+        try (Connection conexao = new PostgresConnection().getConnection();
+             PreparedStatement stmt = conexao.prepareStatement(sql)) {
+
+            stmt.setInt(1, id);
             ResultSet rs = stmt.executeQuery();
 
             if (rs.next()) {
@@ -68,7 +64,7 @@ public class ParceiroDAO {
                     rs.getInt("idPessoa"),
                     rs.getString("nomePessoa"),
                     rs.getString("usuarioPessoa"),
-                    rs.getString("senhaPessoa"),
+                    null /* P0-2: a senha nunca sai do banco */,
                     rs.getString("nivelPessoa"),
                     rs.getBoolean("situacaoPessoa"),
                     rs.getString("emailPessoa"),
@@ -83,31 +79,19 @@ public class ParceiroDAO {
                 );
                 parceiro.setTipoParceiro(rs.getString("tipo_parceiro"));
             }
-            }catch (SQLException e) {
-                e.printStackTrace();
-                System.out.println("Erro ao listar os parceiros: " + e.getMessage());
-            } finally {
-                if (conexao != null) {
-                    conexao.close();
-                }
-            }
-        
+        }
         return parceiro;
     }
     /*Listar tudo*/
     public List<Parceiro> listAllParceiro() throws SQLException {
         
         List<Parceiro> parceiroList = new ArrayList<>();
-        PostgresConnection conn = new PostgresConnection();
-        Connection conexao = conn.getConnection();
-        
-        try {  
-            // Consulta SQL para buscar parceiros com seus respectivos endereços
-            String sql = "SELECT * FROM parceiro ";
-                       
-            PreparedStatement stmt = conexao.prepareStatement(sql);
-            ResultSet rs = stmt.executeQuery();
-            
+        String sql = "SELECT * FROM parceiro ORDER BY nomepessoa";
+
+        try (Connection conexao = new PostgresConnection().getConnection();
+             PreparedStatement stmt = conexao.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+
             while (rs.next()) {
               
                 
@@ -116,7 +100,7 @@ public class ParceiroDAO {
                     rs.getInt("idpessoa"),                // ID da pessoa
                     rs.getString("nomepessoa"),           // Nome da pessoa
                     rs.getString("usuariopessoa"),        // Usuário da pessoa
-                    rs.getString("senhapessoa"),          // Senha da pessoa
+                    null /* P0-2: a senha nunca sai do banco */,          // Senha da pessoa
                     rs.getString("nivelpessoa"),          // Nível da pessoa
                     rs.getBoolean("situacaopessoa"),      // Situação da pessoa
                     rs.getString("emailpessoa"),          // Email da pessoa
@@ -133,45 +117,30 @@ public class ParceiroDAO {
 
                 parceiroList.add(parceiro);
             }
-            
-        } catch (SQLException e) {
-            e.printStackTrace();
-            System.out.println("Erro ao listar os parceiros: " + e.getMessage());
-        } finally {
-            if (conexao != null) {
-                conexao.close();
-            }
         }
-
         return parceiroList;
     }
 
+    /**
+     * O CNPJ ja esta cadastrado?
+     *
+     * <p>P0-4/P0-5: a conexao nunca era fechada e a excecao era engolida,
+     * devolvendo {@code false}. Ou seja, uma falha do banco fazia o sistema
+     * concluir que o CNPJ era inedito e seguir para o INSERT, criando parceiro
+     * duplicado. Agora a excecao sobe e o cadastro e interrompido.</p>
+     */
     public boolean existeCNPJ(String cnpj) throws SQLException {
-		 PostgresConnection conn = new PostgresConnection();
-		 Connection conexao= conn.getConnection();
-		 
-	        boolean existe = false;
+        String sql = "SELECT 1 FROM parceiro WHERE cnpjpessoacnpj = ? LIMIT 1";
 
-	        // Substitua pelo seu método de obter conexão com o banco de dados
-	        try {
-	        	 String sql = "SELECT COUNT(*) FROM parceiro WHERE cnpjpessoacnpj = ?";
-	             PreparedStatement stmt = conexao.prepareStatement(sql);
-	             // Definindo o valor do parâmetro da consulta
-	             stmt.setString(1, cnpj);
-	             ResultSet rs = stmt.executeQuery();
-	             if (rs.next()) {
-	                    // Verificando se a contagem é maior que zero
-	                    existe = rs.getInt(1)>0;
-	                }
+        try (Connection conexao = new PostgresConnection().getConnection();
+             PreparedStatement stmt = conexao.prepareStatement(sql)) {
 
-
-	        } catch (SQLException e) {
-	        	e.printStackTrace();
-	            System.out.println("Erro no nivel dao: "+e.getMessage()); // Tratar exceções de forma adequada na sua aplicação
-	        }
- 
-	        return existe;
-	    }
+            stmt.setString(1, cnpj);
+            try (ResultSet rs = stmt.executeQuery()) {
+                return rs.next();
+            }
+        }
+    }
     /*Contagenm do total ativos*/
  public int contarPorSituacao(boolean ativo) throws SQLException {
     int numero = 0;
@@ -218,52 +187,34 @@ public class ParceiroDAO {
 }
 /*Verificação id para perceiro*/
     public Integer obterIdPArceiroPorCNPJ(String cnpj) throws SQLException {
-	    PostgresConnection conn = new PostgresConnection();
-	    Connection conexao = conn.getConnection();
-	    
-	    Integer idpessoa = null;
+        String sql = "SELECT idpessoa FROM parceiro WHERE cnpjpessoacnpj = ?";
 
-	    try {
-	        // Modificando a consulta SQL para retornar o 'idendereco' ao invés de contar os registros
-	        String sql = "SELECT idpessoa FROM parceiro WHERE cnpjpessoacnpj = ?";
-	        PreparedStatement stmt = conexao.prepareStatement(sql);
-	        
-	        // Definindo o valor do parâmetro da consulta
-	        stmt.setString(1, cnpj);
-	        ResultSet rs = stmt.executeQuery();
-	        
-	        if (rs.next()) {
-	            // Atribuindo o valor de 'idendereco' à variável
-	            idpessoa = rs.getInt("idpessoa");
-	        }
+        try (Connection conexao = new PostgresConnection().getConnection();
+             PreparedStatement stmt = conexao.prepareStatement(sql)) {
 
-	    } catch (SQLException e) {
-	        e.printStackTrace();
-	        System.out.println("Erro no nivel DAO: " + e.getMessage()); // Tratar exceções de forma adequada na sua aplicação
-	    } finally {
-	        if (conexao != null) {
-	            conexao.close(); // Certifique-se de fechar a conexão para evitar vazamento de recursos
-	        }
-	    }
-	    
-	  
-	    return idpessoa;
-	}
+            stmt.setString(1, cnpj);
+            try (ResultSet rs = stmt.executeQuery()) {
+                return rs.next() ? rs.getInt("idpessoa") : null;
+            }
+        }
+    }
 
     public void updateParceiro(Parceiro parceiro) throws SQLException {
-    	  PostgresConnection conn = new PostgresConnection();
-  	    Connection conexao = conn.getConnection();
-        try  {
                 String sql = "UPDATE parceiro SET "+
-       "nomepessoa = ?, usuariopessoa = ?, senhapessoa = ?, "+
+       // P0-2: senha em branco no formulario mantem a atual.
+       "nomepessoa = ?, usuariopessoa = ?, "+
+       "senhapessoa = COALESCE(NULLIF(?, ''), senhapessoa), "+
        "nivelpessoa = ?, situacaopessoa = ?, emailpessoa = ?,"+
        "numero = ?, complemento = ?, cep = ?, "+
        "telefonepessoa = ?, cnpjPessoaCnpj = ?, razaosocialpessoacnpj = ?,"+
        "inscricaoestadualpessoacnpj = ?, siteparceiro = ?, tipo_parceiro = ? WHERE idpessoa = ?";
-                PreparedStatement stmt = conexao.prepareStatement(sql);
+
+        try (Connection conexao = new PostgresConnection().getConnection();
+             PreparedStatement stmt = conexao.prepareStatement(sql)) {
+
             stmt.setString(1, parceiro.getNomePessoa());
             stmt.setString(2, parceiro.getUsuarioPessoa());
-            stmt.setString(3, parceiro.getSenhaPessoa());
+            stmt.setString(3, Util.SenhaUtil.hashOuVazio(parceiro.getSenhaPessoa()));  // P0-2
             
             stmt.setString(4, parceiro.getNivelPessoa());
             stmt.setBoolean(5, parceiro.isSituacaoPessoa());
@@ -281,11 +232,7 @@ public class ParceiroDAO {
             stmt.setString(14, parceiro.getSiteparceiro());
             stmt.setString(15, Model.Model.TipoParceiro.normalizar(parceiro.getTipoParceiro()));
             stmt.setInt(16, parceiro.getIdPessoa());
-
             stmt.executeUpdate();
-        } catch (SQLException e) {
-        	e.printStackTrace();
-            System.out.println("Erro no nivel dao: "+e.getMessage());
         }
     }
 
@@ -309,7 +256,7 @@ public class ParceiroDAO {
                     rs.getInt("idpessoa"),
                     rs.getString("nomepessoa"),
                     rs.getString("usuariopessoa"),
-                    rs.getString("senhapessoa"),
+                    null /* P0-2: a senha nunca sai do banco */,
                     rs.getString("nivelpessoa"),
                     rs.getBoolean("situacaopessoa"),
                     rs.getString("emailpessoa"),
@@ -342,90 +289,24 @@ public class ParceiroDAO {
         return numero;
     }
 
+    /** Desativa o parceiro (exclusao logica). */
     public void deleteParceiro(int id, Boolean situacao) throws SQLException {
-    	  PostgresConnection conn = new PostgresConnection();
-    	    Connection conexao = conn.getConnection();
-        try  {
-        	 String sql = "UPDATE parceiro SET situacaopessoa = ? WHERE idpessoa = ?";
-        	 PreparedStatement stmt = conexao.prepareStatement(sql);
-        	 System.out.println("passei daao "+situacao);
-        	 stmt.setBoolean(1, situacao);
-        	 stmt.setInt(2, id);
+        String sql = "UPDATE parceiro SET situacaopessoa = ? WHERE idpessoa = ?";
+
+        try (Connection conexao = new PostgresConnection().getConnection();
+             PreparedStatement stmt = conexao.prepareStatement(sql)) {
+
+            stmt.setBoolean(1, situacao != null && situacao);
+            stmt.setInt(2, id);
             stmt.executeUpdate();
-        } catch (SQLException e) {
-        	e.printStackTrace();
-            System.out.println("Erro no nivel dao: "+e.getMessage());
         }
     }
-/*
-    public Parceiro getParceiroById(int id) {
-        String sql = "SELECT * FROM parceiro WHERE idpessoa = ?";
-        Parceiro parceiro = null;
 
-        try (Connection conn = PostgresConnection.getConnection(); 
-                PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setInt(1, id);
-            ResultSet rs = stmt.executeQuery();
-
-            if (rs.next()) {
-                Endereco endereco = new EnderecoDAO().setEnderecoById(rs.getInt("idendereco"));  // Presumindo que há uma relação com a tabela de endereços
-
-                parceiro = new Parceiro(
-                        rs.getInt("idpessoa"),
-                        rs.getString("nomepessoa"),
-                        endereco,
-                        rs.getString("usuariopessoa"),
-                        rs.getString("senhapessoa"),
-                        rs.getString("nivelpessoa"),
-                        rs.getBoolean("situacaopessoa"),
-                        rs.getString("emailpessoa"),
-                        rs.getString("telefonepessoa"),
-                        rs.getString("cnpjPessoaCnpj"),
-                        rs.getString("razaoSocialPessoaCnpj"),
-                        rs.getString("inscricaoEstadualPessoaCnpj"),
-                        rs.getString("siteparceiro")
-                );
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("Erro ao buscar o parceiro: " + e.getMessage(), e);
-        }
-
-        return parceiro;
-    }
-
-    public List<Parceiro> getAllParceiros() {
-        String sql = "SELECT * FROM parceiro";
-        List<Parceiro> parceiros = new ArrayList<>();
-
-        try (Connection conn = PostgresConnection.getConnection(); 
-                PreparedStatement stmt = conn.prepareStatement(sql)) {
-            ResultSet rs = stmt.executeQuery();
-
-            while (rs.next()) {
-                Endereco endereco = new EnderecoDAO().getIdendereco(rs.getInt("idendereco"));  // Presumindo que há uma relação com a tabela de endereços
-
-                Parceiro parceiro = new Parceiro(
-                        rs.getInt("idpessoa"),
-                        rs.getString("nomepessoa"),
-                        endereco,
-                        rs.getString("usuariopessoa"),
-                        rs.getString("senhapessoa"),
-                        rs.getString("nivelpessoa"),
-                        rs.getBoolean("situacaopessoa"),
-                        rs.getString("emailpessoa"),
-                        rs.getString("telefonepessoa"),
-                        rs.getString("cnpjPessoaCnpj"),
-                        rs.getString("razaoSocialPessoaCnpj"),
-                        rs.getString("inscricaoEstadualPessoaCnpj"),
-                        rs.getString("siteparceiro")
-                );
-                parceiros.add(parceiro);
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("Erro ao listar os parceiros: " + e.getMessage(), e);
-        }
-
-        return parceiros;
-    }*/
-
+    /*
+     * Removidas nesta revisao duas versoes antigas de getParceiroById e
+     * getAllParceiros que estavam comentadas no fim do arquivo (cerca de 70
+     * linhas). Referenciavam EnderecoDAO/Endereco, que nao existem mais, e um
+     * PostgresConnection.getConnection() estatico que tambem nao existe.
+     * Codigo morto so atrapalha a leitura — o historico esta no Git.
+     */
 }
