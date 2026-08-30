@@ -2,6 +2,13 @@
 **Data:** 29/08/2026 · **Escopo:** 13.234 linhas Java (21 servlets, 28 DAOs, 3 services), 38 tabelas PostgreSQL, 5.555 linhas de `main.js`, 24 JSPs
 **Objetivo:** levantar erros e bugs existentes **antes** de programar novas funções.
 
+> **Situação em 30/08/2026 — corrigido.** Dos 31 achados (28 desta auditoria mais 3
+> descobertos durante a correção), 30 foram corrigidos na branch `fix/auditoria-2026-08`;
+> o P1-14 foi mantido por decisão do cliente. Uma revisão adversarial das próprias
+> correções encontrou mais 22 defeitos, também corrigidos. O detalhamento está em
+> [RELATORIO_CORRECOES_2026-08-30.docx](RELATORIO_CORRECOES_2026-08-30.docx).
+> Este documento fica como o registro do diagnóstico original.
+
 ---
 
 ## Semáforo
