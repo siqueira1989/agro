@@ -47,6 +47,9 @@ public final class SchemaMigrator {
      */
     private static final int BASELINE_ATE = 19;
 
+    /** Chave do pg_advisory_lock — qualquer bigint estável serve. */
+    private static final long CHAVE_LOCK = 8_270_2026L;
+
     private final ServletContext ctx;
 
     public SchemaMigrator(ServletContext ctx) {
@@ -56,6 +59,13 @@ public final class SchemaMigrator {
     /** Aplica as migrações pendentes. Devolve quantas foram aplicadas. */
     public int migrar(boolean aplicar) {
         try (Connection c = new PostgresConnection().getConnection()) {
+            // Lock consultivo: dois nós ou dois deploys simultâneos aplicariam a
+            // mesma migração em paralelo — e a V21 tem um UPDATE de backfill que
+            // não é idempotente sob concorrência. O segundo espera aqui e, ao
+            // entrar, já encontra tudo registrado em schema_version.
+            try (Statement st = c.createStatement()) {
+                st.execute("SELECT pg_advisory_lock(" + CHAVE_LOCK + ")");
+            }
             criarTabelaControle(c);
             baselineSeNecessario(c);
             Set<Integer> aplicadas = versoesAplicadas(c);
@@ -68,6 +78,7 @@ public final class SchemaMigrator {
 
             if (pendentes.isEmpty()) {
                 LogUtil.info(SchemaMigrator.class, "Esquema do banco em dia; nada a aplicar.");
+                liberarLock(c);
                 return 0;
             }
 
@@ -76,6 +87,7 @@ public final class SchemaMigrator {
                 for (Script s : pendentes) sb.append(s.nome).append(' ');
                 LogUtil.aviso(SchemaMigrator.class,
                         "Migrações PENDENTES (db.migrate.onStartup=false): " + sb.toString().trim(), null);
+                liberarLock(c);
                 return 0;
             }
 
@@ -85,6 +97,7 @@ public final class SchemaMigrator {
                 total++;
             }
             LogUtil.info(SchemaMigrator.class, total + " migração(ões) aplicada(s) com sucesso.");
+            liberarLock(c);
             return total;
 
         } catch (SQLException e) {
@@ -93,6 +106,15 @@ public final class SchemaMigrator {
             throw new IllegalStateException(
                     "Banco de dados não pôde ser migrado (código " + cod + "). "
                   + "A aplicação não deve subir com o esquema desatualizado.", e);
+        }
+    }
+
+    /** Libera o lock consultivo; a conexão volta ao pool logo em seguida. */
+    private void liberarLock(Connection c) {
+        try (Statement st = c.createStatement()) {
+            st.execute("SELECT pg_advisory_unlock(" + CHAVE_LOCK + ")");
+        } catch (SQLException e) {
+            LogUtil.aviso(SchemaMigrator.class, "Falha ao liberar o lock de migração.", e);
         }
     }
 
@@ -185,7 +207,14 @@ public final class SchemaMigrator {
     private void aplicarScript(Connection c, Script s) throws SQLException {
         String sql = ler(s.caminho);
         if (sql == null || sql.isBlank()) {
-            LogUtil.aviso(SchemaMigrator.class, "Script vazio ignorado: " + s.nome, null);
+            // Registra assim mesmo: um script vazio que não é registrado volta a
+            // ser lido e "ignorado" em todo boot, para sempre.
+            LogUtil.aviso(SchemaMigrator.class, "Script vazio: " + s.nome + " (registrado como aplicado).", null);
+            try (PreparedStatement st = c.prepareStatement(
+                    "INSERT INTO public.schema_version (versao, nome, duracao_ms, sucesso) "
+                  + "VALUES (?,?,0,true) ON CONFLICT (versao) DO NOTHING")) {
+                st.setInt(1, s.versao); st.setString(2, s.nome); st.executeUpdate();
+            }
             return;
         }
 

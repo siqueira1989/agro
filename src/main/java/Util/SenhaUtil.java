@@ -106,9 +106,27 @@ public final class SenhaUtil {
         return gerarHash(senhaPlana);
     }
 
-    /** Indica se o valor já está no formato PBKDF2 (usado pela migração). */
+    /**
+     * O valor já está no formato PBKDF2?
+     *
+     * <p>Confere a <b>estrutura inteira</b>, não só o prefixo: cinco partes,
+     * iterações numéricas e Base64 decodificável. Uma checagem por prefixo
+     * aceitaria uma senha digitada literalmente como {@code pbkdf2$sha256$...},
+     * que então iria em claro para o banco e deixaria a conta inacessível — o
+     * login falharia no {@code parseInt} das iterações.</p>
+     */
     public static boolean estaEmHash(String valor) {
-        return valor != null && valor.startsWith(MARCADOR);
+        if (valor == null || !valor.startsWith(MARCADOR)) return false;
+        String[] partes = valor.split("\\$");
+        if (partes.length != 5) return false;
+        try {
+            Integer.parseInt(partes[2]);
+            Base64.getDecoder().decode(partes[3]);
+            Base64.getDecoder().decode(partes[4]);
+            return true;
+        } catch (RuntimeException e) {
+            return false;
+        }
     }
 
     private static byte[] derivar(String senha, byte[] salt, int iteracoes) {

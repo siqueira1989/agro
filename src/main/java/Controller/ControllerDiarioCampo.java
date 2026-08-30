@@ -118,6 +118,12 @@ public class ControllerDiarioCampo extends HttpServlet {
             }
         } catch (EstoqueInsuficienteException e) {
             writeJson(resp, 400, false, e.getMessage());
+        } catch (IllegalArgumentException e) {
+            // Violação de regra de negócio (transição de status inválida, diário
+            // concluído, jornada implausível). A mensagem é escrita para o usuário
+            // e precisa chegar até ele; antes caía no catch genérico e virava
+            // "Erro interno" com um código opaco.
+            writeJson(resp, 400, false, e.getMessage());
         } catch (Exception e) {
             // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
             String cod = Util.LogUtil.erro(ControllerDiarioCampo.class, "Falha tratada em ControllerDiarioCampo.", e);

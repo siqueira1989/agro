@@ -21,9 +21,19 @@ COMMENT ON COLUMN public.pessoa.senhapessoa IS
   'Hash PBKDF2-HMAC-SHA256 no formato pbkdf2$sha256$<iter>$<salt>$<hash>. '
   'Nunca gravar texto puro. Gerado por Util.SenhaUtil.';
 
--- 2) Barrar login duplicado antes de criar os indices ----------------------
--- Se houver dois cadastros com o mesmo usuario, o indice unico falharia com
--- uma mensagem opaca. Este bloco falha antes, dizendo exatamente quais sao.
+-- 2) Normalizar usuario em branco -----------------------------------------
+-- ControllerFuncionario grava a string crua do formulario: quem cadastra sem
+-- login fica com '' (string vazia), nao NULL. Como '' e um valor como outro
+-- qualquer, dois cadastros sem login seriam vistos como usuario duplicado e
+-- travariam a criacao do indice unico — e, depois, todo cadastro novo sem
+-- login. Em SQL, varios NULL convivem num indice unico; varios '' nao.
+UPDATE public.pessoa
+   SET usuariopessoa = NULL
+ WHERE usuariopessoa IS NOT NULL AND btrim(usuariopessoa) = '';
+
+-- 3) Barrar login realmente duplicado antes de criar os indices ------------
+-- Se sobrar duplicidade de verdade, o indice unico falharia com uma mensagem
+-- opaca. Este bloco falha antes, dizendo exatamente quais sao.
 DO $$
 DECLARE
     duplicados text;
@@ -33,7 +43,7 @@ BEGIN
       FROM (
           SELECT usuariopessoa AS u
             FROM public.pessoa
-           WHERE usuariopessoa IS NOT NULL
+           WHERE usuariopessoa IS NOT NULL AND btrim(usuariopessoa) <> ''
            GROUP BY usuariopessoa
           HAVING count(*) > 1
       ) d;
@@ -46,37 +56,40 @@ BEGIN
     END IF;
 END $$;
 
--- 3) Indice unico por tabela ------------------------------------------------
+-- 4) Indice unico por tabela ------------------------------------------------
 -- Resolve DOIS problemas de uma vez:
 --   a) unicidade dentro de cada tabela;
 --   b) o Seq Scan que o login provocava em 9 tabelas a cada tentativa.
 CREATE UNIQUE INDEX IF NOT EXISTS uk_pessoa_usuario
-    ON public.pessoa (usuariopessoa) WHERE usuariopessoa IS NOT NULL;
+    ON public.pessoa (usuariopessoa) WHERE usuariopessoa IS NOT NULL AND btrim(usuariopessoa) <> '';
 CREATE UNIQUE INDEX IF NOT EXISTS uk_pessoafisica_usuario
-    ON public.pessoafisica (usuariopessoa) WHERE usuariopessoa IS NOT NULL;
+    ON public.pessoafisica (usuariopessoa) WHERE usuariopessoa IS NOT NULL AND btrim(usuariopessoa) <> '';
 CREATE UNIQUE INDEX IF NOT EXISTS uk_funcionario_usuario
-    ON public.funcionario (usuariopessoa) WHERE usuariopessoa IS NOT NULL;
+    ON public.funcionario (usuariopessoa) WHERE usuariopessoa IS NOT NULL AND btrim(usuariopessoa) <> '';
 CREATE UNIQUE INDEX IF NOT EXISTS uk_funcionarioclt_usuario
-    ON public.funcionarioclt (usuariopessoa) WHERE usuariopessoa IS NOT NULL;
+    ON public.funcionarioclt (usuariopessoa) WHERE usuariopessoa IS NOT NULL AND btrim(usuariopessoa) <> '';
 CREATE UNIQUE INDEX IF NOT EXISTS uk_funcionariodiarista_usuario
-    ON public.funcionariodiarista (usuariopessoa) WHERE usuariopessoa IS NOT NULL;
+    ON public.funcionariodiarista (usuariopessoa) WHERE usuariopessoa IS NOT NULL AND btrim(usuariopessoa) <> '';
 CREATE UNIQUE INDEX IF NOT EXISTS uk_funcionarioempreita_usuario
-    ON public.funcionarioempreita (usuariopessoa) WHERE usuariopessoa IS NOT NULL;
+    ON public.funcionarioempreita (usuariopessoa) WHERE usuariopessoa IS NOT NULL AND btrim(usuariopessoa) <> '';
 CREATE UNIQUE INDEX IF NOT EXISTS uk_funcionarioproducao_usuario
-    ON public.funcionarioproducao (usuariopessoa) WHERE usuariopessoa IS NOT NULL;
+    ON public.funcionarioproducao (usuariopessoa) WHERE usuariopessoa IS NOT NULL AND btrim(usuariopessoa) <> '';
 CREATE UNIQUE INDEX IF NOT EXISTS uk_pessoacnpj_usuario
-    ON public.pessoacnpj (usuariopessoa) WHERE usuariopessoa IS NOT NULL;
+    ON public.pessoacnpj (usuariopessoa) WHERE usuariopessoa IS NOT NULL AND btrim(usuariopessoa) <> '';
 CREATE UNIQUE INDEX IF NOT EXISTS uk_parceiro_usuario
-    ON public.parceiro (usuariopessoa) WHERE usuariopessoa IS NOT NULL;
+    ON public.parceiro (usuariopessoa) WHERE usuariopessoa IS NOT NULL AND btrim(usuariopessoa) <> '';
 
--- 4) Unicidade GLOBAL na hierarquia ----------------------------------------
+-- 5) Unicidade GLOBAL na hierarquia ----------------------------------------
 -- Os indices acima nao impedem que um parceiro e um funcionario usem o mesmo
 -- login, porque cada um vive em uma tabela. Um SELECT na tabela-mae enxerga
 -- as filhas, entao o trigger cobre a hierarquia inteira.
 CREATE OR REPLACE FUNCTION public.trg_usuario_unico_hierarquia()
 RETURNS trigger AS $$
 BEGIN
-    IF NEW.usuariopessoa IS NULL THEN
+    -- Sem login informado nao ha o que verificar. Trata '' como ausencia,
+    -- senao o segundo cadastro sem login seria recusado como duplicado.
+    IF NEW.usuariopessoa IS NULL OR btrim(NEW.usuariopessoa) = '' THEN
+        NEW.usuariopessoa := NULL;
         RETURN NEW;
     END IF;
 
@@ -129,6 +142,6 @@ DROP TRIGGER IF EXISTS chk_usuario_unico ON public.parceiro;
 CREATE TRIGGER chk_usuario_unico BEFORE INSERT OR UPDATE OF usuariopessoa
     ON public.parceiro FOR EACH ROW EXECUTE FUNCTION public.trg_usuario_unico_hierarquia();
 
--- 5) A conversao das senhas existentes para PBKDF2 nao pode ser feita em SQL
+-- 6) A conversao das senhas existentes para PBKDF2 nao pode ser feita em SQL
 --    (o PostgreSQL nao calcula PBKDF2 sem pgcrypto). Ela roda no boot da
 --    aplicacao, em Util.MigracaoSenhas, disparada por Util.Bootstrap.

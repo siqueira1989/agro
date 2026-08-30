@@ -13,6 +13,8 @@ import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Encargos da folha: INSS, IRRF e FGTS (P1-9 da auditoria de 29/08/2026).
@@ -33,8 +35,8 @@ import java.util.List;
  * refletem a tabela de maio/2025 e existem para que a estrutura nasça
  * funcionando. Elas mudam por lei, normalmente todo ano.
  * <b>Confira com a contabilidade antes de usar a folha em produção.</b>
- * {@link #tabelaDesatualizada(LocalDate)} avisa quando a vigência mais recente
- * é anterior à competência que está sendo calculada.</p>
+ * {@link Encargos#tabelaConfiavel()} vem {@code false} quando a vigência
+ * encontrada não cobre bem a competência calculada.</p>
  */
 public final class EncargosService {
 
@@ -53,6 +55,26 @@ public final class EncargosService {
         }
     }
 
+    // ─────────────── cache das tabelas legais ───────────────
+    // As faixas mudam uma ou duas vezes por ano e têm 5 a 9 linhas. Sem cache,
+    // cada funcionário custava ~7 empréstimos de conexão do pool só para reler
+    // as mesmas linhas — numa folha de 80 pessoas, ~560 idas a um pool de 10.
+
+    private static final long TTL_CACHE_MS = 60L * 60L * 1000L;
+
+    private record CacheFaixas(List<Faixa> faixas, long expiraEm) { }
+    private record CacheValor(BigDecimal valor, long expiraEm) { }
+
+    private static final Map<String, CacheFaixas> CACHE_FAIXAS = new ConcurrentHashMap<>();
+    private static final Map<String, CacheValor>  CACHE_PARAMS = new ConcurrentHashMap<>();
+
+    /** Descarta o cache — chame depois de cadastrar uma nova vigência. */
+    public static void limparCache() {
+        CACHE_FAIXAS.clear();
+        CACHE_PARAMS.clear();
+        LogUtil.info(EncargosService.class, "Cache de tabelas de encargos limpo.");
+    }
+
     /**
      * Apura INSS, IRRF e FGTS sobre a remuneração bruta da competência.
      *
@@ -66,14 +88,16 @@ public final class EncargosService {
         BigDecimal base = bruto == null ? BigDecimal.ZERO : bruto.max(BigDecimal.ZERO);
 
         BigDecimal inss = calcularInss(base, competencia);
-        BigDecimal baseIrrf = base.subtract(inss)
+        BigDecimal baseLegal = base.subtract(inss)
                 .subtract(deducaoDependentes(dependentes, competencia))
                 .max(BigDecimal.ZERO);
-        BigDecimal irrf = calcularIrrf(baseIrrf, competencia);
+
+        BigDecimal irrf = calcularIrrf(base, inss, dependentes, competencia);
+
         BigDecimal fgts = base.multiply(parametro("FGTS_ALIQUOTA", competencia, new BigDecimal("0.08")))
                               .setScale(2, RoundingMode.HALF_UP);
 
-        return new Encargos(inss, irrf, fgts, baseIrrf, !tabelaDesatualizada(competencia));
+        return new Encargos(inss, irrf, fgts, baseLegal, tabelaConfiavel(competencia));
     }
 
     /**
@@ -103,23 +127,44 @@ public final class EncargosService {
     }
 
     /**
-     * IRRF pela tabela mensal: alíquota da faixa menos a parcela a deduzir.
+     * IRRF pela tabela mensal, escolhendo o modelo mais vantajoso.
      *
-     * <p>Compara com o desconto simplificado e aplica o que for mais vantajoso
-     * para o trabalhador, como manda a regra vigente.</p>
+     * <p>O desconto simplificado é uma <b>alternativa</b> às deduções legais, não
+     * um acréscimo a elas. A comparação correta é entre:</p>
+     * <ul>
+     *   <li><b>completo:</b> {@code bruto − INSS − dependentes};</li>
+     *   <li><b>simplificado:</b> {@code bruto − desconto simplificado}.</li>
+     * </ul>
+     *
+     * <p>A versão anterior subtraía o desconto simplificado de uma base que
+     * <b>já havia perdido o INSS e os dependentes</b>, e o {@code min()} sempre
+     * escolhia esse ramo. Num salário de R$ 5.000 sem dependentes isso retinha
+     * R$ 196,45 em vez de R$ 312,89 — <b>R$ 116 a menos por mês por
+     * funcionário</b>, que vira passivo fiscal.</p>
      */
-    public static BigDecimal calcularIrrf(BigDecimal baseCalculo, LocalDate competencia) throws SQLException {
-        List<Faixa> faixas = faixas("IRRF", competencia);
-        if (faixas.isEmpty() || baseCalculo.signum() <= 0) return BigDecimal.ZERO;
+    public static BigDecimal calcularIrrf(BigDecimal bruto, BigDecimal inss,
+                                          int dependentes, LocalDate competencia)
+            throws SQLException {
 
-        BigDecimal porFaixa = aplicarTabela(baseCalculo, faixas);
+        List<Faixa> faixas = faixas("IRRF", competencia);
+        if (faixas.isEmpty() || bruto == null || bruto.signum() <= 0) return BigDecimal.ZERO;
+
+        BigDecimal baseCompleta = bruto
+                .subtract(inss == null ? BigDecimal.ZERO : inss)
+                .subtract(deducaoDependentes(dependentes, competencia))
+                .max(BigDecimal.ZERO);
+        BigDecimal impostoCompleto = aplicarTabela(baseCompleta, faixas);
 
         BigDecimal simplificado = parametro("IRRF_DESCONTO_SIMPL", competencia, null);
-        if (simplificado != null) {
-            BigDecimal baseSimpl = baseCalculo.subtract(simplificado).max(BigDecimal.ZERO);
-            porFaixa = porFaixa.min(aplicarTabela(baseSimpl, faixas));
+        if (simplificado == null) {
+            return impostoCompleto.setScale(2, RoundingMode.HALF_UP);
         }
-        return porFaixa.max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
+
+        BigDecimal baseSimplificada = bruto.subtract(simplificado).max(BigDecimal.ZERO);
+        BigDecimal impostoSimplificado = aplicarTabela(baseSimplificada, faixas);
+
+        return impostoCompleto.min(impostoSimplificado)
+                .max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
     }
 
     private static BigDecimal aplicarTabela(BigDecimal base, List<Faixa> faixas) {
@@ -137,32 +182,74 @@ public final class EncargosService {
         return porDependente.multiply(BigDecimal.valueOf(dependentes));
     }
 
-    /** A vigência mais recente é anterior à competência calculada? */
-    public static boolean tabelaDesatualizada(LocalDate competencia) throws SQLException {
-        String sql = "SELECT max(vigencia_inicio) FROM faixa_encargo";
+    /**
+     * A vigência encontrada cobre bem a competência calculada?
+     *
+     * <p>Devolve {@code false} em dois casos, e os dois importam:</p>
+     * <ul>
+     *   <li>a tabela mais recente é anterior em mais de um ano — provavelmente
+     *       a lei mudou e ninguém cadastrou;</li>
+     *   <li>a competência é <b>anterior</b> à vigência mais antiga cadastrada —
+     *       é o caso de um recálculo retroativo. Antes, isso devolvia INSS e
+     *       IRRF zerados e ainda marcava o resultado como confiável.</li>
+     * </ul>
+     */
+    public static boolean tabelaConfiavel(LocalDate competencia) throws SQLException {
+        String sql = "SELECT min(vigencia_inicio), max(vigencia_inicio) FROM faixa_encargo";
         try (Connection c = new PostgresConnection().getConnection();
              PreparedStatement st = c.prepareStatement(sql);
              ResultSet rs = st.executeQuery()) {
-            if (!rs.next()) return true;
-            Date d = rs.getDate(1);
-            if (d == null) return true;
-            LocalDate maisRecente = d.toLocalDate();
-            boolean velha = maisRecente.plusYears(1).isBefore(competencia);
-            if (velha) {
+
+            if (!rs.next()) return false;
+            Date min = rs.getDate(1);
+            Date max = rs.getDate(2);
+            if (min == null || max == null) return false;
+
+            if (competencia.isBefore(min.toLocalDate())) {
                 LogUtil.aviso(EncargosService.class,
-                        "Tabela de encargos com vigência de " + maisRecente
+                        "Competência " + competencia + " é anterior à vigência mais antiga cadastrada ("
+                      + min.toLocalDate() + "). Usando a tabela mais antiga; confira o recálculo "
+                      + "retroativo com a contabilidade.", null);
+                return false;
+            }
+            if (max.toLocalDate().plusYears(1).isBefore(competencia)) {
+                LogUtil.aviso(EncargosService.class,
+                        "Tabela de encargos com vigência de " + max.toLocalDate()
                       + " sendo usada para a competência " + competencia
                       + ". Confirme as faixas com a contabilidade.", null);
+                return false;
             }
-            return velha;
+            return true;
         }
     }
 
+    /** @deprecated Nome invertido; use {@link #tabelaConfiavel(LocalDate)}. */
+    @Deprecated
+    public static boolean tabelaDesatualizada(LocalDate competencia) throws SQLException {
+        return !tabelaConfiavel(competencia);
+    }
+
+    /**
+     * Faixas vigentes na competência.
+     *
+     * <p>Quando a competência é anterior a tudo que está cadastrado, cai para a
+     * vigência mais antiga em vez de devolver lista vazia. Devolver vazia fazia
+     * o recálculo retroativo produzir INSS = 0 e IRRF = 0 silenciosamente — um
+     * líquido inflado apresentado como correto.</p>
+     */
     private static List<Faixa> faixas(String tributo, LocalDate competencia) throws SQLException {
+        String chave = tributo + "@" + competencia.withDayOfMonth(1);
+        long agora = System.currentTimeMillis();
+
+        CacheFaixas cache = CACHE_FAIXAS.get(chave);
+        if (cache != null && cache.expiraEm() > agora) return cache.faixas();
+
         String sql = "SELECT limite_ate, aliquota, parcela_deduzir FROM faixa_encargo "
                    + "WHERE tributo = ? AND vigencia_inicio = ("
-                   + "    SELECT max(vigencia_inicio) FROM faixa_encargo "
-                   + "     WHERE tributo = ? AND vigencia_inicio <= ?) "
+                   + "    SELECT COALESCE("
+                   + "        (SELECT max(vigencia_inicio) FROM faixa_encargo "
+                   + "          WHERE tributo = ? AND vigencia_inicio <= ?),"
+                   + "        (SELECT min(vigencia_inicio) FROM faixa_encargo WHERE tributo = ?))) "
                    + "ORDER BY ordem";
 
         List<Faixa> lista = new ArrayList<>();
@@ -171,31 +258,49 @@ public final class EncargosService {
             st.setString(1, tributo);
             st.setString(2, tributo);
             st.setDate(3, Date.valueOf(competencia));
+            st.setString(4, tributo);
             try (ResultSet rs = st.executeQuery()) {
                 while (rs.next()) {
                     lista.add(new Faixa(rs.getBigDecimal(1), rs.getBigDecimal(2), rs.getBigDecimal(3)));
                 }
             }
         }
+
         if (lista.isEmpty()) {
             LogUtil.aviso(EncargosService.class,
-                    "Nenhuma faixa de " + tributo + " vigente em " + competencia
-                  + ". O encargo será zero — aplique a migração V22 e confira a tabela.", null);
+                    "Nenhuma faixa de " + tributo + " cadastrada. O encargo será zero — "
+                  + "aplique a migração V22 e confira a tabela com a contabilidade.", null);
+            return lista;   // não cacheia a ausência
         }
+
+        CACHE_FAIXAS.put(chave, new CacheFaixas(List.copyOf(lista), agora + TTL_CACHE_MS));
         return lista;
     }
 
     private static BigDecimal parametro(String chave, LocalDate competencia, BigDecimal padrao)
             throws SQLException {
+
+        String chaveCache = chave + "@" + competencia.withDayOfMonth(1);
+        long agora = System.currentTimeMillis();
+
+        CacheValor cache = CACHE_PARAMS.get(chaveCache);
+        if (cache != null && cache.expiraEm() > agora) return cache.valor();
+
         String sql = "SELECT valor FROM parametro_encargo WHERE chave = ? AND vigencia_inicio <= ? "
                    + "ORDER BY vigencia_inicio DESC LIMIT 1";
+        BigDecimal valor = padrao;
         try (Connection c = new PostgresConnection().getConnection();
              PreparedStatement st = c.prepareStatement(sql)) {
             st.setString(1, chave);
             st.setDate(2, Date.valueOf(competencia));
             try (ResultSet rs = st.executeQuery()) {
-                return rs.next() ? rs.getBigDecimal(1) : padrao;
+                if (rs.next()) valor = rs.getBigDecimal(1);
             }
         }
+
+        if (valor != null) {
+            CACHE_PARAMS.put(chaveCache, new CacheValor(valor, agora + TTL_CACHE_MS));
+        }
+        return valor;
     }
 }

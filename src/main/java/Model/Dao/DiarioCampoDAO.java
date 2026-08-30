@@ -22,7 +22,6 @@ public class DiarioCampoDAO {
 
     private final VinculoDAO vinculoDAO = new VinculoDAO();
     private final EstoqueMovimentoDAO estoqueDAO = new EstoqueMovimentoDAO();
-    private static final BigDecimal DIAS_UTEIS_MES = new BigDecimal("22");
 
     /* ===================== CRIAÇÃO ===================== */
 
@@ -59,8 +58,10 @@ public class DiarioCampoDAO {
             c.setAutoCommit(false);
             try {
                 String status = statusAtual(c, d.getIdDiario());
-                if ("CONCLUIDA".equals(status)) throw new SQLException("Diário concluído não pode ser editado.");
-                atualizarCabecalho(c, d);
+                if ("CONCLUIDA".equals(status)) {
+                    throw new IllegalArgumentException("Diário concluído não pode ser editado.");
+                }
+                String statusFinal = atualizarCabecalho(c, d, status);
 
                 try (PreparedStatement st = c.prepareStatement(
                         "DELETE FROM diario_maquina WHERE iddiario=?")) {
@@ -84,10 +85,15 @@ public class DiarioCampoDAO {
                     }
                 }
                 // PLANEJADA continua sem custo (previsão); EM_ANDAMENTO/CONCLUIDA calculam.
-                if (calculaCusto(d.getStatus())) recalcularCustos(c, d.getIdDiario()); else zerarCustos(c, d.getIdDiario());
+                // Usa o status EFETIVAMENTE gravado, não o que veio no payload: uma
+                // requisição sem o campo "status" rebaixava um diário EM_ANDAMENTO
+                // para PLANEJADA e zerava custos já apurados, respondendo "sucesso".
+                if (calculaCusto(statusFinal)) recalcularCustos(c, d.getIdDiario());
+                else zerarCustos(c, d.getIdDiario());
                 c.commit();
-            } catch (SQLException e) { c.rollback(); throw e; }
-            finally { c.setAutoCommit(true); }
+            } catch (SQLException | RuntimeException e) {
+                c.rollback(); throw e;
+            } finally { c.setAutoCommit(true); }
         }
     }
 
@@ -140,10 +146,31 @@ public class DiarioCampoDAO {
         }
     }
 
-    private void atualizarCabecalho(Connection c, DiarioCampo d) throws SQLException {
-        // status só pode ser PLANEJADA ou EM_ANDAMENTO na edição (CONCLUIDA é via finalizar, e diário
-        // concluído nem chega aqui). Se vier algo diferente, mantém PLANEJADA.
-        String novoStatus = "EM_ANDAMENTO".equals(d.getStatus()) ? "EM_ANDAMENTO" : "PLANEJADA";
+    /**
+     * Grava o cabeçalho e devolve o status que ficou efetivamente no banco.
+     *
+     * @param statusAtualDoBanco status antes da edição, lido pelo chamador
+     */
+    private String atualizarCabecalho(Connection c, DiarioCampo d, String statusAtualDoBanco)
+            throws SQLException {
+        // O status so muda se o payload trouxer um valor VALIDO e a transicao for
+        // permitida; caso contrario o atual e preservado. Antes, qualquer valor
+        // diferente de EM_ANDAMENTO virava PLANEJADA — inclusive a ausencia do
+        // campo —, o que rebaixava o diario e, na sequencia, zerava seus custos.
+        // Era tambem um desvio da maquina de estados: CANCELADA voltava a
+        // PLANEJADA por "acao=update", sem passar por definirStatus.
+        String novoStatus = statusAtualDoBanco;
+        String pedido = d.getStatus() == null ? null : d.getStatus().trim().toUpperCase();
+        if ("EM_ANDAMENTO".equals(pedido) || "PLANEJADA".equals(pedido)) {
+            if (pedido.equals(statusAtualDoBanco)
+                    || !STATUS_CONHECIDOS.contains(statusAtualDoBanco)
+                    || TRANSICOES_PERMITIDAS.get(pedido).contains(statusAtualDoBanco)) {
+                novoStatus = pedido;
+            } else {
+                throw new IllegalArgumentException(
+                    "Transição de status inválida: " + statusAtualDoBanco + " para " + pedido + ".");
+            }
+        }
         String sql = "UPDATE diario_campo SET data=?, id_area=?, id_quadra=?, id_cultura=?, id_responsavel=?, "
                 + "id_tipo_atividade=?, descricao=?, data_prevista=?, hora_inicio=?, hora_fim=?, observacoes=?, id_safra=?, status=? WHERE iddiario=?";
         try (PreparedStatement st = c.prepareStatement(sql)) {
@@ -156,6 +183,7 @@ public class DiarioCampoDAO {
             st.setString(13, novoStatus); st.setInt(14, d.getIdDiario());
             st.executeUpdate();
         }
+        return novoStatus;
     }
 
     private int proximoId(Connection c) throws SQLException {
@@ -216,6 +244,12 @@ public class DiarioCampoDAO {
     public void recalcularCustos(Connection c, int idDiario) throws SQLException {
         BigDecimal custoMO = BigDecimal.ZERO, custoMaq = BigDecimal.ZERO, custoIns = BigDecimal.ZERO;
 
+        // Pares (pessoa, dia) de diaristas tocados aqui: ao fim, os OUTROS diários
+        // do mesmo dia precisam ser reajustados, senão o rateio fica pela metade
+        // (um diário com a diária cheia e o outro com a metade).
+        List<int[]> diaristasParaRatear = new ArrayList<>();
+        List<LocalDate> diasParaRatear = new ArrayList<>();
+
         // Mão de obra
         for (Object[] f : carregarFuncBrutos(c, idDiario)) {
             int id = (int) f[0]; String tipo = (String) f[1]; BigDecimal horas = (BigDecimal) f[2];
@@ -225,17 +259,16 @@ public class DiarioCampoDAO {
             BigDecimal custoHora = BigDecimal.ZERO, custo;
 
             if ("CLT".equalsIgnoreCase(tipo)) {
-                custoHora = custoHoraCLT(c, idpessoa);
+                custoHora = custoHoraCLT(c, idpessoa, dataExec);
                 custo = custoHora.multiply(nz(horas)).setScale(2, RoundingMode.HALF_UP);
 
             } else if ("DIARISTA".equalsIgnoreCase(tipo)) {
                 // P1-6: a diária é por PESSOA e por DIA, não por lançamento. Se o
                 // diarista trabalhou em três atividades no mesmo dia, antes eram
                 // cobradas três diárias. Agora a diária é rateada entre elas.
-                BigDecimal diaria = valorDiaria(c, idpessoa);
-                int lancamentosNoDia = contarLancamentosNoDia(c, idpessoa, dataExec, "DIARISTA");
-                custo = diaria.divide(BigDecimal.valueOf(Math.max(lancamentosNoDia, 1)),
-                                      2, RoundingMode.HALF_UP);
+                custo = custoDiariaRateada(c, idpessoa, dataExec);
+                diaristasParaRatear.add(new int[]{ idpessoa });
+                diasParaRatear.add(dataExec);
 
             } else if ("EMPREITA".equalsIgnoreCase(tipo)) {
                 // P1-6: usava funcionarioempreita.valorfixoacordado — o valor do
@@ -294,6 +327,85 @@ public class DiarioCampoDAO {
                 + "custo_maquinas=?, custo_total=? WHERE iddiario=?")) {
             st.setBigDecimal(1, custoMO); st.setBigDecimal(2, custoIns); st.setBigDecimal(3, custoMaq);
             st.setBigDecimal(4, total); st.setInt(5, idDiario); st.executeUpdate();
+        }
+
+        for (int k = 0; k < diaristasParaRatear.size(); k++) {
+            ratearDiariaNosDemaisDiarios(c, diaristasParaRatear.get(k)[0], diasParaRatear.get(k), idDiario);
+        }
+    }
+
+    /**
+     * Valor que cabe a UM lançamento de diária: a diária dividida pelo número de
+     * lançamentos daquela pessoa naquele dia.
+     */
+    private BigDecimal custoDiariaRateada(Connection c, int idpessoa, LocalDate data) throws SQLException {
+        BigDecimal diaria = valorDiaria(c, idpessoa);
+        int lancamentos = contarLancamentosNoDia(c, idpessoa, data, "DIARISTA");
+        return diaria.divide(BigDecimal.valueOf(Math.max(lancamentos, 1)), 2, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Propaga o rateio da diária para os OUTROS diários do mesmo dia.
+     *
+     * <p>Sem isto, o rateio só funcionava no caso de um lançamento por dia — que
+     * já estava certo antes. Com dois diários: o primeiro gravava a diária cheia
+     * (só existia um lançamento na hora do cálculo) e o segundo gravava metade;
+     * ninguém voltava para corrigir o primeiro, e o dia somava 1,5 diária. Com
+     * três, somava 1,83.</p>
+     *
+     * <p>Diários já CONCLUIDA não são alterados — o custo deles é um retrato
+     * fechado —, mas continuam contando no divisor, e o fato vai para o log para
+     * que a diferença não passe despercebida.</p>
+     */
+    private void ratearDiariaNosDemaisDiarios(Connection c, int idpessoa, LocalDate data, int idDiarioOrigem)
+            throws SQLException {
+        if (data == null) return;
+
+        BigDecimal valor = custoDiariaRateada(c, idpessoa, data);
+        List<Integer> afetados = new ArrayList<>();
+
+        String sel = "SELECT df.id, df.iddiario, d.status FROM diario_funcionario df "
+                   + "JOIN diario_campo d ON d.iddiario = df.iddiario "
+                   + "WHERE df.idpessoa=? AND df.data_execucao=? "
+                   + "AND upper(df.tipo_funcionario)='DIARISTA' "
+                   + "AND COALESCE(d.status,'') <> 'CANCELADA' AND df.iddiario <> ?";
+        try (PreparedStatement st = c.prepareStatement(sel)) {
+            st.setInt(1, idpessoa); st.setDate(2, Date.valueOf(data)); st.setInt(3, idDiarioOrigem);
+            try (ResultSet rs = st.executeQuery()) {
+                while (rs.next()) {
+                    int idLinha = rs.getInt(1);
+                    int idDiario = rs.getInt(2);
+                    String status = rs.getString(3);
+                    if ("CONCLUIDA".equals(status)) {
+                        Util.LogUtil.aviso(DiarioCampoDAO.class,
+                                "Diário " + idDiario + " está CONCLUIDA e mantém a diária antiga "
+                              + "do diarista " + idpessoa + " em " + data
+                              + "; o rateio correto agora seria " + valor + ".", null);
+                        continue;
+                    }
+                    try (PreparedStatement up = c.prepareStatement(
+                            "UPDATE diario_funcionario SET custo=? WHERE id=?")) {
+                        up.setBigDecimal(1, valor); up.setInt(2, idLinha); up.executeUpdate();
+                    }
+                    if (!afetados.contains(idDiario)) afetados.add(idDiario);
+                }
+            }
+        }
+
+        for (int idDiario : afetados) atualizarTotaisCabecalho(c, idDiario);
+    }
+
+    /** Recalcula custo_mao_obra e custo_total do cabeçalho a partir das linhas. */
+    private void atualizarTotaisCabecalho(Connection c, int idDiario) throws SQLException {
+        String sql = "UPDATE diario_campo d SET "
+                   + "  custo_mao_obra = COALESCE((SELECT SUM(custo) FROM diario_funcionario "
+                   + "                              WHERE iddiario = d.iddiario), 0), "
+                   + "  custo_total = COALESCE((SELECT SUM(custo) FROM diario_funcionario "
+                   + "                           WHERE iddiario = d.iddiario), 0) "
+                   + "              + d.custo_insumos + d.custo_maquinas "
+                   + "WHERE d.iddiario = ?";
+        try (PreparedStatement st = c.prepareStatement(sql)) {
+            st.setInt(1, idDiario); st.executeUpdate();
         }
     }
 
@@ -360,27 +472,38 @@ public class DiarioCampoDAO {
     public void definirStatus(int idDiario, String status) throws SQLException {
         String novo = status == null ? "" : status.trim().toUpperCase();
 
+        // Estas sao violacoes de REGRA DE NEGOCIO, nao falhas tecnicas: por isso
+        // IllegalArgumentException, que o ControllerDiarioCampo traduz em HTTP 400
+        // com a mensagem visivel. Como SQLException, caiam no catch generico e o
+        // usuario recebia "Erro interno" com um codigo opaco.
         if ("CONCLUIDA".equals(novo)) {
-            throw new SQLException(
+            throw new IllegalArgumentException(
                 "Para concluir a atividade use a ação Finalizar: é ela que recalcula "
               + "os custos e dá baixa nos insumos.");
         }
         if (!TRANSICOES_PERMITIDAS.containsKey(novo)) {
-            throw new SQLException("Status inválido: " + status + ".");
+            throw new IllegalArgumentException("Status inválido: " + status + ".");
         }
 
         try (Connection c = new PostgresConnection().getConnection()) {
             String atual = statusAtual(c, idDiario);
-            if (atual == null) throw new SQLException("Diário não encontrado.");
+            if (atual == null) throw new IllegalArgumentException("Diário não encontrado.");
             if (atual.equals(novo)) return;
 
             if ("CONCLUIDA".equals(atual)) {
-                throw new SQLException(
+                throw new IllegalArgumentException(
                     "Diário concluído não pode voltar para " + novo + ". O estoque já foi "
                   + "baixado; reabrir exigiria estorno das movimentações.");
             }
-            if (!TRANSICOES_PERMITIDAS.get(novo).contains(atual)) {
-                throw new SQLException("Transição de status inválida: " + atual + " para " + novo + ".");
+            // Diario com status legado (nulo, minusculo, valor antigo) nao pode
+            // ficar travado: registra o fato e deixa passar.
+            if (!STATUS_CONHECIDOS.contains(atual)) {
+                Util.LogUtil.aviso(DiarioCampoDAO.class,
+                        "Diário " + idDiario + " com status legado '" + atual
+                      + "'; transição para " + novo + " permitida.", null);
+            } else if (!TRANSICOES_PERMITIDAS.get(novo).contains(atual)) {
+                throw new IllegalArgumentException(
+                    "Transição de status inválida: " + atual + " para " + novo + ".");
             }
 
             try (PreparedStatement st = c.prepareStatement(
@@ -394,10 +517,17 @@ public class DiarioCampoDAO {
 
     /** Status de origem aceitos para cada status de destino. */
     private static final Map<String, java.util.Set<String>> TRANSICOES_PERMITIDAS = Map.of(
-        "PLANEJADA",    java.util.Set.of("EM_ANDAMENTO"),
-        "EM_ANDAMENTO", java.util.Set.of("PLANEJADA"),
+        // CANCELADA e reversivel de proposito: cancelar por engano nao pode
+        // obrigar a recriar o diario do zero, com novo numero e sem o historico
+        // de execucoes. O que continua irreversivel e CONCLUIDA, porque ali o
+        // estoque ja foi baixado.
+        "PLANEJADA",    java.util.Set.of("EM_ANDAMENTO", "CANCELADA"),
+        "EM_ANDAMENTO", java.util.Set.of("PLANEJADA", "CANCELADA"),
         "CANCELADA",    java.util.Set.of("PLANEJADA", "EM_ANDAMENTO")
     );
+
+    private static final java.util.Set<String> STATUS_CONHECIDOS =
+        java.util.Set.of("PLANEJADA", "EM_ANDAMENTO", "CONCLUIDA", "CANCELADA");
 
     /* ===================== CONSULTAS ===================== */
 
@@ -507,8 +637,11 @@ public class DiarioCampoDAO {
         String sql = "SELECT f.idpessoa, pe.nomepessoa, "
                 + "CASE WHEN c.idpessoa IS NOT NULL THEN 'CLT' WHEN di.idpessoa IS NOT NULL THEN 'DIARISTA' "
                 + "     WHEN e.idpessoa IS NOT NULL THEN 'EMPREITA' ELSE 'OUTRO' END AS tipo, "
+                // P1-11: era "* 22.0" fixo. O divisor passa a ser o numero real de
+                // dias uteis do mes de referencia, calculado em Java e passado como
+                // parametro — mesma fonte usada por custoHoraCLT.
                 + "CASE WHEN c.idpessoa IS NOT NULL THEN round(COALESCE(v.salario_mensal, c.salariomensal, 0) / "
-                + "        (GREATEST(COALESCE(v.carga_horaria_diaria, c.cargahorariadiaria, 8),1) * 22.0), 2) "
+                + "        (GREATEST(COALESCE(v.carga_horaria_diaria, c.cargahorariadiaria, 8),1) * CAST(? AS numeric)), 2) "
                 + "     WHEN di.idpessoa IS NOT NULL THEN COALESCE(di.valorpordia, 0) "
                 + "     WHEN e.idpessoa IS NOT NULL THEN COALESCE(e.valorfixoacordado, 0) ELSE 0 END AS custo_ref "
                 + "FROM funcionario f JOIN pessoa pe ON pe.idpessoa=f.idpessoa "
@@ -523,9 +656,13 @@ public class DiarioCampoDAO {
                         + "OR (c.idpessoa IS NULL AND f.situacaopessoa = true) " : "")
                 + "ORDER BY pe.nomepessoa";
         List<Map<String, Object>> out = new ArrayList<>();
+        // O "?" dos dias uteis aparece na lista do SELECT, antes dos parametros do
+        // JOIN — a ordem dos indices segue a posicao no texto do SQL.
+        int diasUteis = Service.ParametrosFolhaService.diasUteisDoMesDe(data);
         try (Connection c = new PostgresConnection().getConnection();
              PreparedStatement st = c.prepareStatement(sql)) {
-            if (data != null) { st.setDate(1, Date.valueOf(data)); st.setDate(2, Date.valueOf(data)); }
+            st.setBigDecimal(1, BigDecimal.valueOf(Math.max(diasUteis, 1)));
+            if (data != null) { st.setDate(2, Date.valueOf(data)); st.setDate(3, Date.valueOf(data)); }
             try (ResultSet rs = st.executeQuery()) {
                 while (rs.next()) {
                     Map<String, Object> m = new LinkedHashMap<>();
@@ -551,7 +688,16 @@ public class DiarioCampoDAO {
         }
     }
 
-    private BigDecimal custoHoraCLT(Connection c, int idpessoa) throws SQLException {
+    /**
+     * Custo da hora de um CLT para efeito de custeio da atividade.
+     *
+     * <p>P1-11: dividia por uma constante fixa de 22 dias úteis, enquanto a
+     * folha usava os dias úteis reais do mês. A hora do mesmo funcionário
+     * custava um valor aqui e outro na folha — em fevereiro, 10% de diferença.
+     * O divisor agora vem de {@link Service.ParametrosFolhaService}, que conta
+     * os dias úteis do mês <b>da atividade</b>, feriados descontados.</p>
+     */
+    private BigDecimal custoHoraCLT(Connection c, int idpessoa, LocalDate dataExec) throws SQLException {
         BigDecimal salario = BigDecimal.ZERO; int carga = 8;
         try {
             // P1-8: era buscarAtivo(idpessoa), que abria OUTRA conexão dentro
@@ -567,7 +713,8 @@ public class DiarioCampoDAO {
             }
         }
         if (salario.signum() == 0) return BigDecimal.ZERO;
-        return salario.divide(new BigDecimal(carga).multiply(DIAS_UTEIS_MES), 2, RoundingMode.HALF_UP);
+        return Service.ParametrosFolhaService.custoHoraProdutiva(
+                salario, carga, java.time.YearMonth.from(dataExec != null ? dataExec : LocalDate.now()));
     }
 
     /**
@@ -580,7 +727,9 @@ public class DiarioCampoDAO {
         String sql = "SELECT COUNT(*) FROM diario_funcionario df "
                    + "JOIN diario_campo d ON d.iddiario = df.iddiario "
                    + "WHERE df.idpessoa = ? AND df.data_execucao = ? "
-                   + "AND upper(df.tipo_funcionario) = ? AND d.status <> 'CANCELADA'";
+                   // COALESCE: comparar NULL com 'CANCELADA' devolve NULL, nao TRUE,
+                   // e a linha sumia do divisor.
+                   + "AND upper(df.tipo_funcionario) = ? AND COALESCE(d.status,'') <> 'CANCELADA'";
         try (PreparedStatement st = c.prepareStatement(sql)) {
             st.setInt(1, idpessoa);
             st.setDate(2, Date.valueOf(data));

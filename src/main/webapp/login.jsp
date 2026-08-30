@@ -3,9 +3,27 @@
 <%
     String _redirect = request.getParameter("redirect");
     String _ctx      = request.getContextPath();
-    // Valida: só aceita URLs internas do sistema
-    if (_redirect == null || _redirect.isEmpty()
-            || !_redirect.startsWith(_ctx + "/view/admin/")) {
+
+    // Validacao do destino pos-login.
+    //
+    // Duas exigencias, nao uma:
+    //   1) tem de ser uma URL interna do sistema (o startsWith de antes);
+    //   2) tem de conter APENAS caracteres seguros de URL.
+    //
+    // So o startsWith nao bastava: o valor e impresso dentro de uma string
+    // JavaScript logo abaixo, e um destino como
+    //     /agro/view/admin/x';alert(document.cookie);//
+    // passava na verificacao e era injetado cru entre as aspas — XSS refletido.
+    // O AuthFilter agora GERA links com ?redirect= a cada acesso sem sessao, o
+    // que tornava o ataque bem plausivel. A lista branca de caracteres fecha o
+    // vetor na origem: aspas, barra invertida e sinal de menor nao entram.
+    boolean _destinoValido =
+            _redirect != null
+         && !_redirect.isEmpty()
+         && _redirect.startsWith(_ctx + "/view/admin/")
+         && _redirect.matches("[A-Za-z0-9/_.\\-]*(\\?[A-Za-z0-9/_.\\-=&%]*)?");
+
+    if (!_destinoValido) {
         _redirect = _ctx + "/view/admin/index.jsp";
     }
     // Já logado: vai direto ao destino

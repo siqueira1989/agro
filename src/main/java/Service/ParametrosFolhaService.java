@@ -1,5 +1,6 @@
 package Service;
 
+import Util.ConfigUtil;
 import Util.LogUtil;
 import Util.PostgresConnection;
 
@@ -19,7 +20,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Origem única dos parâmetros de tempo e de divisores da folha
+ * Origem única dos parâmetros de tempo e dos divisores da folha
  * (P1-10 e P1-11 da auditoria de 29/08/2026).
  *
  * <h3>O que estava errado</h3>
@@ -46,23 +47,35 @@ import java.util.concurrent.ConcurrentHashMap;
  *   <li><b>Folha (o que a lei manda pagar e descontar).</b> Para salário mensal,
  *       o valor do dia é {@code salário / 30} — CLT, art. 64. Descontar uma
  *       falta por {@code salário / diasÚteis} tirava ≈4,5% do salário no lugar
- *       dos ≈3,3% devidos: desconto a maior em toda falta injustificada.</li>
+ *       dos ≈3,3% devidos. Já a hora normal usa o divisor <b>220</b> da jornada
+ *       de 44 h semanais, e não 240.</li>
  *   <li><b>Custeio da atividade (quanto a hora trabalhada custa à fazenda).</b>
  *       Aí o salário se dilui nas horas efetivamente produtivas do mês:
  *       {@code salário / (jornada × diasÚteis do mês)}. Dividir por 30 aqui
  *       subestimaria o custo, porque incluiria os dias de descanso.</li>
  * </ul>
- *
- * <p>Os dois métodos existem, têm nomes que dizem para que servem, e os feriados
- * entram no cálculo dos dias úteis em ambos os casos.</p>
  */
 public final class ParametrosFolhaService {
 
     /** Divisor legal do salário mensal para obter o valor do dia (CLT, art. 64). */
     public static final BigDecimal DIVISOR_MENSAL_LEGAL = new BigDecimal("30");
 
-    /** Cache de feriados por ano — evita ida ao banco a cada dia avaliado. */
-    private static final Map<Integer, Set<LocalDate>> CACHE_FERIADOS = new ConcurrentHashMap<>();
+    /**
+     * Horas mensais por hora de jornada diária: 27,5.
+     *
+     * <p>Uma jornada de 8 h corresponde a 44 h semanais e ao divisor legal de
+     * <b>220 horas mensais</b> (8 × 27,5 = 220). O código anterior derivava a
+     * hora de {@code salário / 30 / jornada} — divisor 240 —, o que pagava toda
+     * hora extra e todo adicional noturno ≈8,3% <b>a menos</b> do que o devido.</p>
+     */
+    private static final BigDecimal HORAS_MENSAIS_POR_HORA_DIARIA = new BigDecimal("27.5");
+
+    /** Validade do cache de feriados: um cadastro novo vale sem reiniciar o Tomcat. */
+    private static final long TTL_CACHE_MS = 60L * 60L * 1000L;
+
+    private record Cache(Set<LocalDate> dias, long expiraEm) { }
+
+    private static final Map<Integer, Cache> CACHE_FERIADOS = new ConcurrentHashMap<>();
 
     private ParametrosFolhaService() { }
 
@@ -74,7 +87,10 @@ public final class ParametrosFolhaService {
         int total = 0;
         for (int d = 1; d <= mes.lengthOfMonth(); d++) {
             LocalDate dia = mes.atDay(d);
-            if (ehDiaUtil(dia, feriados)) total++;
+            DayOfWeek dow = dia.getDayOfWeek();
+            if (dow == DayOfWeek.SATURDAY || dow == DayOfWeek.SUNDAY) continue;
+            if (feriados.contains(dia)) continue;
+            total++;
         }
         return total;
     }
@@ -86,12 +102,6 @@ public final class ParametrosFolhaService {
 
     public static boolean ehFeriado(LocalDate dia) {
         return feriadosDoAno(dia.getYear()).contains(dia);
-    }
-
-    private static boolean ehDiaUtil(LocalDate dia, Set<LocalDate> feriados) {
-        DayOfWeek dow = dia.getDayOfWeek();
-        if (dow == DayOfWeek.SATURDAY || dow == DayOfWeek.SUNDAY) return false;
-        return !feriados.contains(dia);
     }
 
     // ───────────────────────── folha (regra legal) ─────────────────────────
@@ -107,15 +117,17 @@ public final class ParametrosFolhaService {
     }
 
     /**
-     * Valor da hora normal para fins de folha: {@code salário / (jornada × 30)}.
+     * Valor da hora normal: {@code salário / (jornada × 27,5)} — divisor 220
+     * para a jornada padrão de 8 h.
      *
      * <p>É a base sobre a qual incidem o adicional de hora extra e o adicional
      * noturno.</p>
      */
     public static BigDecimal valorHoraFolha(BigDecimal salarioMensal, int jornadaDiaria) {
+        if (salarioMensal == null || salarioMensal.signum() <= 0) return BigDecimal.ZERO;
         int jornada = jornadaDiaria > 0 ? jornadaDiaria : 8;
-        return valorDiaFolha(salarioMensal)
-                .divide(BigDecimal.valueOf(jornada), 4, RoundingMode.HALF_UP);
+        BigDecimal horasMensais = HORAS_MENSAIS_POR_HORA_DIARIA.multiply(BigDecimal.valueOf(jornada));
+        return salarioMensal.divide(horasMensais, 4, RoundingMode.HALF_UP);
     }
 
     // ───────────────────── custeio de atividade ─────────────────────
@@ -135,50 +147,113 @@ public final class ParametrosFolhaService {
                 BigDecimal.valueOf((long) jornada * uteis), 2, RoundingMode.HALF_UP);
     }
 
+    /** Dias úteis do mês da data informada — usado pelas consultas do Diário. */
+    public static int diasUteisDoMesDe(LocalDate data) {
+        return diasUteis(YearMonth.from(data != null ? data : LocalDate.now()));
+    }
+
     // ───────────────────────── feriados ─────────────────────────
 
     /**
      * Feriados do ano: os de data fixa vêm da tabela {@code feriado}; os móveis
      * (Carnaval, Sexta-feira Santa e Corpus Christi) são derivados da Páscoa e
      * não precisam ser cadastrados a cada ano.
+     *
+     * <p>A abrangência é respeitada: feriados estaduais só valem para a UF
+     * configurada em {@code folha.uf} e os municipais para o município em
+     * {@code folha.municipio}. Sem esse filtro, um feriado municipal de outra
+     * cidade reduziria o divisor de todo mundo.</p>
+     *
+     * <p><b>Falha de leitura não é cacheada.</b> Se o banco estiver
+     * indisponível no primeiro cálculo do ano, o conjunto incompleto seria
+     * gravado no cache e, pelo resto da vida da JVM, 7 de setembro e Natal
+     * deixariam de existir para o cálculo — sem nenhum erro visível.</p>
      */
     private static Set<LocalDate> feriadosDoAno(int ano) {
-        return CACHE_FERIADOS.computeIfAbsent(ano, a -> {
-            Set<LocalDate> dias = new HashSet<>(feriadosMoveis(a));
-            String sql = "SELECT data FROM feriado WHERE EXTRACT(YEAR FROM data) = ?";
-            try (Connection c = new PostgresConnection().getConnection();
-                 PreparedStatement st = c.prepareStatement(sql)) {
-                st.setInt(1, a);
-                try (ResultSet rs = st.executeQuery()) {
-                    while (rs.next()) {
-                        Date d = rs.getDate(1);
-                        if (d != null) dias.add(d.toLocalDate());
-                    }
-                }
-            } catch (SQLException e) {
-                // Sem a tabela (migração V21 ainda não aplicada) o cálculo segue
-                // apenas com os feriados móveis — melhor do que interromper a
-                // folha, mas o fato precisa ficar registrado.
-                LogUtil.aviso(ParametrosFolhaService.class,
-                        "Não foi possível ler a tabela de feriados do ano " + a
-                      + "; considerando apenas os feriados móveis.", e);
-            }
-            return dias;
-        });
+        long agora = System.currentTimeMillis();
+        Cache atual = CACHE_FERIADOS.get(ano);
+        if (atual != null && atual.expiraEm() > agora) return atual.dias();
+
+        Set<LocalDate> dias = new HashSet<>(feriadosMoveis(ano));
+        try {
+            dias.addAll(feriadosCadastrados(ano));
+            CACHE_FERIADOS.put(ano, new Cache(Set.copyOf(dias), agora + TTL_CACHE_MS));
+        } catch (SQLException e) {
+            // Não cacheia: a próxima chamada tenta de novo em vez de congelar
+            // um calendário incompleto.
+            LogUtil.aviso(ParametrosFolhaService.class,
+                    "Não foi possível ler a tabela de feriados do ano " + ano
+                  + "; considerando apenas os feriados móveis nesta chamada.", e);
+        }
+        return dias;
     }
 
-    /** Limpa o cache — chame após cadastrar ou remover feriados. */
+    private static Set<LocalDate> feriadosCadastrados(int ano) throws SQLException {
+        String uf        = ConfigUtil.get("folha.uf", null);
+        String municipio = ConfigUtil.get("folha.municipio", null);
+
+        // Intervalo de datas em vez de EXTRACT(YEAR FROM data): função sobre a
+        // coluna impede o uso do índice idx_feriado_data.
+        String sql = "SELECT data FROM feriado "
+                   + "WHERE data >= ? AND data <= ? "
+                   + "AND (abrangencia = 'NACIONAL' "
+                   + "  OR (abrangencia = 'ESTADUAL'  AND uf = ?) "
+                   + "  OR (abrangencia = 'MUNICIPAL' AND municipio = ?))";
+
+        Set<LocalDate> dias = new HashSet<>();
+        try (Connection c = new PostgresConnection().getConnection();
+             PreparedStatement st = c.prepareStatement(sql)) {
+            st.setDate(1, Date.valueOf(LocalDate.of(ano, 1, 1)));
+            st.setDate(2, Date.valueOf(LocalDate.of(ano, 12, 31)));
+            st.setString(3, uf);
+            st.setString(4, municipio);
+            try (ResultSet rs = st.executeQuery()) {
+                while (rs.next()) {
+                    Date d = rs.getDate(1);
+                    if (d != null) dias.add(d.toLocalDate());
+                }
+            }
+        }
+        return dias;
+    }
+
+    /** Limpa o cache — chame após cadastrar, alterar ou remover feriados. */
     public static void limparCacheFeriados() {
         CACHE_FERIADOS.clear();
+        LogUtil.info(ParametrosFolhaService.class, "Cache de feriados limpo.");
     }
 
+    /**
+     * Feriados móveis derivados da Páscoa.
+     *
+     * <p><b>Só a Sexta-feira Santa entra por padrão.</b> Carnaval (segunda e
+     * terça) e Corpus Christi <b>não são feriados nacionais</b> — são ponto
+     * facultativo, e cada empresa decide se para. Contá-los como feriado
+     * reduziria os dias úteis de todo mundo: em fevereiro de 2026, de 20 para
+     * 18, o que infla o custo da hora produtiva em ~11% para uma fazenda que
+     * trabalha no Carnaval.</p>
+     *
+     * <p>Quem não trabalha nessas datas liga em {@code agro.properties}:</p>
+     * <pre>
+     * folha.feriado.carnaval=true
+     * folha.feriado.corpusChristi=true
+     * </pre>
+     * <p>Feriados estaduais e municipais continuam vindo da tabela
+     * {@code feriado}, com a abrangência respeitada.</p>
+     */
     private static Set<LocalDate> feriadosMoveis(int ano) {
         LocalDate pascoa = domingoDePascoa(ano);
         Set<LocalDate> dias = new HashSet<>();
-        dias.add(pascoa.minusDays(48));  // segunda de Carnaval
-        dias.add(pascoa.minusDays(47));  // terça de Carnaval
-        dias.add(pascoa.minusDays(2));   // Sexta-feira Santa
-        dias.add(pascoa.plusDays(60));   // Corpus Christi
+
+        dias.add(pascoa.minusDays(2));   // Sexta-feira Santa — feriado nacional
+
+        if (ConfigUtil.getBoolean("folha.feriado.carnaval", false)) {
+            dias.add(pascoa.minusDays(48));  // segunda de Carnaval
+            dias.add(pascoa.minusDays(47));  // terça de Carnaval
+        }
+        if (ConfigUtil.getBoolean("folha.feriado.corpusChristi", false)) {
+            dias.add(pascoa.plusDays(60));
+        }
         return dias;
     }
 

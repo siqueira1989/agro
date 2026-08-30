@@ -52,7 +52,10 @@ public class AuthFilter implements Filter {
 
     /** Caminhos exatos liberados sem sessão. */
     private static final Set<String> PUBLICOS_EXATOS = new HashSet<>(Arrays.asList(
-        "/", "/login.jsp", "/LoginServlet", "/LogoutServlet", "/favicon.ico"
+        // "/" NÃO entra aqui: a raiz cai no welcome-file index.jsp e serviria o
+        // painel (estrutura, menu, títulos) a quem não fez login. Sem sessão, a
+        // raiz agora redireciona para a tela de login, como deve ser.
+        "/login.jsp", "/LoginServlet", "/LogoutServlet", "/favicon.ico"
     ));
 
     /** Prefixos liberados: recursos estáticos servidos ao navegador. */

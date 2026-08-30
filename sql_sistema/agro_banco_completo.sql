@@ -1,31 +1,15 @@
--- =====================================================================
--- AGRO TECH ONE — BANCO DE DADOS COMPLETO (schema consolidado)
--- Recria o banco do zero: createdb agro && psql -U postgres -d agro -f agro_banco_completo.sql
---
--- HISTÓRICO DE VERSÕES (migrações em src/main/resources/db/migration)
---   V1 base · V2 triggers · V3 CLT rural · V4 vínculo · V5 id_vinculo
---   V6 empreita · V7 produção/caixas · V8 CLT multi-modo · V9 pagamentos
---   V10 tipo_parceiro · V11 estoque insumos · V12 remove talão
---   V13 quadras + situacao · V14 Diário de Campo · V15 Maquinário
---   V16 Safra (safra + safra_talhao N:N, area_ha no talhão, id_safra no diário,
---       rateio de custos COE/SEBRAE-CONAB, trava por período)
---   V17 Safra obrigatória no Diário (id_safra NOT NULL, FK ON DELETE RESTRICT)
---
--- SCHEMA (estrutura), sem dados. Gerado via pg_dump.
--- =====================================================================
-
-
 --
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 17.4
--- Dumped by pg_dump version 17.4
+\restrict dP07Dw8sF7BSy2Fb1mvtcBtTbPWAsjYeSmjh7hRoxsnJPUcH62Wm3uDDyi6XeJV
+
+-- Dumped from database version 16.13 (Ubuntu 16.13-0ubuntu0.24.04.1)
+-- Dumped by pg_dump version 16.13 (Ubuntu 16.13-0ubuntu0.24.04.1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
 SET idle_in_transaction_session_timeout = 0;
-SET transaction_timeout = 0;
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
 SELECT pg_catalog.set_config('search_path', '', false);
@@ -88,6 +72,55 @@ BEGIN
     DELETE FROM pagamento              WHERE idpessoa      = OLD.idpessoa;
     DELETE FROM vinculo_empregaticio   WHERE idpessoa      = OLD.idpessoa;
     RETURN OLD;
+END;
+$$;
+
+
+--
+-- Name: trg_usuario_unico_hierarquia(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.trg_usuario_unico_hierarquia() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    -- Sem login informado nao ha o que verificar. Trata '' como ausencia,
+    -- senao o segundo cadastro sem login seria recusado como duplicado.
+    IF NEW.usuariopessoa IS NULL OR btrim(NEW.usuariopessoa) = '' THEN
+        NEW.usuariopessoa := NULL;
+        RETURN NEW;
+    END IF;
+
+    IF EXISTS (
+        SELECT 1 FROM public.pessoa
+         WHERE usuariopessoa = NEW.usuariopessoa
+           AND idpessoa IS DISTINCT FROM NEW.idpessoa
+    ) THEN
+        RAISE EXCEPTION 'O usuario "%" ja esta em uso por outro cadastro.', NEW.usuariopessoa
+            USING ERRCODE = 'unique_violation';
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: trg_valida_fornecedor_existe(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.trg_valida_fornecedor_existe() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF NEW.id_fornecedor IS NULL THEN
+        RETURN NEW;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM public.parceiro WHERE idpessoa = NEW.id_fornecedor) THEN
+        RAISE EXCEPTION 'Fornecedor % nao existe na tabela parceiro.', NEW.id_fornecedor
+            USING ERRCODE = 'foreign_key_violation';
+    END IF;
+    RETURN NEW;
 END;
 $$;
 
@@ -335,8 +368,16 @@ CREATE TABLE public.diario_funcionario (
     horas_trabalhadas numeric(6,2) DEFAULT 0 NOT NULL,
     custo_hora numeric(12,2) DEFAULT 0 NOT NULL,
     valor_contratado numeric(12,2) DEFAULT 0 NOT NULL,
-    custo numeric(12,2) DEFAULT 0 NOT NULL
+    custo numeric(12,2) DEFAULT 0 NOT NULL,
+    data_execucao date
 );
+
+
+--
+-- Name: COLUMN diario_funcionario.valor_contratado; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.diario_funcionario.valor_contratado IS 'Valor acordado PARA ESTA ATIVIDADE (empreita). Nao e o valor do contrato inteiro do empreiteiro — ver P1-6 da auditoria de 29/08/2026.';
 
 
 --
@@ -505,6 +546,50 @@ ALTER SEQUENCE public.estoque_movimento_idmov_seq OWNED BY public.estoque_movime
 
 
 --
+-- Name: faixa_encargo; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.faixa_encargo (
+    idfaixa integer NOT NULL,
+    tributo character varying(10) NOT NULL,
+    vigencia_inicio date NOT NULL,
+    limite_ate numeric(12,2),
+    aliquota numeric(6,4) NOT NULL,
+    parcela_deduzir numeric(12,2) DEFAULT 0 NOT NULL,
+    ordem integer NOT NULL,
+    CONSTRAINT ck_faixa_aliquota CHECK (((aliquota >= (0)::numeric) AND (aliquota <= (1)::numeric))),
+    CONSTRAINT ck_faixa_tributo CHECK (((tributo)::text = ANY ((ARRAY['INSS'::character varying, 'IRRF'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE faixa_encargo; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.faixa_encargo IS 'Faixas progressivas de INSS e IRRF por vigencia. Lidas por Service.EncargosService. CONFERIR COM A CONTABILIDADE a cada mudanca de tabela legal.';
+
+
+--
+-- Name: faixa_encargo_idfaixa_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.faixa_encargo_idfaixa_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: faixa_encargo_idfaixa_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.faixa_encargo_idfaixa_seq OWNED BY public.faixa_encargo.idfaixa;
+
+
+--
 -- Name: falta_funcionario; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -573,7 +658,11 @@ CREATE TABLE public.fechamento_folha_ponto (
     minutos_extra_100 integer DEFAULT 0 NOT NULL,
     id_vinculo integer,
     valor_producao numeric(10,2) DEFAULT 0.00 NOT NULL,
-    valor_empreita numeric(10,2) DEFAULT 0.00 NOT NULL
+    valor_empreita numeric(10,2) DEFAULT 0.00 NOT NULL,
+    desconto_inss numeric(10,2) DEFAULT 0 NOT NULL,
+    desconto_irrf numeric(10,2) DEFAULT 0 NOT NULL,
+    fgts_deposito numeric(10,2) DEFAULT 0 NOT NULL,
+    dependentes integer DEFAULT 0 NOT NULL
 );
 
 
@@ -582,6 +671,13 @@ CREATE TABLE public.fechamento_folha_ponto (
 --
 
 COMMENT ON TABLE public.fechamento_folha_ponto IS 'Resultado financeiro mensal calculado pelo sistema';
+
+
+--
+-- Name: COLUMN fechamento_folha_ponto.fgts_deposito; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.fechamento_folha_ponto.fgts_deposito IS 'FGTS e encargo do EMPREGADOR: nao desconta do liquido, mas compoe o custo.';
 
 
 --
@@ -602,6 +698,48 @@ CREATE SEQUENCE public.fechamento_folha_ponto_idfechamento_seq
 --
 
 ALTER SEQUENCE public.fechamento_folha_ponto_idfechamento_seq OWNED BY public.fechamento_folha_ponto.idfechamento;
+
+
+--
+-- Name: feriado; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.feriado (
+    idferiado integer NOT NULL,
+    data date NOT NULL,
+    descricao character varying(80) NOT NULL,
+    abrangencia character varying(10) DEFAULT 'NACIONAL'::character varying NOT NULL,
+    uf character varying(2),
+    municipio character varying(60),
+    CONSTRAINT ck_feriado_abrangencia CHECK (((abrangencia)::text = ANY ((ARRAY['NACIONAL'::character varying, 'ESTADUAL'::character varying, 'MUNICIPAL'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE feriado; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.feriado IS 'Feriados considerados no calculo de dias uteis (Service.ParametrosFolhaService). Feriados moveis (Carnaval, Sexta-feira Santa, Corpus Christi) sao calculados a partir da Pascoa em Java e nao precisam ser cadastrados.';
+
+
+--
+-- Name: feriado_idferiado_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.feriado_idferiado_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: feriado_idferiado_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.feriado_idferiado_seq OWNED BY public.feriado.idferiado;
 
 
 --
@@ -647,7 +785,7 @@ CREATE TABLE public.pessoa (
     idpessoa integer NOT NULL,
     nomepessoa character varying(50) NOT NULL,
     usuariopessoa character varying(50),
-    senhapessoa character varying(50),
+    senhapessoa character varying(255),
     nivelpessoa character varying(20) NOT NULL,
     situacaopessoa boolean,
     emailpessoa character varying(50) NOT NULL,
@@ -656,6 +794,13 @@ CREATE TABLE public.pessoa (
     complemento character varying(50) NOT NULL,
     cep character varying(100)
 );
+
+
+--
+-- Name: COLUMN pessoa.senhapessoa; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.pessoa.senhapessoa IS 'Hash PBKDF2-HMAC-SHA256 no formato pbkdf2$sha256$<iter>$<salt>$<hash>. Nunca gravar texto puro. Gerado por Util.SenhaUtil.';
 
 
 --
@@ -918,6 +1063,18 @@ ALTER SEQUENCE public.pagamento_idpagamento_seq OWNED BY public.pagamento.idpaga
 
 
 --
+-- Name: parametro_encargo; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.parametro_encargo (
+    chave character varying(40) NOT NULL,
+    valor numeric(12,4) NOT NULL,
+    vigencia_inicio date NOT NULL,
+    descricao character varying(120)
+);
+
+
+--
 -- Name: pessoacnpj; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -984,7 +1141,8 @@ CREATE TABLE public.ponto_eletronico (
     hash_autenticidade character varying(64),
     registrado_por integer,
     atualizado_em timestamp without time zone,
-    id_vinculo integer
+    id_vinculo integer,
+    folga_compensatoria boolean DEFAULT false NOT NULL
 );
 
 
@@ -993,6 +1151,13 @@ CREATE TABLE public.ponto_eletronico (
 --
 
 COMMENT ON TABLE public.ponto_eletronico IS 'Registro diário de ponto: entrada1/saida1 (manhã) e entrada2/saida2 (tarde)';
+
+
+--
+-- Name: COLUMN ponto_eletronico.folga_compensatoria; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ponto_eletronico.folga_compensatoria IS 'true quando o dia foi concedido como folga compensatoria do domingo trabalhado na mesma semana. Marcado explicitamente pelo usuario.';
 
 
 --
@@ -1192,7 +1357,8 @@ CREATE TABLE public.safra (
     estimativa_producao numeric(14,3) DEFAULT 0 NOT NULL,
     unidade_producao character varying(10) DEFAULT 'SACA'::character varying NOT NULL,
     despesas_fixas numeric(12,2) DEFAULT 0 NOT NULL,
-    criado_em timestamp without time zone DEFAULT now() NOT NULL
+    criado_em timestamp without time zone DEFAULT now() NOT NULL,
+    id_area_producao integer
 );
 
 
@@ -1412,6 +1578,13 @@ ALTER TABLE ONLY public.estoque_movimento ALTER COLUMN idmov SET DEFAULT nextval
 
 
 --
+-- Name: faixa_encargo idfaixa; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.faixa_encargo ALTER COLUMN idfaixa SET DEFAULT nextval('public.faixa_encargo_idfaixa_seq'::regclass);
+
+
+--
 -- Name: falta_funcionario idfalta; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1423,6 +1596,13 @@ ALTER TABLE ONLY public.falta_funcionario ALTER COLUMN idfalta SET DEFAULT nextv
 --
 
 ALTER TABLE ONLY public.fechamento_folha_ponto ALTER COLUMN idfechamento SET DEFAULT nextval('public.fechamento_folha_ponto_idfechamento_seq'::regclass);
+
+
+--
+-- Name: feriado idferiado; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.feriado ALTER COLUMN idferiado SET DEFAULT nextval('public.feriado_idferiado_seq'::regclass);
 
 
 --
@@ -1625,6 +1805,86 @@ ALTER TABLE ONLY public.areaproducao
 
 
 --
+-- Name: diario_campo ck_diario_custos_nao_negativos; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE public.diario_campo
+    ADD CONSTRAINT ck_diario_custos_nao_negativos CHECK (((custo_mao_obra >= (0)::numeric) AND (custo_insumos >= (0)::numeric) AND (custo_maquinas >= (0)::numeric) AND (custo_total >= (0)::numeric))) NOT VALID;
+
+
+--
+-- Name: diario_campo ck_diario_status; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE public.diario_campo
+    ADD CONSTRAINT ck_diario_status CHECK (((status)::text = ANY ((ARRAY['PLANEJADA'::character varying, 'EM_ANDAMENTO'::character varying, 'CONCLUIDA'::character varying, 'CANCELADA'::character varying])::text[]))) NOT VALID;
+
+
+--
+-- Name: insumo ck_insumo_preco_nao_negativo; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE public.insumo
+    ADD CONSTRAINT ck_insumo_preco_nao_negativo CHECK ((preco_medio >= (0)::numeric)) NOT VALID;
+
+
+--
+-- Name: insumo ck_insumo_saldo_nao_negativo; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE public.insumo
+    ADD CONSTRAINT ck_insumo_saldo_nao_negativo CHECK ((quantidade_disponivel >= (0)::numeric)) NOT VALID;
+
+
+--
+-- Name: maquina ck_maquina_custos; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE public.maquina
+    ADD CONSTRAINT ck_maquina_custos CHECK (((custo_hora >= (0)::numeric) AND (custo_km >= (0)::numeric))) NOT VALID;
+
+
+--
+-- Name: estoque_movimento ck_movimento_quantidade; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE public.estoque_movimento
+    ADD CONSTRAINT ck_movimento_quantidade CHECK ((quantidade > (0)::numeric)) NOT VALID;
+
+
+--
+-- Name: estoque_movimento ck_movimento_tipo; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE public.estoque_movimento
+    ADD CONSTRAINT ck_movimento_tipo CHECK (((tipo)::text = ANY ((ARRAY['ENTRADA'::character varying, 'SAIDA'::character varying])::text[]))) NOT VALID;
+
+
+--
+-- Name: ponto_eletronico ck_ponto_jornada_plausivel; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE public.ponto_eletronico
+    ADD CONSTRAINT ck_ponto_jornada_plausivel CHECK (((total_minutos IS NULL) OR ((total_minutos >= 0) AND (total_minutos <= 960)))) NOT VALID;
+
+
+--
+-- Name: vinculo_empregaticio ck_vinculo_periodo; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE public.vinculo_empregaticio
+    ADD CONSTRAINT ck_vinculo_periodo CHECK (((data_desligamento IS NULL) OR (data_desligamento >= data_admissao))) NOT VALID;
+
+
+--
+-- Name: vinculo_empregaticio ck_vinculo_salario; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE public.vinculo_empregaticio
+    ADD CONSTRAINT ck_vinculo_salario CHECK ((salario_mensal >= (0)::numeric)) NOT VALID;
+
+
+--
 -- Name: classificacao classificacao_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1705,6 +1965,14 @@ ALTER TABLE ONLY public.estoque_movimento
 
 
 --
+-- Name: faixa_encargo faixa_encargo_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.faixa_encargo
+    ADD CONSTRAINT faixa_encargo_pkey PRIMARY KEY (idfaixa);
+
+
+--
 -- Name: falta_funcionario falta_funcionario_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1718,6 +1986,14 @@ ALTER TABLE ONLY public.falta_funcionario
 
 ALTER TABLE ONLY public.fechamento_folha_ponto
     ADD CONSTRAINT fechamento_folha_ponto_pkey PRIMARY KEY (idfechamento);
+
+
+--
+-- Name: feriado feriado_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.feriado
+    ADD CONSTRAINT feriado_pkey PRIMARY KEY (idferiado);
 
 
 --
@@ -1870,6 +2146,14 @@ ALTER TABLE ONLY public.pessoacnpj
 
 ALTER TABLE ONLY public.pessoafisica
     ADD CONSTRAINT pessoafisica_cpfpf_key UNIQUE (cpfpf);
+
+
+--
+-- Name: parametro_encargo pk_parametro_encargo; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.parametro_encargo
+    ADD CONSTRAINT pk_parametro_encargo PRIMARY KEY (chave, vigencia_inicio);
 
 
 --
@@ -2041,6 +2325,20 @@ CREATE INDEX idx_diariofunc_diario ON public.diario_funcionario USING btree (idd
 
 
 --
+-- Name: idx_diariofunc_execucao; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_diariofunc_execucao ON public.diario_funcionario USING btree (iddiario, data_execucao);
+
+
+--
+-- Name: idx_diariofunc_pessoa_data; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_diariofunc_pessoa_data ON public.diario_funcionario USING btree (idpessoa, data_execucao);
+
+
+--
 -- Name: idx_diarioins_diario; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2069,10 +2367,24 @@ CREATE INDEX idx_falta_funcionario ON public.falta_funcionario USING btree (idpe
 
 
 --
+-- Name: idx_falta_pessoa_data; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_falta_pessoa_data ON public.falta_funcionario USING btree (idpessoa, datafalta);
+
+
+--
 -- Name: idx_fechamento_vinculo; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_fechamento_vinculo ON public.fechamento_folha_ponto USING btree (id_vinculo);
+
+
+--
+-- Name: idx_feriado_data; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_feriado_data ON public.feriado USING btree (data);
 
 
 --
@@ -2118,6 +2430,13 @@ CREATE INDEX idx_ponto_funcionario ON public.ponto_eletronico USING btree (idpes
 
 
 --
+-- Name: idx_ponto_pessoa_data; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ponto_pessoa_data ON public.ponto_eletronico USING btree (idpessoa, dataregistro);
+
+
+--
 -- Name: idx_ponto_vinculo; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2143,6 +2462,13 @@ CREATE INDEX idx_quadra_area ON public.quadra USING btree (idareaproducao);
 --
 
 CREATE INDEX idx_regponto_func_data ON public.registroponto USING btree (idfuncionario, dataponto);
+
+
+--
+-- Name: idx_safra_area; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_safra_area ON public.safra USING btree (id_area_producao);
 
 
 --
@@ -2181,10 +2507,101 @@ CREATE INDEX idx_vale_idpessoa_status ON public.vale_funcionario USING btree (id
 
 
 --
+-- Name: idx_vale_pessoa_data; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_vale_pessoa_data ON public.vale_funcionario USING btree (idpessoa, datavale);
+
+
+--
 -- Name: idx_vinculo_pessoa; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_vinculo_pessoa ON public.vinculo_empregaticio USING btree (idpessoa);
+
+
+--
+-- Name: idx_vinculo_pessoa_periodo; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_vinculo_pessoa_periodo ON public.vinculo_empregaticio USING btree (idpessoa, data_admissao, data_desligamento);
+
+
+--
+-- Name: uk_faixa_encargo; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uk_faixa_encargo ON public.faixa_encargo USING btree (tributo, vigencia_inicio, ordem);
+
+
+--
+-- Name: uk_feriado_data_abrangencia; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uk_feriado_data_abrangencia ON public.feriado USING btree (data, abrangencia, COALESCE(uf, ''::character varying), COALESCE(municipio, ''::character varying));
+
+
+--
+-- Name: uk_funcionario_usuario; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uk_funcionario_usuario ON public.funcionario USING btree (usuariopessoa) WHERE ((usuariopessoa IS NOT NULL) AND (btrim((usuariopessoa)::text) <> ''::text));
+
+
+--
+-- Name: uk_funcionarioclt_usuario; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uk_funcionarioclt_usuario ON public.funcionarioclt USING btree (usuariopessoa) WHERE ((usuariopessoa IS NOT NULL) AND (btrim((usuariopessoa)::text) <> ''::text));
+
+
+--
+-- Name: uk_funcionariodiarista_usuario; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uk_funcionariodiarista_usuario ON public.funcionariodiarista USING btree (usuariopessoa) WHERE ((usuariopessoa IS NOT NULL) AND (btrim((usuariopessoa)::text) <> ''::text));
+
+
+--
+-- Name: uk_funcionarioempreita_usuario; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uk_funcionarioempreita_usuario ON public.funcionarioempreita USING btree (usuariopessoa) WHERE ((usuariopessoa IS NOT NULL) AND (btrim((usuariopessoa)::text) <> ''::text));
+
+
+--
+-- Name: uk_funcionarioproducao_usuario; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uk_funcionarioproducao_usuario ON public.funcionarioproducao USING btree (usuariopessoa) WHERE ((usuariopessoa IS NOT NULL) AND (btrim((usuariopessoa)::text) <> ''::text));
+
+
+--
+-- Name: uk_parceiro_usuario; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uk_parceiro_usuario ON public.parceiro USING btree (usuariopessoa) WHERE ((usuariopessoa IS NOT NULL) AND (btrim((usuariopessoa)::text) <> ''::text));
+
+
+--
+-- Name: uk_pessoa_usuario; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uk_pessoa_usuario ON public.pessoa USING btree (usuariopessoa) WHERE ((usuariopessoa IS NOT NULL) AND (btrim((usuariopessoa)::text) <> ''::text));
+
+
+--
+-- Name: uk_pessoacnpj_usuario; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uk_pessoacnpj_usuario ON public.pessoacnpj USING btree (usuariopessoa) WHERE ((usuariopessoa IS NOT NULL) AND (btrim((usuariopessoa)::text) <> ''::text));
+
+
+--
+-- Name: uk_pessoafisica_usuario; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uk_pessoafisica_usuario ON public.pessoafisica USING btree (usuariopessoa) WHERE ((usuariopessoa IS NOT NULL) AND (btrim((usuariopessoa)::text) <> ''::text));
 
 
 --
@@ -2241,6 +2658,13 @@ CREATE TRIGGER casc_del_func AFTER DELETE ON public.funcionarioempreita FOR EACH
 --
 
 CREATE TRIGGER casc_del_func AFTER DELETE ON public.funcionarioproducao FOR EACH ROW EXECUTE FUNCTION public.trg_cascade_delete_funcionario();
+
+
+--
+-- Name: insumo chk_fornecedor_existe; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER chk_fornecedor_existe BEFORE INSERT OR UPDATE OF id_fornecedor ON public.insumo FOR EACH ROW EXECUTE FUNCTION public.trg_valida_fornecedor_existe();
 
 
 --
@@ -2325,6 +2749,69 @@ CREATE TRIGGER chk_func_exist BEFORE INSERT OR UPDATE ON public.vale_funcionario
 --
 
 CREATE TRIGGER chk_func_exist BEFORE INSERT OR UPDATE ON public.vinculo_empregaticio FOR EACH ROW EXECUTE FUNCTION public.trg_valida_funcionario_existe('idpessoa');
+
+
+--
+-- Name: funcionario chk_usuario_unico; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER chk_usuario_unico BEFORE INSERT OR UPDATE OF usuariopessoa ON public.funcionario FOR EACH ROW EXECUTE FUNCTION public.trg_usuario_unico_hierarquia();
+
+
+--
+-- Name: funcionarioclt chk_usuario_unico; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER chk_usuario_unico BEFORE INSERT OR UPDATE OF usuariopessoa ON public.funcionarioclt FOR EACH ROW EXECUTE FUNCTION public.trg_usuario_unico_hierarquia();
+
+
+--
+-- Name: funcionariodiarista chk_usuario_unico; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER chk_usuario_unico BEFORE INSERT OR UPDATE OF usuariopessoa ON public.funcionariodiarista FOR EACH ROW EXECUTE FUNCTION public.trg_usuario_unico_hierarquia();
+
+
+--
+-- Name: funcionarioempreita chk_usuario_unico; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER chk_usuario_unico BEFORE INSERT OR UPDATE OF usuariopessoa ON public.funcionarioempreita FOR EACH ROW EXECUTE FUNCTION public.trg_usuario_unico_hierarquia();
+
+
+--
+-- Name: funcionarioproducao chk_usuario_unico; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER chk_usuario_unico BEFORE INSERT OR UPDATE OF usuariopessoa ON public.funcionarioproducao FOR EACH ROW EXECUTE FUNCTION public.trg_usuario_unico_hierarquia();
+
+
+--
+-- Name: parceiro chk_usuario_unico; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER chk_usuario_unico BEFORE INSERT OR UPDATE OF usuariopessoa ON public.parceiro FOR EACH ROW EXECUTE FUNCTION public.trg_usuario_unico_hierarquia();
+
+
+--
+-- Name: pessoa chk_usuario_unico; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER chk_usuario_unico BEFORE INSERT OR UPDATE OF usuariopessoa ON public.pessoa FOR EACH ROW EXECUTE FUNCTION public.trg_usuario_unico_hierarquia();
+
+
+--
+-- Name: pessoacnpj chk_usuario_unico; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER chk_usuario_unico BEFORE INSERT OR UPDATE OF usuariopessoa ON public.pessoacnpj FOR EACH ROW EXECUTE FUNCTION public.trg_usuario_unico_hierarquia();
+
+
+--
+-- Name: pessoafisica chk_usuario_unico; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER chk_usuario_unico BEFORE INSERT OR UPDATE OF usuariopessoa ON public.pessoafisica FOR EACH ROW EXECUTE FUNCTION public.trg_usuario_unico_hierarquia();
 
 
 --
@@ -2448,6 +2935,14 @@ ALTER TABLE ONLY public.quadra
 
 
 --
+-- Name: safra safra_id_area_producao_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.safra
+    ADD CONSTRAINT safra_id_area_producao_fkey FOREIGN KEY (id_area_producao) REFERENCES public.areaproducao(idareaproducao);
+
+
+--
 -- Name: safra safra_id_cultura_principal_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2474,4 +2969,101 @@ ALTER TABLE ONLY public.safra_talhao
 --
 -- PostgreSQL database dump complete
 --
+
+\unrestrict dP07Dw8sF7BSy2Fb1mvtcBtTbPWAsjYeSmjh7hRoxsnJPUcH62Wm3uDDyi6XeJV
+
+--
+-- PostgreSQL database dump
+--
+
+\restrict VzVeE1GAHoHJVzCgBbyZeL0JdbKYS2W64zLMpByQT2a6DYdxMq86Lacp8CsGV3t
+
+-- Dumped from database version 16.13 (Ubuntu 16.13-0ubuntu0.24.04.1)
+-- Dumped by pg_dump version 16.13 (Ubuntu 16.13-0ubuntu0.24.04.1)
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+--
+-- Data for Name: faixa_encargo; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.faixa_encargo (idfaixa, tributo, vigencia_inicio, limite_ate, aliquota, parcela_deduzir, ordem) FROM stdin;
+1	INSS	2025-05-01	1518.00	0.0750	0.00	1
+2	INSS	2025-05-01	2793.88	0.0900	0.00	2
+3	INSS	2025-05-01	4190.83	0.1200	0.00	3
+4	INSS	2025-05-01	8157.41	0.1400	0.00	4
+5	IRRF	2025-05-01	2428.80	0.0000	0.00	1
+6	IRRF	2025-05-01	2826.65	0.0750	182.16	2
+7	IRRF	2025-05-01	3751.05	0.1500	394.16	3
+8	IRRF	2025-05-01	4664.68	0.2250	675.49	4
+9	IRRF	2025-05-01	\N	0.2750	908.73	5
+\.
+
+
+--
+-- Data for Name: feriado; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.feriado (idferiado, data, descricao, abrangencia, uf, municipio) FROM stdin;
+1	2026-01-01	Confraternizacao Universal	NACIONAL	\N	\N
+2	2026-04-21	Tiradentes	NACIONAL	\N	\N
+3	2026-05-01	Dia do Trabalho	NACIONAL	\N	\N
+4	2026-09-07	Independencia	NACIONAL	\N	\N
+5	2026-10-12	Nossa Senhora Aparecida	NACIONAL	\N	\N
+6	2026-11-02	Finados	NACIONAL	\N	\N
+7	2026-11-15	Proclamacao da Republica	NACIONAL	\N	\N
+8	2026-11-20	Consciencia Negra	NACIONAL	\N	\N
+9	2026-12-25	Natal	NACIONAL	\N	\N
+10	2027-01-01	Confraternizacao Universal	NACIONAL	\N	\N
+11	2027-04-21	Tiradentes	NACIONAL	\N	\N
+12	2027-05-01	Dia do Trabalho	NACIONAL	\N	\N
+13	2027-09-07	Independencia	NACIONAL	\N	\N
+14	2027-10-12	Nossa Senhora Aparecida	NACIONAL	\N	\N
+15	2027-11-02	Finados	NACIONAL	\N	\N
+16	2027-11-15	Proclamacao da Republica	NACIONAL	\N	\N
+17	2027-11-20	Consciencia Negra	NACIONAL	\N	\N
+18	2027-12-25	Natal	NACIONAL	\N	\N
+\.
+
+
+--
+-- Data for Name: parametro_encargo; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.parametro_encargo (chave, valor, vigencia_inicio, descricao) FROM stdin;
+INSS_TETO	8157.4100	2025-05-01	Teto do salario de contribuicao
+IRRF_DEDUCAO_DEPEND	189.5900	2025-05-01	Deducao mensal por dependente
+IRRF_DESCONTO_SIMPL	607.2000	2025-05-01	Desconto simplificado mensal
+FGTS_ALIQUOTA	0.0800	1990-01-01	FGTS: 8% sobre a remuneracao (encargo do empregador)
+\.
+
+
+--
+-- Name: faixa_encargo_idfaixa_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.faixa_encargo_idfaixa_seq', 18, true);
+
+
+--
+-- Name: feriado_idferiado_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.feriado_idferiado_seq', 54, true);
+
+
+--
+-- PostgreSQL database dump complete
+--
+
+\unrestrict VzVeE1GAHoHJVzCgBbyZeL0JdbKYS2W64zLMpByQT2a6DYdxMq86Lacp8CsGV3t
 

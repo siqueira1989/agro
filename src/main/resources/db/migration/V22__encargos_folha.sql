@@ -33,11 +33,18 @@ COMMENT ON TABLE public.faixa_encargo IS
   'Faixas progressivas de INSS e IRRF por vigencia. Lidas por Service.EncargosService. '
   'CONFERIR COM A CONTABILIDADE a cada mudanca de tabela legal.';
 
+-- A chave sozinha NAO pode ser a PK: EncargosService.parametro() consulta
+-- "WHERE chave = ? AND vigencia_inicio <= ? ORDER BY vigencia_inicio DESC",
+-- ou seja, foi escrita para varias vigencias por chave. Com PK so em "chave",
+-- cadastrar a tabela de 2027 violaria a PK e a saida seria um UPDATE — que
+-- reescreveria o passado e faria toda competencia antiga ser recalculada com
+-- o valor novo, em silencio. Exatamente o oposto do que este arquivo promete.
 CREATE TABLE IF NOT EXISTS public.parametro_encargo (
-    chave           character varying(40) PRIMARY KEY,
+    chave           character varying(40) NOT NULL,
     valor           numeric(12,4) NOT NULL,
     vigencia_inicio date NOT NULL,
-    descricao       character varying(120)
+    descricao       character varying(120),
+    CONSTRAINT pk_parametro_encargo PRIMARY KEY (chave, vigencia_inicio)
 );
 
 -- INSS — tabela progressiva vigente desde 01/05/2025 (CONFERIR)
@@ -62,7 +69,7 @@ INSERT INTO public.parametro_encargo (chave, valor, vigencia_inicio, descricao) 
     ('IRRF_DEDUCAO_DEPEND',   189.59, '2025-05-01', 'Deducao mensal por dependente'),
     ('IRRF_DESCONTO_SIMPL',   607.20, '2025-05-01', 'Desconto simplificado mensal'),
     ('FGTS_ALIQUOTA',          0.0800, '1990-01-01', 'FGTS: 8% sobre a remuneracao (encargo do empregador)')
-ON CONFLICT (chave) DO NOTHING;
+ON CONFLICT (chave, vigencia_inicio) DO NOTHING;
 
 -- Colunas para guardar os encargos apurados no fechamento
 ALTER TABLE public.fechamento_folha_ponto

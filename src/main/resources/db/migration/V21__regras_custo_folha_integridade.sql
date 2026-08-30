@@ -112,53 +112,88 @@ CREATE INDEX IF NOT EXISTS idx_vinculo_pessoa_periodo
 
 -- ---------------------------------------------------------------------------
 -- 5) CHECK CONSTRAINTS (P2-17)
--- Eram 38 tabelas com UM unico CHECK. Estas regras estavam so no Java — ou
--- em lugar nenhum — e podiam ser burladas por qualquer UPDATE direto.
+-- Eram 38 tabelas com UM unico CHECK. Estas regras estavam so no Java — ou em
+-- lugar nenhum — e podiam ser burladas por qualquer UPDATE direto.
+--
+-- TODAS entram como NOT VALID, de proposito. Um CHECK comum valida as linhas
+-- ja existentes, e a migracao inteira falha se alguma nao passar. Como o
+-- proprio P1-7 descreve baixa de estoque em duplicidade, e bem possivel que
+-- exista insumo com saldo negativo em producao — justamente o resultado do
+-- bug. Com NOT VALID a regra passa a valer para toda escrita NOVA sem barrar o
+-- historico, e a aplicacao sobe. O bloco de diagnostico abaixo lista o que
+-- precisa ser acertado; depois de corrigir, rode:
+--     ALTER TABLE <tabela> VALIDATE CONSTRAINT <constraint>;
 -- ---------------------------------------------------------------------------
 ALTER TABLE public.insumo DROP CONSTRAINT IF EXISTS ck_insumo_saldo_nao_negativo;
 ALTER TABLE public.insumo ADD CONSTRAINT ck_insumo_saldo_nao_negativo
-    CHECK (quantidade_disponivel >= 0);
+    CHECK (quantidade_disponivel >= 0) NOT VALID;
 
 ALTER TABLE public.insumo DROP CONSTRAINT IF EXISTS ck_insumo_preco_nao_negativo;
 ALTER TABLE public.insumo ADD CONSTRAINT ck_insumo_preco_nao_negativo
-    CHECK (preco_medio >= 0);
+    CHECK (preco_medio >= 0) NOT VALID;
 
 ALTER TABLE public.diario_campo DROP CONSTRAINT IF EXISTS ck_diario_status;
 ALTER TABLE public.diario_campo ADD CONSTRAINT ck_diario_status
-    CHECK (status IN ('PLANEJADA', 'EM_ANDAMENTO', 'CONCLUIDA', 'CANCELADA'));
+    CHECK (status IN ('PLANEJADA', 'EM_ANDAMENTO', 'CONCLUIDA', 'CANCELADA')) NOT VALID;
 
 ALTER TABLE public.diario_campo DROP CONSTRAINT IF EXISTS ck_diario_custos_nao_negativos;
 ALTER TABLE public.diario_campo ADD CONSTRAINT ck_diario_custos_nao_negativos
     CHECK (custo_mao_obra >= 0 AND custo_insumos >= 0
-       AND custo_maquinas >= 0 AND custo_total >= 0);
+       AND custo_maquinas >= 0 AND custo_total >= 0) NOT VALID;
 
 ALTER TABLE public.estoque_movimento DROP CONSTRAINT IF EXISTS ck_movimento_tipo;
 ALTER TABLE public.estoque_movimento ADD CONSTRAINT ck_movimento_tipo
-    CHECK (tipo IN ('ENTRADA', 'SAIDA'));
+    CHECK (tipo IN ('ENTRADA', 'SAIDA')) NOT VALID;
 
 ALTER TABLE public.estoque_movimento DROP CONSTRAINT IF EXISTS ck_movimento_quantidade;
 ALTER TABLE public.estoque_movimento ADD CONSTRAINT ck_movimento_quantidade
-    CHECK (quantidade > 0);
+    CHECK (quantidade > 0) NOT VALID;
 
 ALTER TABLE public.vinculo_empregaticio DROP CONSTRAINT IF EXISTS ck_vinculo_periodo;
 ALTER TABLE public.vinculo_empregaticio ADD CONSTRAINT ck_vinculo_periodo
-    CHECK (data_desligamento IS NULL OR data_desligamento >= data_admissao);
+    CHECK (data_desligamento IS NULL OR data_desligamento >= data_admissao) NOT VALID;
 
 ALTER TABLE public.vinculo_empregaticio DROP CONSTRAINT IF EXISTS ck_vinculo_salario;
 ALTER TABLE public.vinculo_empregaticio ADD CONSTRAINT ck_vinculo_salario
-    CHECK (salario_mensal >= 0);
+    CHECK (salario_mensal >= 0) NOT VALID;
 
 ALTER TABLE public.maquina DROP CONSTRAINT IF EXISTS ck_maquina_custos;
 ALTER TABLE public.maquina ADD CONSTRAINT ck_maquina_custos
-    CHECK (custo_hora >= 0 AND custo_km >= 0);
+    CHECK (custo_hora >= 0 AND custo_km >= 0) NOT VALID;
 
 -- Teto de jornada (P2-26): 17:00 as 08:00 digitado por engano virava 15 h
 -- trabalhadas e 7 h extras indevidas. 16 h e o limite plausivel para um dia.
 ALTER TABLE public.ponto_eletronico DROP CONSTRAINT IF EXISTS ck_ponto_jornada_plausivel;
 ALTER TABLE public.ponto_eletronico ADD CONSTRAINT ck_ponto_jornada_plausivel
-    CHECK (totalminutos IS NULL OR (totalminutos >= 0 AND totalminutos <= 960));
+    CHECK (total_minutos IS NULL OR (total_minutos >= 0 AND total_minutos <= 960)) NOT VALID;
 
--- ---------------------------------------------------------------------------
+-- Diagnostico: aponta, no log do servidor, o que impede a validacao completa.
+DO $$
+DECLARE
+    n_saldo   bigint;
+    n_status  bigint;
+    n_jornada bigint;
+    n_qtd     bigint;
+BEGIN
+    SELECT count(*) INTO n_saldo   FROM public.insumo WHERE quantidade_disponivel < 0;
+    SELECT count(*) INTO n_status  FROM public.diario_campo
+        WHERE status IS NULL OR status NOT IN ('PLANEJADA','EM_ANDAMENTO','CONCLUIDA','CANCELADA');
+    SELECT count(*) INTO n_jornada FROM public.ponto_eletronico
+        WHERE total_minutos IS NOT NULL AND (total_minutos < 0 OR total_minutos > 960);
+    SELECT count(*) INTO n_qtd     FROM public.estoque_movimento WHERE quantidade <= 0;
+
+    IF n_saldo + n_status + n_jornada + n_qtd > 0 THEN
+        RAISE NOTICE 'V21 — dados historicos fora das novas regras (constraints ficaram NOT VALID):';
+        RAISE NOTICE '  insumo com saldo negativo ............ %', n_saldo;
+        RAISE NOTICE '  diario_campo com status invalido ..... %', n_status;
+        RAISE NOTICE '  ponto com jornada fora de 0..16h ..... %', n_jornada;
+        RAISE NOTICE '  movimento com quantidade <= 0 ........ %', n_qtd;
+        RAISE NOTICE 'Corrija esses registros e rode ALTER TABLE ... VALIDATE CONSTRAINT ...';
+    ELSE
+        RAISE NOTICE 'V21 — nenhum dado historico viola as novas regras.';
+    END IF;
+END $$;
+
 -- 6) FK que faltava e era possivel criar
 -- insumo.id_fornecedor aponta para parceiro, que herda pessoa — FK real e
 -- impossivel enquanto houver heranca (P2-17). Fica o trigger equivalente.

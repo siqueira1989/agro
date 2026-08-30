@@ -10,3 +10,5 @@ target/
 src/main/resources/email.properties
 src/main/resources/agro.properties
 src/main/resources/db.properties
+_to_delete/
+*.tgz

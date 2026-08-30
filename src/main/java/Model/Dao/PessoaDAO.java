@@ -27,6 +27,18 @@ import Util.SenhaUtil;
  */
 public class PessoaDAO {
 
+    /**
+     * Hash descartável, derivado uma única vez na carga da classe.
+     *
+     * <p>Serve para gastar, no caso "usuário não existe", o mesmo tempo do caso
+     * "usuário existe" — sem isso, a resposta instantânea denuncia quais logins
+     * existem. A primeira versão desta defesa chamava {@code gerarHash} a cada
+     * tentativa e depois {@code verificar}: <b>duas</b> derivações PBKDF2 contra
+     * <b>uma</b> do caminho normal, o que inverteu e amplificou o mesmo canal
+     * lateral, além de dobrar o custo de CPU de um endpoint público.</p>
+     */
+    private static final String HASH_DUMMY = SenhaUtil.gerarHash("usuario-inexistente");
+
     private static final String SQL_BUSCAR_POR_USUARIO =
         "SELECT idpessoa, nomepessoa, usuariopessoa, senhapessoa, nivelpessoa, situacaopessoa " +
         "FROM pessoa WHERE usuariopessoa = ?";
@@ -47,10 +59,9 @@ public class PessoaDAO {
 
             try (ResultSet rs = stmt.executeQuery()) {
                 if (!rs.next()) {
-                    // Mesmo sem encontrar o usuário, gastamos o tempo de um
-                    // hash: sem isso, a resposta instantânea denunciaria que o
-                    // login não existe (enumeração de usuários).
-                    SenhaUtil.verificar(credenciais.getSenhaPessoa(), SenhaUtil.gerarHash("nao-existe"));
+                    // Uma única derivação contra o hash constante: mesmo custo do
+                    // caminho em que o usuário existe.
+                    SenhaUtil.verificar(credenciais.getSenhaPessoa(), HASH_DUMMY);
                     return null;
                 }
 

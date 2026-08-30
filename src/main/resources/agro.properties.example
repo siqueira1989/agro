@@ -46,3 +46,17 @@ mail.smtp.port=587
 mail.smtp.user=
 mail.smtp.pass=
 mail.admin.emails=
+
+# --- Feriados considerados no calculo de dias uteis ------------------------
+# Sexta-feira Santa e feriado nacional e entra sempre.
+# Carnaval e Corpus Christi NAO sao feriados nacionais — sao ponto facultativo.
+# Ligue apenas se a fazenda realmente para nessas datas: conta-los reduz os
+# dias uteis do mes e altera valor-dia, hora extra, DSR e custo por hora.
+folha.feriado.carnaval=false
+folha.feriado.corpusChristi=false
+
+# UF e municipio da fazenda — filtram os feriados ESTADUAIS e MUNICIPAIS
+# cadastrados na tabela "feriado". Sem isso, um feriado municipal de outra
+# cidade reduziria o divisor de todo mundo.
+folha.uf=
+folha.municipio=
