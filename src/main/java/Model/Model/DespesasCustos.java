@@ -14,6 +14,7 @@ public class DespesasCustos {
  private String unidadedespesascustos;
  private double valordespesascustos;
  private String tipodespesascustos;
+ private String classificacao;
 
     public int getIddespesascusto() {
         return iddespesascusto;
@@ -54,5 +55,13 @@ public class DespesasCustos {
     public void setTipodespesascustos(String tipodespesascustos) {
         this.tipodespesascustos = tipodespesascustos;
     }
- 
+
+    public String getClassificacao() {
+        return classificacao;
+    }
+
+    public void setClassificacao(String classificacao) {
+        this.classificacao = classificacao;
+    }
+
 }

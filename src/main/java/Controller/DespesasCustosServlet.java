@@ -99,10 +99,15 @@ public class DespesasCustosServlet extends HttpServlet {
             String unidadedespesacusto  = request.getParameter("unidadedespesacusto");
             String valordespesacusto    = request.getParameter("valordespesacusto");
             String tipodespesacusto     = request.getParameter("tipodespesacusto");
+            String classificacao        = request.getParameter("classificacao");
 
             // Regras simples de validação (opcional, mas útil):
             if (isBlank(despesascusto) || isBlank(unidadedespesacusto) || isBlank(valordespesacusto) || isBlank(tipodespesacusto)) {
                 writeJson(response, HttpServletResponse.SC_BAD_REQUEST, false, "Todos os campos são obrigatórios.", "modalCadastro");
+                return;
+            }
+            if (!"FIXO".equalsIgnoreCase(classificacao) && !"VARIAVEL".equalsIgnoreCase(classificacao)) {
+                writeJson(response, HttpServletResponse.SC_BAD_REQUEST, false, "Classificação deve ser Fixo ou Variável.", "modalCadastro");
                 return;
             }
 
@@ -119,6 +124,7 @@ public class DespesasCustosServlet extends HttpServlet {
             bean.setUnidadedespesascustos(unidadedespesacusto);
             bean.setValordespesascustos(valor);
             bean.setTipodespesascustos(tipodespesacusto);
+            bean.setClassificacao(classificacao.toUpperCase());
 
             despesasCustosDAO.create(bean);
 
@@ -139,10 +145,15 @@ public class DespesasCustosServlet extends HttpServlet {
             String unidadedespesacustos = request.getParameter("unidadedespesacustos");
             String valordespesacustos   = request.getParameter("valordespesacustos");
             String tipodespesacustos    = request.getParameter("tipodespesacustos");
+            String classificacao        = request.getParameter("classificacao");
 
             if (isBlank(iddespesascustos) || isBlank(despesascustos) || isBlank(unidadedespesacustos) ||
                 isBlank(valordespesacustos) || isBlank(tipodespesacustos)) {
                 writeJson(response, HttpServletResponse.SC_BAD_REQUEST, false, "Todos os campos são obrigatórios.", "modalAtualizacao");
+                return;
+            }
+            if (!"FIXO".equalsIgnoreCase(classificacao) && !"VARIAVEL".equalsIgnoreCase(classificacao)) {
+                writeJson(response, HttpServletResponse.SC_BAD_REQUEST, false, "Classificação deve ser Fixo ou Variável.", "modalAtualizacao");
                 return;
             }
 
@@ -154,14 +165,13 @@ public class DespesasCustosServlet extends HttpServlet {
             bean.setUnidadedespesascustos(unidadedespesacustos);
             bean.setValordespesascustos(valor);
             bean.setTipodespesascustos(tipodespesacustos);
-             if (despesasCustosDAO.VerificarDadosUpdate(bean)) {
-                 System.out.println("ok");
+            bean.setClassificacao(classificacao.toUpperCase());
+            if (despesasCustosDAO.VerificarDadosUpdate(bean)) {
                 writeJson(response, HttpServletResponse.SC_BAD_REQUEST, false, "Despesa/Custo está igual ao cadastro anterior.", "modalAtualizacao");
                 return;
             }
-              if (despesasCustosDAO.existeDespesaCusto(despesascustos)) {
-                 System.out.println("ok");
-                writeJson(response, HttpServletResponse.SC_BAD_REQUEST, false, "Despesa/Custo está igual ao cadastro  de outro registro.", "modalAtualizacao");
+            if (despesasCustosDAO.ExisteEmOutroRegistroDespesasCustos(bean)) {
+                writeJson(response, HttpServletResponse.SC_BAD_REQUEST, false, "Já existe uma Despesa/Custo cadastrada com esses dados.", "modalAtualizacao");
                 return;
             }
             despesasCustosDAO.update(bean);

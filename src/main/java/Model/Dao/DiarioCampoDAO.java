@@ -37,6 +37,7 @@ public class DiarioCampoDAO {
                 for (DiarioFuncionario f : d.getFuncionarios()) inserirFuncionario(c, id, f, dataExec);
                 for (DiarioMaquina m : d.getMaquinas()) inserirMaquina(c, id, m);
                 for (DiarioInsumo i : d.getInsumos()) inserirInsumo(c, id, i);
+                for (DiarioDespesa dsp : d.getDespesas()) inserirDespesa(c, id, dsp, dataExec);
                 // PLANEJADA é apenas agendamento (previsão): não calcula custo. EM_ANDAMENTO/CONCLUIDA calculam.
                 if (calculaCusto(d.getStatus())) recalcularCustos(c, id); else zerarCustos(c, id);
                 c.commit();
@@ -100,15 +101,19 @@ public class DiarioCampoDAO {
     /**
      * Registra uma nova execução (dia + equipe) num diário já em EM_ANDAMENTO, sem apagar as
      * execuções anteriores — o custo total soma automaticamente todas (recalcularCustos agrega
-     * todas as linhas de diario_funcionario do diário).
+     * todas as linhas de diario_funcionario/diario_despesa do diário). Despesas seguem o mesmo
+     * regime de mão de obra: só entram por aqui (ou na criação), nunca são apagadas por
+     * {@link #atualizarCompleto} — cada compra lançada é histórico.
      */
-    public void adicionarExecucao(int idDiario, LocalDate dataExecucao, List<DiarioFuncionario> funcionarios) throws SQLException {
+    public void adicionarExecucao(int idDiario, LocalDate dataExecucao, List<DiarioFuncionario> funcionarios,
+                                   List<DiarioDespesa> despesas) throws SQLException {
         try (Connection c = new PostgresConnection().getConnection()) {
             c.setAutoCommit(false);
             try {
                 String status = statusAtual(c, idDiario);
                 if (!"EM_ANDAMENTO".equals(status)) throw new SQLException("Só é possível registrar execução em diários EM_ANDAMENTO.");
                 for (DiarioFuncionario f : funcionarios) inserirFuncionario(c, idDiario, f, dataExecucao);
+                for (DiarioDespesa d : despesas) inserirDespesa(c, idDiario, d, dataExecucao);
                 recalcularCustos(c, idDiario);
                 c.commit();
             } catch (SQLException e) { c.rollback(); throw e; }
@@ -124,7 +129,7 @@ public class DiarioCampoDAO {
     /** Zera os custos do diário (usado quando a atividade está apenas Planejada). */
     private void zerarCustos(Connection c, int idDiario) throws SQLException {
         try (PreparedStatement st = c.prepareStatement("UPDATE diario_campo SET custo_mao_obra=0, "
-                + "custo_insumos=0, custo_maquinas=0, custo_total=0 WHERE iddiario=?")) {
+                + "custo_insumos=0, custo_maquinas=0, custo_despesas=0, custo_total=0 WHERE iddiario=?")) {
             st.setInt(1, idDiario); st.executeUpdate();
         }
     }
@@ -235,6 +240,41 @@ public class DiarioCampoDAO {
         }
     }
 
+    /**
+     * Insere uma despesa lançada numa execução. Nome/classificação/valor de
+     * referência vêm do catálogo pelo id (nunca confia no texto enviado pelo
+     * cliente); para despesa FIXO o valor unitário também vem do catálogo,
+     * ignorando o que o cliente mandou — só VARIAVEL aceita o valor informado
+     * (é o caso da marmita: cada compra com seu próprio preço).
+     */
+    private void inserirDespesa(Connection c, int idDiario, DiarioDespesa d, LocalDate dataExecucaoPadrao) throws SQLException {
+        String[] cat = despesaCatalogo(c, d.getIdDespesaCusto());
+        if (cat == null) throw new SQLException("Despesa/Custo não encontrada: " + d.getIdDespesaCusto());
+        boolean fixo = "FIXO".equalsIgnoreCase(cat[1]);
+        BigDecimal valorCatalogo = new BigDecimal(cat[2]);
+        BigDecimal qtd = (d.getQuantidade() != null && d.getQuantidade().signum() > 0) ? d.getQuantidade() : BigDecimal.ONE;
+        BigDecimal valorUnit = (fixo ? valorCatalogo : nz(d.getValorUnitario())).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal valor = qtd.multiply(valorUnit).setScale(2, RoundingMode.HALF_UP);
+        String sql = "INSERT INTO diario_despesa (iddiario, iddespesascusto, descricao, quantidade, "
+                   + "valor_unitario, valor, data_execucao) VALUES (?,?,?,?,?,?,?)";
+        try (PreparedStatement st = c.prepareStatement(sql)) {
+            st.setInt(1, idDiario); st.setInt(2, d.getIdDespesaCusto()); st.setString(3, cat[0]);
+            st.setBigDecimal(4, qtd); st.setBigDecimal(5, valorUnit); st.setBigDecimal(6, valor);
+            st.setDate(7, Date.valueOf(d.getDataExecucao() != null ? d.getDataExecucao() : dataExecucaoPadrao));
+            st.executeUpdate();
+        }
+    }
+
+    /** [despesascusto, classificacao, valordespesascustos] do catálogo, ou null. */
+    private String[] despesaCatalogo(Connection c, int idDespesaCusto) throws SQLException {
+        try (PreparedStatement st = c.prepareStatement(
+                "SELECT despesascusto, classificacao, valordespesascustos FROM despesascusto WHERE iddespesascusto=?")) {
+            st.setInt(1, idDespesaCusto); ResultSet rs = st.executeQuery();
+            if (!rs.next()) return null;
+            return new String[]{ rs.getString(1), rs.getString(2), nz(rs.getBigDecimal(3)).toPlainString() };
+        }
+    }
+
     /* ===================== CÁLCULO DE CUSTOS ===================== */
 
     /**
@@ -259,14 +299,29 @@ public class DiarioCampoDAO {
             BigDecimal custoHora = BigDecimal.ZERO, custo;
 
             if ("CLT".equalsIgnoreCase(tipo)) {
+                // Acima de 8h: as 8h normais ao valor da hora normal + o excedente
+                // ao valor da hora extra (cadastrado no vínculo/funcionarioclt, ou
+                // 1,5x a hora normal na ausência de valor cadastrado — mesma regra
+                // de ControllerCLT#valorHoraExtraEfetivo).
                 custoHora = custoHoraCLT(c, idpessoa, dataExec);
-                custo = custoHora.multiply(nz(horas)).setScale(2, RoundingMode.HALF_UP);
+                BigDecimal h = nz(horas);
+                if (h.compareTo(BigDecimal.valueOf(8)) > 0) {
+                    BigDecimal horasExtras = h.subtract(BigDecimal.valueOf(8));
+                    BigDecimal valorHoraExtra = custoHoraExtraCLT(c, idpessoa, dataExec);
+                    custo = custoHora.multiply(BigDecimal.valueOf(8))
+                            .add(valorHoraExtra.multiply(horasExtras))
+                            .setScale(2, RoundingMode.HALF_UP);
+                } else {
+                    custo = custoHora.multiply(h).setScale(2, RoundingMode.HALF_UP);
+                }
 
             } else if ("DIARISTA".equalsIgnoreCase(tipo)) {
-                // P1-6: a diária é por PESSOA e por DIA, não por lançamento. Se o
-                // diarista trabalhou em três atividades no mesmo dia, antes eram
-                // cobradas três diárias. Agora a diária é rateada entre elas.
-                custo = custoDiariaRateada(c, idpessoa, dataExec);
+                // Até 8h no dia: a diária é prorateada pelas horas lançadas
+                // (diária/8 × horas). Acima de 8h: a diária cheia. P1-6 segue
+                // valendo — se a pessoa tem mais de um lançamento no mesmo dia,
+                // o total do dia continua limitado a uma diária, rateado entre
+                // os lançamentos proporcionalmente às horas de cada um.
+                custo = custoDiariaPorHoras(c, idpessoa, dataExec, nz(horas));
                 diaristasParaRatear.add(new int[]{ idpessoa });
                 diasParaRatear.add(dataExec);
 
@@ -322,11 +377,18 @@ public class DiarioCampoDAO {
             custoIns = custoIns.add(custo);
         }
 
-        BigDecimal total = custoMO.add(custoMaq).add(custoIns);
+        // Despesas (o valor já foi travado no momento do lançamento, sem recálculo por linha)
+        BigDecimal custoDesp = BigDecimal.ZERO;
+        try (PreparedStatement st = c.prepareStatement("SELECT COALESCE(SUM(valor),0) FROM diario_despesa WHERE iddiario=?")) {
+            st.setInt(1, idDiario); ResultSet rs = st.executeQuery();
+            if (rs.next()) custoDesp = nz(rs.getBigDecimal(1));
+        }
+
+        BigDecimal total = custoMO.add(custoMaq).add(custoIns).add(custoDesp);
         try (PreparedStatement st = c.prepareStatement("UPDATE diario_campo SET custo_mao_obra=?, custo_insumos=?, "
-                + "custo_maquinas=?, custo_total=? WHERE iddiario=?")) {
+                + "custo_maquinas=?, custo_despesas=?, custo_total=? WHERE iddiario=?")) {
             st.setBigDecimal(1, custoMO); st.setBigDecimal(2, custoIns); st.setBigDecimal(3, custoMaq);
-            st.setBigDecimal(4, total); st.setInt(5, idDiario); st.executeUpdate();
+            st.setBigDecimal(4, custoDesp); st.setBigDecimal(5, total); st.setInt(6, idDiario); st.executeUpdate();
         }
 
         for (int k = 0; k < diaristasParaRatear.size(); k++) {
@@ -335,13 +397,35 @@ public class DiarioCampoDAO {
     }
 
     /**
-     * Valor que cabe a UM lançamento de diária: a diária dividida pelo número de
-     * lançamentos daquela pessoa naquele dia.
+     * Valor de UM lançamento de diarista: até 8h somadas no dia, a diária é
+     * prorateada pelas horas de cada lançamento (diária/8 × horas); acima de
+     * 8h somadas, o dia vale uma diária cheia, rateada proporcionalmente às
+     * horas de cada lançamento (P1-6: o total do dia nunca passa de 1 diária).
      */
-    private BigDecimal custoDiariaRateada(Connection c, int idpessoa, LocalDate data) throws SQLException {
+    private BigDecimal custoDiariaPorHoras(Connection c, int idpessoa, LocalDate data, BigDecimal horasEntry) throws SQLException {
         BigDecimal diaria = valorDiaria(c, idpessoa);
-        int lancamentos = contarLancamentosNoDia(c, idpessoa, data, "DIARISTA");
-        return diaria.divide(BigDecimal.valueOf(Math.max(lancamentos, 1)), 2, RoundingMode.HALF_UP);
+        if (diaria.signum() == 0) return BigDecimal.ZERO;
+        BigDecimal totalHorasDia = somarHorasNoDia(c, idpessoa, data, "DIARISTA");
+        BigDecimal custoPorHora = diaria.divide(BigDecimal.valueOf(8), 6, RoundingMode.HALF_UP);
+        if (totalHorasDia.compareTo(BigDecimal.valueOf(8)) <= 0) {
+            return horasEntry.multiply(custoPorHora).setScale(2, RoundingMode.HALF_UP);
+        }
+        if (totalHorasDia.signum() == 0) return BigDecimal.ZERO;
+        return horasEntry.divide(totalHorasDia, 10, RoundingMode.HALF_UP)
+                .multiply(diaria).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    /** Soma das horas lançadas por uma pessoa, de um tipo, num dia (diários não cancelados). */
+    private BigDecimal somarHorasNoDia(Connection c, int idpessoa, LocalDate data, String tipo) throws SQLException {
+        if (data == null) return BigDecimal.ZERO;
+        String sql = "SELECT COALESCE(SUM(df.horas_trabalhadas),0) FROM diario_funcionario df "
+                   + "JOIN diario_campo d ON d.iddiario = df.iddiario "
+                   + "WHERE df.idpessoa = ? AND df.data_execucao = ? "
+                   + "AND upper(df.tipo_funcionario) = ? AND COALESCE(d.status,'') <> 'CANCELADA'";
+        try (PreparedStatement st = c.prepareStatement(sql)) {
+            st.setInt(1, idpessoa); st.setDate(2, Date.valueOf(data)); st.setString(3, tipo);
+            try (ResultSet rs = st.executeQuery()) { return rs.next() ? nz(rs.getBigDecimal(1)) : BigDecimal.ZERO; }
+        }
     }
 
     /**
@@ -351,7 +435,9 @@ public class DiarioCampoDAO {
      * já estava certo antes. Com dois diários: o primeiro gravava a diária cheia
      * (só existia um lançamento na hora do cálculo) e o segundo gravava metade;
      * ninguém voltava para corrigir o primeiro, e o dia somava 1,5 diária. Com
-     * três, somava 1,83.</p>
+     * três, somava 1,83. Agora cada lançamento vale conforme suas PRÓPRIAS horas
+     * (ver {@link #custoDiariaPorHoras}), então cada linha é recalculada com a
+     * sua própria quantidade de horas, não um valor único para todas.</p>
      *
      * <p>Diários já CONCLUIDA não são alterados — o custo deles é um retrato
      * fechado —, mas continuam contando no divisor, e o fato vai para o log para
@@ -361,10 +447,9 @@ public class DiarioCampoDAO {
             throws SQLException {
         if (data == null) return;
 
-        BigDecimal valor = custoDiariaRateada(c, idpessoa, data);
         List<Integer> afetados = new ArrayList<>();
 
-        String sel = "SELECT df.id, df.iddiario, d.status FROM diario_funcionario df "
+        String sel = "SELECT df.id, df.iddiario, df.horas_trabalhadas, d.status FROM diario_funcionario df "
                    + "JOIN diario_campo d ON d.iddiario = df.iddiario "
                    + "WHERE df.idpessoa=? AND df.data_execucao=? "
                    + "AND upper(df.tipo_funcionario)='DIARISTA' "
@@ -375,7 +460,9 @@ public class DiarioCampoDAO {
                 while (rs.next()) {
                     int idLinha = rs.getInt(1);
                     int idDiario = rs.getInt(2);
-                    String status = rs.getString(3);
+                    BigDecimal horasLinha = nz(rs.getBigDecimal(3));
+                    String status = rs.getString(4);
+                    BigDecimal valor = custoDiariaPorHoras(c, idpessoa, data, horasLinha);
                     if ("CONCLUIDA".equals(status)) {
                         Util.LogUtil.aviso(DiarioCampoDAO.class,
                                 "Diário " + idDiario + " está CONCLUIDA e mantém a diária antiga "
@@ -402,7 +489,7 @@ public class DiarioCampoDAO {
                    + "                              WHERE iddiario = d.iddiario), 0), "
                    + "  custo_total = COALESCE((SELECT SUM(custo) FROM diario_funcionario "
                    + "                           WHERE iddiario = d.iddiario), 0) "
-                   + "              + d.custo_insumos + d.custo_maquinas "
+                   + "              + d.custo_insumos + d.custo_maquinas + d.custo_despesas "
                    + "WHERE d.iddiario = ?";
         try (PreparedStatement st = c.prepareStatement(sql)) {
             st.setInt(1, idDiario); st.executeUpdate();
@@ -437,6 +524,44 @@ public class DiarioCampoDAO {
                 }
                 c.commit();
             } catch (SQLException | EstoqueInsuficienteException e) { c.rollback(); throw e; }
+            finally { c.setAutoCommit(true); }
+        }
+    }
+
+    /**
+     * Diários (EM_ANDAMENTO/CONCLUIDA) que têm ao menos um lançamento de mão de
+     * obra desta pessoa. PLANEJADA fica de fora — agendamento não tem custo.
+     */
+    public List<Integer> listarDiariosComPessoa(int idpessoa) throws SQLException {
+        String sql = "SELECT DISTINCT df.iddiario FROM diario_funcionario df "
+                   + "JOIN diario_campo d ON d.iddiario = df.iddiario "
+                   + "WHERE df.idpessoa = ? AND d.status IN ('EM_ANDAMENTO','CONCLUIDA') "
+                   + "ORDER BY df.iddiario";
+        List<Integer> out = new ArrayList<>();
+        try (Connection c = new PostgresConnection().getConnection();
+             PreparedStatement st = c.prepareStatement(sql)) {
+            st.setInt(1, idpessoa);
+            try (ResultSet rs = st.executeQuery()) { while (rs.next()) out.add(rs.getInt(1)); }
+        }
+        return out;
+    }
+
+    /**
+     * Recalcula o custo de um diário já existente (mão de obra + máquinas +
+     * insumos), sem mexer em status nem em estoque. Uso administrativo: corrigir
+     * o custo de um diário CONCLUIDA depois que um valor cadastrado da pessoa
+     * (salário, diária, empreitada) é ajustado retroativamente — {@link #finalizar}
+     * só recalcula no momento da conclusão, então esses diários fechados ficariam
+     * com o custo antigo (ex.: zero, se o cadastro estava sem valor) para sempre.
+     */
+    public void recalcularCustos(int idDiario) throws SQLException {
+        try (Connection c = new PostgresConnection().getConnection()) {
+            c.setAutoCommit(false);
+            try {
+                if (statusNumeroData(c, idDiario) == null) throw new SQLException("Diário não encontrado.");
+                recalcularCustos(c, idDiario);
+                c.commit();
+            } catch (SQLException e) { c.rollback(); throw e; }
             finally { c.setAutoCommit(true); }
         }
     }
@@ -550,6 +675,7 @@ public class DiarioCampoDAO {
             d.setFuncionarios(listarFuncionarios(c, id));
             d.setMaquinas(listarMaquinas(c, id));
             d.setInsumos(listarInsumos(c, id));
+            d.setDespesas(listarDespesas(c, id));
             return d;
         }
     }
@@ -596,7 +722,8 @@ public class DiarioCampoDAO {
         }
         StringBuilder sql = new StringBuilder("SELECT COALESCE(" + grupo + ",'—') AS rotulo, COUNT(*) AS qtd_atividades, "
                 + "COALESCE(SUM(d.custo_total),0) AS custo_total, COALESCE(SUM(d.custo_mao_obra),0) AS custo_mao_obra, "
-                + "COALESCE(SUM(d.custo_insumos),0) AS custo_insumos, COALESCE(SUM(d.custo_maquinas),0) AS custo_maquinas "
+                + "COALESCE(SUM(d.custo_insumos),0) AS custo_insumos, COALESCE(SUM(d.custo_maquinas),0) AS custo_maquinas, "
+                + "COALESCE(SUM(d.custo_despesas),0) AS custo_despesas "
                 + "FROM diario_campo d " + join + " WHERE d.status='CONCLUIDA'");
         List<Object> ps = new ArrayList<>();
         if (de != null && !de.isBlank())  { sql.append(" AND d.data>=?"); ps.add(Date.valueOf(de)); }
@@ -612,6 +739,7 @@ public class DiarioCampoDAO {
                 m.put("rotulo", rs.getString("rotulo")); m.put("qtdAtividades", rs.getInt("qtd_atividades"));
                 m.put("custoTotal", rs.getBigDecimal("custo_total")); m.put("custoMaoObra", rs.getBigDecimal("custo_mao_obra"));
                 m.put("custoInsumos", rs.getBigDecimal("custo_insumos")); m.put("custoMaquinas", rs.getBigDecimal("custo_maquinas"));
+                m.put("custoDespesas", rs.getBigDecimal("custo_despesas"));
                 out.add(m);
             }
         }
@@ -643,7 +771,16 @@ public class DiarioCampoDAO {
                 + "CASE WHEN c.idpessoa IS NOT NULL THEN round(COALESCE(v.salario_mensal, c.salariomensal, 0) / "
                 + "        (GREATEST(COALESCE(v.carga_horaria_diaria, c.cargahorariadiaria, 8),1) * CAST(? AS numeric)), 2) "
                 + "     WHEN di.idpessoa IS NOT NULL THEN COALESCE(di.valorpordia, 0) "
-                + "     WHEN e.idpessoa IS NOT NULL THEN COALESCE(e.valorfixoacordado, 0) ELSE 0 END AS custo_ref "
+                + "     WHEN e.idpessoa IS NOT NULL THEN COALESCE(e.valorfixoacordado, 0) ELSE 0 END AS custo_ref, "
+                // Valor da hora extra do CLT (usada quando horas > 8 na atividade): o
+                // valor cadastrado manualmente, se houver, senão 1,5x a hora normal —
+                // mesma regra de Controller.ControllerCLT#valorHoraExtraEfetivo.
+                + "CASE WHEN c.idpessoa IS NOT NULL THEN "
+                + "     CASE WHEN COALESCE(v.valor_hora_extra, c.valorhoraextra, 0) > 0 "
+                + "          THEN COALESCE(v.valor_hora_extra, c.valorhoraextra) "
+                + "          ELSE round(COALESCE(v.salario_mensal, c.salariomensal, 0) / "
+                + "               (GREATEST(COALESCE(v.carga_horaria_diaria, c.cargahorariadiaria, 8),1) * CAST(? AS numeric)) * 1.5, 2) "
+                + "     END ELSE 0 END AS custo_ref_extra "
                 + "FROM funcionario f JOIN pessoa pe ON pe.idpessoa=f.idpessoa "
                 + "LEFT JOIN funcionarioclt c ON c.idpessoa=f.idpessoa "
                 + "LEFT JOIN funcionariodiarista di ON di.idpessoa=f.idpessoa "
@@ -656,20 +793,43 @@ public class DiarioCampoDAO {
                         + "OR (c.idpessoa IS NULL AND f.situacaopessoa = true) " : "")
                 + "ORDER BY pe.nomepessoa";
         List<Map<String, Object>> out = new ArrayList<>();
-        // O "?" dos dias uteis aparece na lista do SELECT, antes dos parametros do
-        // JOIN — a ordem dos indices segue a posicao no texto do SQL.
+        // Os dois "?" dos dias uteis aparecem na lista do SELECT (custo_ref e
+        // custo_ref_extra), antes dos parametros do JOIN — a ordem dos indices
+        // segue a posicao no texto do SQL.
         int diasUteis = Service.ParametrosFolhaService.diasUteisDoMesDe(data);
         try (Connection c = new PostgresConnection().getConnection();
              PreparedStatement st = c.prepareStatement(sql)) {
             st.setBigDecimal(1, BigDecimal.valueOf(Math.max(diasUteis, 1)));
-            if (data != null) { st.setDate(2, Date.valueOf(data)); st.setDate(3, Date.valueOf(data)); }
+            st.setBigDecimal(2, BigDecimal.valueOf(Math.max(diasUteis, 1)));
+            if (data != null) { st.setDate(3, Date.valueOf(data)); st.setDate(4, Date.valueOf(data)); }
             try (ResultSet rs = st.executeQuery()) {
                 while (rs.next()) {
                     Map<String, Object> m = new LinkedHashMap<>();
                     m.put("idPessoa", rs.getInt("idpessoa")); m.put("nome", rs.getString("nomepessoa"));
                     m.put("tipo", rs.getString("tipo")); m.put("custoRef", rs.getBigDecimal("custo_ref"));
+                    m.put("custoRefExtra", rs.getBigDecimal("custo_ref_extra"));
                     out.add(m);
                 }
+            }
+        }
+        return out;
+    }
+
+    /** Catálogo de Despesas/Custos p/ o select de lançamento (nome, classificação, valor de referência). */
+    public List<Map<String, Object>> listarDespesasDisponiveis() throws SQLException {
+        String sql = "SELECT iddespesascusto, despesascusto, classificacao, valordespesascustos "
+                   + "FROM despesascusto ORDER BY despesascusto";
+        List<Map<String, Object>> out = new ArrayList<>();
+        try (Connection c = new PostgresConnection().getConnection();
+             PreparedStatement st = c.prepareStatement(sql);
+             ResultSet rs = st.executeQuery()) {
+            while (rs.next()) {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("idDespesaCusto", rs.getInt("iddespesascusto"));
+                m.put("nome", rs.getString("despesascusto"));
+                m.put("classificacao", rs.getString("classificacao"));
+                m.put("valorRef", rs.getBigDecimal("valordespesascustos"));
+                out.add(m);
             }
         }
         return out;
@@ -698,46 +858,56 @@ public class DiarioCampoDAO {
      * os dias úteis do mês <b>da atividade</b>, feriados descontados.</p>
      */
     private BigDecimal custoHoraCLT(Connection c, int idpessoa, LocalDate dataExec) throws SQLException {
-        BigDecimal salario = BigDecimal.ZERO; int carga = 8;
-        try {
-            // P1-8: era buscarAtivo(idpessoa), que abria OUTRA conexão dentro
-            // desta transação — uma por funcionário da atividade — e lia fora
-            // dela. Agora reaproveita a conexão corrente.
-            Vinculo v = vinculoDAO.buscarAtivo(c, idpessoa);
-            if (v != null) { salario = nz(v.getSalarioMensal()); carga = v.getCargaHorariaDiaria() > 0 ? v.getCargaHorariaDiaria() : 8; }
-        } catch (SQLException ignore) {}
-        if (salario.signum() == 0) {
-            try (PreparedStatement st = c.prepareStatement("SELECT salariomensal, cargahorariadiaria FROM funcionarioclt WHERE idpessoa=?")) {
-                st.setInt(1, idpessoa); ResultSet rs = st.executeQuery();
-                if (rs.next()) { salario = nz(rs.getBigDecimal(1)); int cg = rs.getInt(2); if (cg > 0) carga = cg; }
-            }
-        }
+        BigDecimal[] termos = termosCLT(c, idpessoa);
+        BigDecimal salario = termos[0]; int carga = termos[1].intValue();
         if (salario.signum() == 0) return BigDecimal.ZERO;
         return Service.ParametrosFolhaService.custoHoraProdutiva(
                 salario, carga, java.time.YearMonth.from(dataExec != null ? dataExec : LocalDate.now()));
     }
 
     /**
-     * Quantos lançamentos deste tipo a pessoa tem na mesma data, em diários não
-     * cancelados. É o divisor do rateio da diária (P1-6).
+     * Valor da hora extra de um CLT (parcela acima de 8h/dia na atividade): o
+     * valor cadastrado manualmente no vínculo/funcionarioclt, se houver; senão
+     * salário/(jornada×dias úteis do mês) × 1,5 — mesma regra e mesma base (sem
+     * arredondar a hora normal antes de multiplicar) de
+     * ControllerCLT#valorHoraExtraEfetivo, para o custeio da atividade bater
+     * com o valor mostrado no perfil do CLT.
      */
-    private int contarLancamentosNoDia(Connection c, int idpessoa, LocalDate data, String tipo)
-            throws SQLException {
-        if (data == null) return 1;
-        String sql = "SELECT COUNT(*) FROM diario_funcionario df "
-                   + "JOIN diario_campo d ON d.iddiario = df.iddiario "
-                   + "WHERE df.idpessoa = ? AND df.data_execucao = ? "
-                   // COALESCE: comparar NULL com 'CANCELADA' devolve NULL, nao TRUE,
-                   // e a linha sumia do divisor.
-                   + "AND upper(df.tipo_funcionario) = ? AND COALESCE(d.status,'') <> 'CANCELADA'";
-        try (PreparedStatement st = c.prepareStatement(sql)) {
-            st.setInt(1, idpessoa);
-            st.setDate(2, Date.valueOf(data));
-            st.setString(3, tipo);
-            try (ResultSet rs = st.executeQuery()) {
-                return rs.next() ? Math.max(rs.getInt(1), 1) : 1;
+    private BigDecimal custoHoraExtraCLT(Connection c, int idpessoa, LocalDate dataExec) throws SQLException {
+        BigDecimal[] termos = termosCLT(c, idpessoa);
+        BigDecimal salario = termos[0], manual = termos[2]; int carga = termos[1].intValue();
+        if (manual.signum() > 0) return manual;
+        if (salario.signum() == 0) return BigDecimal.ZERO;
+        int diasUteis = Service.ParametrosFolhaService.diasUteisDoMesDe(dataExec);
+        BigDecimal horasMes = BigDecimal.valueOf((long) carga * Math.max(diasUteis, 1));
+        return salario.divide(horasMes, 4, RoundingMode.HALF_UP)
+                .multiply(new BigDecimal("1.5")).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    /** [salário mensal, carga horária diária, valor hora extra manual] do vínculo ativo, com fallback em funcionarioclt. */
+    private BigDecimal[] termosCLT(Connection c, int idpessoa) throws SQLException {
+        BigDecimal salario = BigDecimal.ZERO, manual = BigDecimal.ZERO; int carga = 8;
+        try {
+            // P1-8: era buscarAtivo(idpessoa), que abria OUTRA conexão dentro
+            // desta transação — uma por funcionário da atividade — e lia fora
+            // dela. Agora reaproveita a conexão corrente.
+            Vinculo v = vinculoDAO.buscarAtivo(c, idpessoa);
+            if (v != null) {
+                salario = nz(v.getSalarioMensal()); manual = nz(v.getValorHoraExtra());
+                carga = v.getCargaHorariaDiaria() > 0 ? v.getCargaHorariaDiaria() : 8;
+            }
+        } catch (SQLException ignore) {}
+        if (salario.signum() == 0) {
+            try (PreparedStatement st = c.prepareStatement(
+                    "SELECT salariomensal, cargahorariadiaria, valorhoraextra FROM funcionarioclt WHERE idpessoa=?")) {
+                st.setInt(1, idpessoa); ResultSet rs = st.executeQuery();
+                if (rs.next()) {
+                    salario = nz(rs.getBigDecimal(1)); int cg = rs.getInt(2); if (cg > 0) carga = cg;
+                    if (manual.signum() == 0) manual = nz(rs.getBigDecimal(3));
+                }
             }
         }
+        return new BigDecimal[]{ salario, BigDecimal.valueOf(carga), manual };
     }
 
     private BigDecimal valorDiaria(Connection c, int idpessoa) throws SQLException {
@@ -887,6 +1057,25 @@ public class DiarioCampoDAO {
         return l;
     }
 
+    private List<DiarioDespesa> listarDespesas(Connection c, int idDiario) throws SQLException {
+        List<DiarioDespesa> l = new ArrayList<>();
+        try (PreparedStatement st = c.prepareStatement("SELECT dd.*, dc.classificacao FROM diario_despesa dd "
+                + "LEFT JOIN despesascusto dc ON dc.iddespesascusto=dd.iddespesascusto "
+                + "WHERE dd.iddiario=? ORDER BY dd.data_execucao, dd.id")) {
+            st.setInt(1, idDiario); ResultSet rs = st.executeQuery();
+            while (rs.next()) {
+                DiarioDespesa d = new DiarioDespesa();
+                d.setId(rs.getInt("id")); d.setIdDiario(idDiario); d.setIdDespesaCusto(rs.getInt("iddespesascusto"));
+                d.setDescricao(rs.getString("descricao")); d.setClassificacao(rs.getString("classificacao"));
+                d.setQuantidade(rs.getBigDecimal("quantidade")); d.setValorUnitario(rs.getBigDecimal("valor_unitario"));
+                d.setValor(rs.getBigDecimal("valor"));
+                Date de = rs.getDate("data_execucao"); d.setDataExecucao(de != null ? de.toLocalDate() : null);
+                l.add(d);
+            }
+        }
+        return l;
+    }
+
     private DiarioCampo mapCabecalho(ResultSet rs) throws SQLException {
         DiarioCampo d = new DiarioCampo();
         d.setIdDiario(rs.getInt("iddiario")); d.setNumeroDiario(rs.getString("numero_diario"));
@@ -904,7 +1093,8 @@ public class DiarioCampoDAO {
         Time hf = rs.getTime("hora_fim"); d.setHoraFim(hf != null ? hf.toLocalTime() : null);
         d.setObservacoes(rs.getString("observacoes"));
         d.setCustoMaoObra(rs.getBigDecimal("custo_mao_obra")); d.setCustoInsumos(rs.getBigDecimal("custo_insumos"));
-        d.setCustoMaquinas(rs.getBigDecimal("custo_maquinas")); d.setCustoTotal(rs.getBigDecimal("custo_total"));
+        d.setCustoMaquinas(rs.getBigDecimal("custo_maquinas")); d.setCustoDespesas(rs.getBigDecimal("custo_despesas"));
+        d.setCustoTotal(rs.getBigDecimal("custo_total"));
         return d;
     }
 

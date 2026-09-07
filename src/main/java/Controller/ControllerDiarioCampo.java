@@ -7,6 +7,7 @@ import Model.Dao.TipoAtividadeDAO;
 import Model.Model.DiarioCampo;
 import Model.Model.DiarioInsumo;
 import Model.Model.DiarioFuncionario;
+import Model.Model.DiarioDespesa;
 import com.google.gson.*;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
@@ -34,6 +35,7 @@ import java.util.Map;
  * GET  ?id=                            → um diário (com funcionários/máquinas/insumos)
  * GET  ?tiposatividade=1               → tipos de atividade ativos
  * GET  ?funcionarios=1                 → funcionários (idpessoa+nome+tipo) p/ selects
+ * GET  ?despesascatalogo=1             → catálogo de despesas/custos (nome+classificação+valor ref.) p/ selects
  * GET  ?relatorio=talhao|cultura|atividade|area|responsavel &de=&ate=  → agregação de custo
  * POST acao=create|update|finalizar|status|addtipoatividade
  */
@@ -77,6 +79,9 @@ public class ControllerDiarioCampo extends HttpServlet {
                 }
                 out.print(gson.toJson(dao.listarFuncionariosDisponiveis(dataFiltro))); return;
             }
+            if (req.getParameter("despesascatalogo") != null) {
+                out.print(gson.toJson(dao.listarDespesasDisponiveis())); return;
+            }
             if (req.getParameter("relatorio") != null) {
                 out.print(gson.toJson(dao.relatorioCusto(req.getParameter("relatorio"),
                         req.getParameter("de"), req.getParameter("ate")))); return;
@@ -114,6 +119,7 @@ public class ControllerDiarioCampo extends HttpServlet {
                 case "addexecucao":     handleAddExecucao(jo, resp); break;
                 case "status":          handleStatus(jo, resp); break;
                 case "addtipoatividade":handleAddTipo(jo, resp); break;
+                case "recalcularpessoa":handleRecalcularPessoa(jo, resp); break;
                 default: writeJson(resp, 400, false, "Ação inválida.");
             }
         } catch (EstoqueInsuficienteException e) {
@@ -158,6 +164,11 @@ public class ControllerDiarioCampo extends HttpServlet {
         for (DiarioInsumo i : d.getInsumos()) {
             if (i.getIdInsumo() == 0 || i.getQuantidade() == null || i.getQuantidade().signum() <= 0) {
                 writeJson(resp, 400, false, "Cada insumo precisa de um produto e quantidade maior que zero."); return;
+            }
+        }
+        for (DiarioDespesa dsp : d.getDespesas()) {
+            if (dsp.getIdDespesaCusto() == 0 || dsp.getQuantidade() == null || dsp.getQuantidade().signum() <= 0) {
+                writeJson(resp, 400, false, "Cada despesa precisa de um item do catálogo e quantidade maior que zero."); return;
             }
         }
 
@@ -213,8 +224,26 @@ public class ControllerDiarioCampo extends HttpServlet {
                 funcionarios.add(f);
             }
         }
-        if (funcionarios.isEmpty()) { writeJson(resp, 400, false, "Informe ao menos um funcionário para a execução."); return; }
-        dao.adicionarExecucao(id, dataExec, funcionarios);
+        List<DiarioDespesa> despesas = new ArrayList<>();
+        if (jo.has("despesas") && jo.get("despesas").isJsonArray()) {
+            for (JsonElement je : jo.getAsJsonArray("despesas")) {
+                DiarioDespesa d = gson.fromJson(je, DiarioDespesa.class);
+                if (d.getIdDespesaCusto() == 0) {
+                    writeJson(resp, 400, false, "Cada despesa precisa de um item do catálogo selecionado."); return;
+                }
+                if (d.getQuantidade() != null && d.getQuantidade().signum() <= 0) {
+                    writeJson(resp, 400, false, "Quantidade da despesa deve ser maior que zero."); return;
+                }
+                if (d.getValorUnitario() != null && d.getValorUnitario().signum() < 0) {
+                    writeJson(resp, 400, false, "Valor da despesa não pode ser negativo."); return;
+                }
+                despesas.add(d);
+            }
+        }
+        if (funcionarios.isEmpty() && despesas.isEmpty()) {
+            writeJson(resp, 400, false, "Informe ao menos um funcionário ou uma despesa para a execução."); return;
+        }
+        dao.adicionarExecucao(id, dataExec, funcionarios, despesas);
         writeJson(resp, 200, true, "Execução registrada com sucesso! Custo total recalculado.");
     }
 
@@ -223,6 +252,22 @@ public class ControllerDiarioCampo extends HttpServlet {
         if (id == 0) { writeJson(resp, 400, false, "ID do diário obrigatório."); return; }
         dao.finalizar(id);   // pode lançar EstoqueInsuficienteException → 400
         writeJson(resp, 200, true, "Atividade finalizada: custos calculados e baixa de estoque realizada.");
+    }
+
+    /**
+     * Recalcula o custo de todos os diários (EM_ANDAMENTO/CONCLUIDA) que têm
+     * lançamento de mão de obra desta pessoa. Uso administrativo: depois de
+     * corrigir um valor cadastrado (salário, diária, empreitada) que estava
+     * errado/zerado, os diários já fechados com esse funcionário continuam com
+     * o custo antigo até serem recalculados manualmente — finalizar() só roda
+     * uma vez, no momento da conclusão.
+     */
+    private void handleRecalcularPessoa(JsonObject jo, HttpServletResponse resp) throws Exception {
+        int idpessoa = getInt(jo, "idpessoa");
+        if (idpessoa == 0) { writeJson(resp, 400, false, "idpessoa é obrigatório."); return; }
+        List<Integer> diarios = dao.listarDiariosComPessoa(idpessoa);
+        for (int id : diarios) dao.recalcularCustos(id);
+        writeJson(resp, 200, true, "Custo recalculado em " + diarios.size() + " diário(s).");
     }
 
     private void handleStatus(JsonObject jo, HttpServletResponse resp) throws Exception {

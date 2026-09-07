@@ -39,7 +39,7 @@ public class DespesasCustosDAO {
 
     private static final String COLUNAS =
         "iddespesascusto, despesascusto, unidadedespesascustos, "
-      + "valordespesascustos, tipodespesascustos";
+      + "valordespesascustos, tipodespesascustos, classificacao";
 
     /** Já existe uma despesa com esta descrição? */
     public boolean existeDespesaCusto(String despesascustos) throws SQLException {
@@ -57,7 +57,7 @@ public class DespesasCustosDAO {
 
     public void create(DespesasCustos despesaCusto) throws SQLException {
         String sql = "INSERT INTO despesascusto (despesascusto, unidadedespesascustos, "
-                   + "valordespesascustos, tipodespesascustos) VALUES (?, ?, ?, ?)";
+                   + "valordespesascustos, tipodespesascustos, classificacao) VALUES (?, ?, ?, ?, ?)";
 
         try (Connection conexao = new PostgresConnection().getConnection();
              PreparedStatement stmt = conexao.prepareStatement(sql)) {
@@ -66,6 +66,7 @@ public class DespesasCustosDAO {
             stmt.setString(2, despesaCusto.getUnidadedespesascustos());
             stmt.setBigDecimal(3, valor(despesaCusto));
             stmt.setString(4, despesaCusto.getTipodespesascustos());
+            stmt.setString(5, despesaCusto.getClassificacao());
             stmt.executeUpdate();
         }
     }
@@ -85,7 +86,7 @@ public class DespesasCustosDAO {
 
     public void update(DespesasCustos despesaCusto) throws SQLException {
         String sql = "UPDATE despesascusto SET despesascusto = ?, unidadedespesascustos = ?, "
-                   + "valordespesascustos = ?, tipodespesascustos = ? WHERE iddespesascusto = ?";
+                   + "valordespesascustos = ?, tipodespesascustos = ?, classificacao = ? WHERE iddespesascusto = ?";
 
         try (Connection conexao = new PostgresConnection().getConnection();
              PreparedStatement stmt = conexao.prepareStatement(sql)) {
@@ -94,7 +95,8 @@ public class DespesasCustosDAO {
             stmt.setString(2, despesaCusto.getUnidadedespesascustos());
             stmt.setBigDecimal(3, valor(despesaCusto));
             stmt.setString(4, despesaCusto.getTipodespesascustos());
-            stmt.setInt(5, despesaCusto.getIddespesascusto());
+            stmt.setString(5, despesaCusto.getClassificacao());
+            stmt.setInt(6, despesaCusto.getIddespesascusto());
             stmt.executeUpdate();
         }
     }
@@ -134,7 +136,7 @@ public class DespesasCustosDAO {
     public boolean VerificarDadosUpdate(DespesasCustos despesaCusto) throws SQLException {
         String sql = "SELECT 1 FROM despesascusto WHERE iddespesascusto = ? AND despesascusto = ? "
                    + "AND unidadedespesascustos = ? AND valordespesascustos = ? "
-                   + "AND tipodespesascustos = ? LIMIT 1";
+                   + "AND tipodespesascustos = ? AND classificacao = ? LIMIT 1";
 
         try (Connection conexao = new PostgresConnection().getConnection();
              PreparedStatement stmt = conexao.prepareStatement(sql)) {
@@ -144,6 +146,7 @@ public class DespesasCustosDAO {
             stmt.setString(3, despesaCusto.getUnidadedespesascustos());
             stmt.setBigDecimal(4, valor(despesaCusto));
             stmt.setString(5, despesaCusto.getTipodespesascustos());
+            stmt.setString(6, despesaCusto.getClassificacao());
             try (ResultSet rs = stmt.executeQuery()) {
                 return rs.next();
             }
@@ -154,7 +157,7 @@ public class DespesasCustosDAO {
     public boolean ExisteEmOutroRegistroDespesasCustos(DespesasCustos despesaCusto) throws SQLException {
         String sql = "SELECT 1 FROM despesascusto WHERE iddespesascusto <> ? AND despesascusto = ? "
                    + "AND unidadedespesascustos = ? AND valordespesascustos = ? "
-                   + "AND tipodespesascustos = ? LIMIT 1";
+                   + "AND tipodespesascustos = ? AND classificacao = ? LIMIT 1";
 
         try (Connection conexao = new PostgresConnection().getConnection();
              PreparedStatement stmt = conexao.prepareStatement(sql)) {
@@ -164,6 +167,7 @@ public class DespesasCustosDAO {
             stmt.setString(3, despesaCusto.getUnidadedespesascustos());
             stmt.setBigDecimal(4, valor(despesaCusto));
             stmt.setString(5, despesaCusto.getTipodespesascustos());
+            stmt.setString(6, despesaCusto.getClassificacao());
             try (ResultSet rs = stmt.executeQuery()) {
                 return rs.next();
             }
@@ -186,6 +190,7 @@ public class DespesasCustosDAO {
         BigDecimal v = rs.getBigDecimal("valordespesascustos");
         d.setValordespesascustos(v != null ? v.doubleValue() : 0d);
         d.setTipodespesascustos(rs.getString("tipodespesascustos"));
+        d.setClassificacao(rs.getString("classificacao"));
         return d;
     }
 

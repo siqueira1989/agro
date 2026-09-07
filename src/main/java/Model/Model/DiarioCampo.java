@@ -30,11 +30,13 @@ public class DiarioCampo {
     private BigDecimal custoMaoObra = BigDecimal.ZERO;
     private BigDecimal custoInsumos = BigDecimal.ZERO;
     private BigDecimal custoMaquinas = BigDecimal.ZERO;
+    private BigDecimal custoDespesas = BigDecimal.ZERO;
     private BigDecimal custoTotal = BigDecimal.ZERO;
 
     private List<DiarioFuncionario> funcionarios = new ArrayList<>();
     private List<DiarioMaquina> maquinas = new ArrayList<>();
     private List<DiarioInsumo> insumos = new ArrayList<>();
+    private List<DiarioDespesa> despesas = new ArrayList<>();
 
     public int getIdDiario() { return idDiario; }
     public void setIdDiario(int idDiario) { this.idDiario = idDiario; }
@@ -86,6 +88,8 @@ public class DiarioCampo {
     public void setCustoInsumos(BigDecimal v) { this.custoInsumos = v; }
     public BigDecimal getCustoMaquinas() { return custoMaquinas; }
     public void setCustoMaquinas(BigDecimal v) { this.custoMaquinas = v; }
+    public BigDecimal getCustoDespesas() { return custoDespesas; }
+    public void setCustoDespesas(BigDecimal v) { this.custoDespesas = v; }
     public BigDecimal getCustoTotal() { return custoTotal; }
     public void setCustoTotal(BigDecimal v) { this.custoTotal = v; }
     public List<DiarioFuncionario> getFuncionarios() { return funcionarios; }
@@ -94,4 +98,6 @@ public class DiarioCampo {
     public void setMaquinas(List<DiarioMaquina> maquinas) { this.maquinas = maquinas; }
     public List<DiarioInsumo> getInsumos() { return insumos; }
     public void setInsumos(List<DiarioInsumo> insumos) { this.insumos = insumos; }
+    public List<DiarioDespesa> getDespesas() { return despesas; }
+    public void setDespesas(List<DiarioDespesa> despesas) { this.despesas = despesas; }
 }

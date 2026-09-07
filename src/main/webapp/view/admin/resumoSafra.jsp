@@ -46,6 +46,7 @@
             <tr><td><i class="fas fa-flask text-primary me-1"></i>Insumos</td><td class="text-end" id="rsIns">R$ 0,00</td><td class="text-end" id="rsPctIns">0%</td></tr>
             <tr><td><i class="fas fa-tractor text-secondary me-1"></i>Maquinário/Combustível</td><td class="text-end" id="rsMaq">R$ 0,00</td><td class="text-end" id="rsPctMaq">0%</td></tr>
             <tr><td><i class="fas fa-users text-success me-1"></i>Mão de Obra</td><td class="text-end" id="rsMo">R$ 0,00</td><td class="text-end" id="rsPctMo">0%</td></tr>
+            <tr><td><i class="fas fa-receipt text-info me-1"></i>Despesas de Execução</td><td class="text-end" id="rsDesp">R$ 0,00</td><td class="text-end" id="rsPctDesp">0%</td></tr>
             <tr><td><i class="fas fa-file-invoice-dollar text-warning me-1"></i>Despesas Fixas</td><td class="text-end" id="rsFix">R$ 0,00</td><td class="text-end" id="rsPctFix">0%</td></tr>
           </tbody>
           <tfoot><tr class="fw-bold"><td>Custo Total</td><td class="text-end" id="rsTotalFoot">R$ 0,00</td><td class="text-end">100%</td></tr></tfoot>

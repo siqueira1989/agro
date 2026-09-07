@@ -132,19 +132,15 @@
         </div>
         <div class="col-md-3"><label class="form-label">Situação *</label>
           <select class="form-select" id="dcStatusSel">
-            <option value="PLANEJADA">Planejado (agendamento)</option>
             <option value="EM_ANDAMENTO">Execução</option>
             <option value="CONCLUIDA">Concluído</option>
           </select>
-          <small class="text-muted">Planejado não calcula custo (previsão). Concluído calcula o custo final e já baixa o estoque dos insumos.</small>
+          <small class="text-muted">Concluído calcula o custo final e já baixa o estoque dos insumos.</small>
         </div>
         <div class="col-md-5"><label class="form-label">Descrição</label><input type="text" class="form-control" id="dcDescricao" maxlength="200"></div>
       </div>
       <div class="row g-2 mt-1">
-        <div class="col-md-3"><label class="form-label">Data prevista</label><input type="date" class="form-control" id="dcDataPrev"></div>
-        <div class="col-md-2"><label class="form-label">Hora início</label><input type="time" class="form-control" id="dcHoraIni"></div>
-        <div class="col-md-2"><label class="form-label">Hora fim</label><input type="time" class="form-control" id="dcHoraFim"></div>
-        <div class="col-md-5"><label class="form-label">Observações</label><input type="text" class="form-control" id="dcObs" maxlength="200"></div>
+        <div class="col-md-12"><label class="form-label">Observações</label><input type="text" class="form-control" id="dcObs" maxlength="200"></div>
       </div>
       <div class="mt-2"><span class="badge bg-light text-dark border"><i class="fas fa-seedling me-1 text-success"></i>Safra vinculada: <strong id="dcSafraNome">—</strong></span></div>
 
@@ -154,7 +150,7 @@
         <button class="btn btn-outline-secondary btn-sm" type="button" id="btnAddFunc"><i class="fas fa-plus me-1"></i>Adicionar</button>
       </div>
       <div class="table-responsive"><table class="table table-sm align-middle mb-2">
-        <thead class="table-light"><tr><th style="width:26%">Funcionário</th><th>Tipo</th><th style="width:14%">Execução</th><th style="width:12%">Horas</th><th style="width:16%">Valor (auto)</th><th></th></tr></thead>
+        <thead class="table-light"><tr><th style="width:30%">Funcionário</th><th>Tipo</th><th style="width:14%">Horas</th><th style="width:18%">Valor (auto)</th><th></th></tr></thead>
         <tbody id="dcFuncBody"></tbody></table></div>
       <div id="dcFuncSoNaExecucao" class="alert alert-info py-2 small d-none">
         <i class="fas fa-circle-info me-1"></i>Ao editar um diário já criado, os funcionários ficam somente leitura — use
@@ -171,6 +167,13 @@
           <thead class="table-light"><tr><th style="width:30%">Funcionário</th><th>Tipo</th><th style="width:16%">Horas</th><th style="width:18%">Valor (auto)</th><th></th></tr></thead>
           <tbody id="exFuncBody"></tbody></table></div>
         <button type="button" class="btn btn-outline-secondary btn-sm" id="btnAddExecFunc"><i class="fas fa-plus me-1"></i>Adicionar colaborador</button>
+
+        <h6 class="fw-bold text-secondary mb-0 mt-3"><i class="fas fa-receipt me-1"></i>Despesas desta execução</h6>
+        <div class="table-responsive mt-2"><table class="table table-sm align-middle mb-2">
+          <thead class="table-light"><tr><th style="width:26%">Despesa</th><th>Classif.</th><th style="width:12%">Qtd</th><th style="width:16%">Valor unit.</th><th style="width:16%">Subtotal</th><th></th></tr></thead>
+          <tbody id="exDespBody"></tbody></table></div>
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="btnAddExecDesp"><i class="fas fa-plus me-1"></i>Adicionar despesa</button>
+
         <button type="button" class="btn btn-success btn-sm float-end" id="btnSalvarExecucao"><i class="fas fa-save me-1"></i>Salvar Execução</button>
       </div>
 
@@ -191,6 +194,19 @@
       <div class="table-responsive"><table class="table table-sm align-middle mb-0">
         <thead class="table-light"><tr><th style="width:34%">Insumo</th><th>Quantidade</th><th>Dose aplicada</th><th></th></tr></thead>
         <tbody id="dcInsBody"></tbody></table></div>
+
+      <!-- Despesas -->
+      <div class="d-flex justify-content-between align-items-center mt-2 mb-1">
+        <h6 class="fw-bold text-secondary mb-0"><i class="fas fa-receipt me-1"></i>Despesas</h6>
+        <button class="btn btn-outline-secondary btn-sm" type="button" id="btnAddDesp"><i class="fas fa-plus me-1"></i>Adicionar</button>
+      </div>
+      <div class="table-responsive"><table class="table table-sm align-middle mb-2">
+        <thead class="table-light"><tr><th style="width:26%">Despesa</th><th>Classif.</th><th style="width:12%">Qtd</th><th style="width:16%">Valor unit.</th><th style="width:16%">Subtotal</th><th></th></tr></thead>
+        <tbody id="dcDespBody"></tbody></table></div>
+      <div id="dcDespSoNaExecucao" class="alert alert-info py-2 small d-none">
+        <i class="fas fa-circle-info me-1"></i>Ao editar um diário já criado, as despesas ficam somente leitura — use
+        <strong>"Registrar nova execução"</strong> acima para lançar novas compras (o custo soma tudo, nunca faz média).
+      </div>
       <small class="text-muted">A baixa de estoque ocorre ao <strong>finalizar</strong> a atividade. O custo total é calculado e salvo automaticamente.</small>
     </div>
     <div class="modal-footer justify-content-between">

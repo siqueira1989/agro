@@ -30,6 +30,7 @@
           <th>Unidade</th>
           <th>Valor</th>
           <th>Tipo</th>
+          <th>Classificação</th>
           <th>Ações</th>
         </tr>
       </thead>
@@ -66,7 +67,16 @@
           </div>
           <div class="mb-3">
             <label for="tipo">Tipo:</label>
-            <input type="text" id="tipo" name="tipo" class="form-control" maxlength="20" placeholder="Ex.: Fixo">
+            <input type="text" id="tipo" name="tipo" class="form-control" maxlength="20" placeholder="Ex.: Venda">
+          </div>
+          <div class="mb-3">
+            <label for="classificacao">Classificação:</label>
+            <select id="classificacao" name="classificacao" class="form-select">
+              <option value="">Selecione...</option>
+              <option value="FIXO">Fixo</option>
+              <option value="VARIAVEL">Variável</option>
+            </select>
+            <small class="text-muted">Variável: o valor pode mudar a cada compra (ex.: marmita); o valor acima vira apenas referência.</small>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -105,6 +115,14 @@
           <div class="mb-3">
             <label for="atualizacaoTipo">Tipo:</label>
             <input type="text" id="atualizacaoTipo" name="tipodespesacusto" class="form-control" maxlength="20">
+          </div>
+          <div class="mb-3">
+            <label for="atualizacaoClassificacao">Classificação:</label>
+            <select id="atualizacaoClassificacao" name="classificacao" class="form-select">
+              <option value="">Selecione...</option>
+              <option value="FIXO">Fixo</option>
+              <option value="VARIAVEL">Variável</option>
+            </select>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>

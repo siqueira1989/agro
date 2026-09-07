@@ -437,7 +437,7 @@ function excluirClassificacao() {
 /******************************************************************************************************/
 
 /** Abre o modal de edição preenchendo os campos com os dados da despesa selecionada. Usado em: despesascustos.jsp */
-function abrirModalAtualizacaoDespesasCustos(id, despesa, unidade, valor, tipo) {
+function abrirModalAtualizacaoDespesasCustos(id, despesa, unidade, valor, tipo, classificacao) {
     // Atribui os valores aos campos do formulário de atualização
     $('#atualizacaoId').val(id);
     $('#atualizacaoDespesa').val(despesa);
@@ -449,6 +449,7 @@ function abrirModalAtualizacaoDespesasCustos(id, despesa, unidade, valor, tipo) 
     $('#atualizacaoValor').val(valorFormatado);
 
     $('#atualizacaoTipo').val(tipo);
+    $('#atualizacaoClassificacao').val(classificacao);
     $('#modalAtualizacao').modal('show');
 }
 
@@ -491,6 +492,15 @@ function CarregarDadosDespesasCustos() {
             },
             {"data": "tipodespesascustos"},
             {
+                "data": "classificacao",
+                "render": function (data, type, row) {
+                    const variavel = data === 'VARIAVEL';
+                    const rotulo = variavel ? 'Variável' : 'Fixo';
+                    const cor = variavel ? 'bg-warning text-dark' : 'bg-secondary';
+                    return '<span class="badge ' + cor + '">' + rotulo + '</span>';
+                }
+            },
+            {
                 "data": null,
                 "render": function (data, type, row) {
                     return '<button class="btn-acao btn-acao-editar" title="Editar" onclick="abrirModalAtualizacaoDespesasCustos('
@@ -498,7 +508,8 @@ function CarregarDadosDespesasCustos() {
                             + row.despesascusto + '\', \''
                             + row.unidadedespesascustos + '\', \''
                             + row.valordespesascustos + '\', \''
-                            + row.tipodespesascustos + '\')"><i class="fas fa-pen-to-square"></i></button> '
+                            + row.tipodespesascustos + '\', \''
+                            + row.classificacao + '\')"><i class="fas fa-pen-to-square"></i></button> '
                             + '<button class="btn-acao btn-acao-excluir" title="Excluir" onclick="abrirModalExclusaoDespesasCustos(' + row.iddespesascusto + ', \'' + row.despesascusto + '\')"><i class="fas fa-trash-can"></i></button>';
                 }
             }
@@ -536,7 +547,7 @@ function excluirDespesasCustos() {
 }
 
 /** Envia POST para atualizar os dados de uma despesa/custo. Usado em: despesascustos.jsp */
-function atualizarDespesasCustos(id, despesa, unidade, valor, tipo) {
+function atualizarDespesasCustos(id, despesa, unidade, valor, tipo, classificacao) {
     $.ajax({
         url: AGRO_CTX + '/DespesasCustosServlet',
         method: 'POST',
@@ -546,7 +557,8 @@ function atualizarDespesasCustos(id, despesa, unidade, valor, tipo) {
             despesascustos: despesa,
             unidadedespesacustos: unidade,
             valordespesacustos: valor,
-            tipodespesacustos: tipo
+            tipodespesacustos: tipo,
+            classificacao: classificacao
         },
         success: function (resp) {
             mostrarAlerta(resp.msg || 'Despesa atualizada com sucesso!', 'success', '#alerta');
@@ -566,7 +578,7 @@ function atualizarDespesasCustos(id, despesa, unidade, valor, tipo) {
 }
 
 /** Envia POST para criar nova despesa/custo via DespesasCustosServlet. Usado em: despesascustos.jsp */
-function salvarDespesasCustos(despesa, unidade, valor, tipo) {
+function salvarDespesasCustos(despesa, unidade, valor, tipo, classificacao) {
     $.ajax({
         url: AGRO_CTX + '/DespesasCustosServlet',
         method: 'POST',
@@ -575,7 +587,8 @@ function salvarDespesasCustos(despesa, unidade, valor, tipo) {
             despesascusto: despesa,
             unidadedespesacusto: unidade,
             valordespesacusto: valor,
-            tipodespesacusto: tipo
+            tipodespesacusto: tipo,
+            classificacao: classificacao
         },
         success: function (resp) {
             // resp: { ok:true, msg:"..." }
@@ -1460,7 +1473,7 @@ function initFuncionarioCadastro() {
   var editId = urlParams.get('id');
   if (editId) {
     $.ajax({
-      url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerFuncionario?id=' + editId,
+      url: AGRO_CTX + '/ControllerFuncionario?id=' + editId,
       method: 'GET',
       dataType: 'json',
       success: function (f) {
@@ -1599,7 +1612,7 @@ function initFuncionarioCadastro() {
       atualizarBotaoSalvar();
       return;
     }
-    $.getJSON((window.__ctxPath || '') + AGRO_CTX + '/ControllerFuncionario',
+    $.getJSON(AGRO_CTX + '/ControllerFuncionario',
       { existe: campo, valor: valor, excluir: editId })
       .done(function (r) {
         var existe = !!(r && r.existe);
@@ -1729,7 +1742,7 @@ function initFuncionarioCadastro() {
       };
 
       $.ajax({
-        url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerFuncionario',
+        url: AGRO_CTX + '/ControllerFuncionario',
         method: 'POST',
         contentType: 'application/json; charset=utf-8',
         dataType: 'json',
@@ -1739,7 +1752,7 @@ function initFuncionarioCadastro() {
           if (res && res.ok) {
             sessionStorage.setItem('mensagemAlerta', msg);
             sessionStorage.setItem('tipoAlerta', 'success');
-            window.location.href = (window.__ctxPath || '') + '/view/admin/Colaboradores.jsp';
+            window.location.href = AGRO_CTX + '/view/admin/Colaboradores.jsp';
           } else {
             if (typeof mostrarAlerta === 'function') {
               mostrarAlerta(msg, 'danger', '#alerta', 5000);
@@ -1763,13 +1776,6 @@ function initFuncionarioCadastro() {
 /***Configuração geral****/
 $(function () {
     initValidacaoEmailAutomatica();
-});
-
-/* Atualiza referência de ctxPath legada para o CTX global */
-$(function () {
-    if (typeof window.__ctxPath === 'undefined') {
-        window.__ctxPath = window.CTX || '';
-    }
 });
 
 /******************************************************************************************************/
@@ -1857,6 +1863,27 @@ $(document).ready(function () {
     });
 });
 
+/* ========== view/admin/index.jsp (dashboard admin) — KPIs ========== */
+$(document).ready(function () {
+    if (!$('#kpiFuncionarios').length) return;
+
+    $.getJSON(CTX + '/ControllerFuncionario?ativos=true', function (lista) {
+        $('#kpiFuncionarios').text(Array.isArray(lista) ? lista.length : 0);
+    });
+
+    $.getJSON(CTX + '/ControllerParceiro?acao=dados', function (dados) {
+        $('#kpiParceiros').text(dados && dados.total != null ? dados.total : 0);
+    });
+
+    $.getJSON(CTX + '/ControllerAlimento', function (lista) {
+        $('#kpiAlimentos').text(Array.isArray(lista) ? lista.length : 0);
+    });
+
+    $.getJSON(CTX + '/ControllerAreaProducao', function (lista) {
+        $('#kpiAreas').text(Array.isArray(lista) ? lista.length : 0);
+    });
+});
+
 /* ========== AtualizarParceiro.jsp ========== */
 $(document).ready(function () {
     if (!$('#cnpjPessoaCnpj').length) return;
@@ -1937,8 +1964,13 @@ $(document).ready(function () {
         let unidade = $('#unidade').val().trim();
         let valor   = $('#valor').val().trim();
         let tipo    = $('#tipo').val().trim();
+        let classificacao = $('#classificacao').val();
         if (!despesa || !unidade || !valor || !tipo) {
             mostrarAlerta('Todos os campos são obrigatórios.', 'danger', '#alertModalCadastro');
+            return;
+        }
+        if (!classificacao) {
+            mostrarAlerta('Selecione a classificação (Fixo ou Variável).', 'danger', '#alertModalCadastro');
             return;
         }
         if (despesa.length > 50 || unidade.length > 2 || tipo.length > 20) {
@@ -1949,7 +1981,7 @@ $(document).ready(function () {
             mostrarAlerta('Formato inválido de valor.', 'warning', '#alertModalCadastro', 4000);
             return;
         }
-        salvarDespesasCustos(despesa, unidade, valor, tipo);
+        salvarDespesasCustos(despesa, unidade, valor, tipo, classificacao);
     });
 
     $('#formAtualizacao').on('submit', function (e) {
@@ -1959,11 +1991,16 @@ $(document).ready(function () {
         let unidade = $('#atualizacaoUnidade').val().trim();
         let valor   = $('#atualizacaoValor').val().trim();
         let tipo    = $('#atualizacaoTipo').val().trim();
+        let classificacao = $('#atualizacaoClassificacao').val();
         if (!despesa || !unidade || !valor || !tipo) {
             ExibirAlerta('Erro', 'Todos os campos são obrigatórios.');
             return;
         }
-        atualizarDespesasCustos(id, despesa, unidade, valor, tipo);
+        if (!classificacao) {
+            ExibirAlerta('Erro', 'Selecione a classificação (Fixo ou Variável).');
+            return;
+        }
+        atualizarDespesasCustos(id, despesa, unidade, valor, tipo, classificacao);
     });
 
     $('#modalCadastro').on('show.bs.modal hidden.bs.modal', function () {
@@ -2434,7 +2471,7 @@ function initPerfilDiarista() {
 
 function carregarPerfilDiarista(id, periodo) {
     $.ajax({
-        url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerDiarista?acao=perfil&id=' + id + '&periodo=' + periodo,
+        url: AGRO_CTX + '/ControllerDiarista?acao=perfil&id=' + id + '&periodo=' + periodo,
         method: 'GET', dataType: 'json',
         success: function (data) {
             renderHeaderDiarista(data);
@@ -2579,7 +2616,7 @@ function marcarValeDescontadoDiarista(idVale) {
 
 function postDiarista(payload, onOk, alertaSel) {
     $.ajax({
-        url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerDiarista',
+        url: AGRO_CTX + '/ControllerDiarista',
         method: 'POST', contentType: 'application/json; charset=utf-8',
         data: JSON.stringify(payload), dataType: 'json',
         success: function (r) {
@@ -2618,7 +2655,7 @@ function initPerfilEmpreita() {
 
 function carregarPerfilEmpreita(id, periodo) {
     $.ajax({
-        url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerEmpreita?acao=perfil&id=' + id + '&periodo=' + periodo,
+        url: AGRO_CTX + '/ControllerEmpreita?acao=perfil&id=' + id + '&periodo=' + periodo,
         method: 'GET', dataType: 'json',
         success: function (data) {
             renderHeaderEmpreita(data);
@@ -2782,7 +2819,7 @@ function marcarValeDescontadoEmpreita(idVale) {
 
 function postEmpreita(payload, onOk, alertaSel) {
     $.ajax({
-        url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerEmpreita',
+        url: AGRO_CTX + '/ControllerEmpreita',
         method: 'POST', contentType: 'application/json; charset=utf-8',
         data: JSON.stringify(payload), dataType: 'json',
         success: function (r) {
@@ -2820,7 +2857,7 @@ function initPerfilProducao() {
 
 function carregarPerfilProducao(id, periodo) {
     $.ajax({
-        url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerProducao?acao=perfil&id=' + id + '&periodo=' + periodo,
+        url: AGRO_CTX + '/ControllerProducao?acao=perfil&id=' + id + '&periodo=' + periodo,
         method: 'GET', dataType: 'json',
         success: function (data) {
             window.__idProducao = data.funcionario ? data.funcionario.idPessoa : id;
@@ -3039,7 +3076,7 @@ function marcarValeDescontadoProducao(idVale) {
 
 function postProducao(payload, onOk, alertaSel) {
     $.ajax({
-        url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerProducao',
+        url: AGRO_CTX + '/ControllerProducao',
         method: 'POST', contentType: 'application/json; charset=utf-8',
         data: JSON.stringify(payload), dataType: 'json',
         success: function (r) {
@@ -3075,7 +3112,7 @@ function abrirModalPagamento() {
     $('#pgBanco,#pgAgencia,#pgConta,#pgChavePix,#pgObs').val('');
     $('#alertaPagamento').addClass('d-none');
     if (ctx.tipo === 'CLT' && ctx.periodo) {
-        $.getJSON((window.__ctxPath || '') + AGRO_CTX + '/ControllerPagamento', { acao: 'prazoclt', periodo: ctx.periodo })
+        $.getJSON(AGRO_CTX + '/ControllerPagamento', { acao: 'prazoclt', periodo: ctx.periodo })
             .done(function (r) {
                 if (r && r.ok) $('#pgPrazoInfo').text('Prazo CLT: pagar até ' + formatDataBR(r.prazo) +
                     ' (5º dia útil do mês seguinte).').removeClass('d-none');
@@ -3100,7 +3137,7 @@ function salvarPagamento() {
         banco: $('#pgBanco').val(), agencia: $('#pgAgencia').val(), conta: $('#pgConta').val(),
         chavepix: $('#pgChavePix').val() };
     $.ajax({
-        url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerPagamento', method: 'POST',
+        url: AGRO_CTX + '/ControllerPagamento', method: 'POST',
         contentType: 'application/json; charset=utf-8', data: JSON.stringify(payload), dataType: 'json',
         success: function (r) {
             if (r.ok) { $('#modalPagamento').modal('hide'); mostrarAlerta(r.msg, 'success', '#alerta', 3000); carregarPagamentos(); }
@@ -3113,7 +3150,7 @@ function salvarPagamento() {
 function carregarPagamentos() {
     var ctx = window.__pgCtx || {};
     if (!ctx.id || !$('#bodyPagamentos').length) return;
-    $.getJSON((window.__ctxPath || '') + AGRO_CTX + '/ControllerPagamento', { acao: 'listar', id: ctx.id, periodo: ctx.periodo })
+    $.getJSON(AGRO_CTX + '/ControllerPagamento', { acao: 'listar', id: ctx.id, periodo: ctx.periodo })
         .done(function (lista) {
             var tbody = $('#bodyPagamentos').empty();
             if (!lista || !lista.length) {
@@ -3137,7 +3174,7 @@ function carregarPagamentos() {
 function excluirPagamento(id) {
     if (!confirm('Excluir este pagamento?')) return;
     $.ajax({
-        url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerPagamento', method: 'POST',
+        url: AGRO_CTX + '/ControllerPagamento', method: 'POST',
         contentType: 'application/json; charset=utf-8',
         data: JSON.stringify({ acao: 'excluir', idpagamento: id }), dataType: 'json',
         success: function () { carregarPagamentos(); }
@@ -3201,7 +3238,7 @@ function initPerfilCLT() {
 
 function carregarPerfilCLT(idFuncionario, periodo) {
     $.ajax({
-        url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerCLT?acao=perfil&id=' + idFuncionario + '&periodo=' + periodo,
+        url: AGRO_CTX + '/ControllerCLT?acao=perfil&id=' + idFuncionario + '&periodo=' + periodo,
         method: 'GET',
         dataType: 'json',
         success: function (data) {
@@ -3418,7 +3455,7 @@ function salvarPontoCLT(idFuncionario) {
     if (editId) payload.idponto = editId;
 
     $.ajax({
-        url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerPontoEletronico',
+        url: AGRO_CTX + '/ControllerPontoEletronico',
         method: 'POST', contentType: 'application/json; charset=utf-8',
         data: JSON.stringify(payload), dataType: 'json',
         success: function (r) {
@@ -3455,7 +3492,7 @@ function editarPontoCLT(idPonto) {
 function excluirPontoCLT(idPonto) {
     if (!confirm('Excluir este registro de ponto?')) return;
     $.ajax({
-        url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerPontoEletronico',
+        url: AGRO_CTX + '/ControllerPontoEletronico',
         method: 'POST', contentType: 'application/json; charset=utf-8',
         data: JSON.stringify({ acao: 'excluir_ponto', idponto: idPonto }), dataType: 'json',
         success: function (r) {
@@ -3480,7 +3517,7 @@ function salvarFaltaCLT(idFuncionario) {
     var data = $('#faltaData').val();
     if (!data) { mostrarAlerta('Informe a data.', 'warning', '#alertaFalta', 3000); return; }
     $.ajax({
-        url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerCLT',
+        url: AGRO_CTX + '/ControllerCLT',
         method: 'POST', contentType: 'application/json; charset=utf-8',
         data: JSON.stringify({
             acao: 'registrarFalta', idpessoa: parseInt(idFuncionario),
@@ -3502,7 +3539,7 @@ function salvarFaltaCLT(idFuncionario) {
 function excluirFaltaCLT(idFalta) {
     if (!confirm('Remover esta falta?')) return;
     $.ajax({
-        url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerCLT',
+        url: AGRO_CTX + '/ControllerCLT',
         method: 'POST', contentType: 'application/json; charset=utf-8',
         data: JSON.stringify({ acao: 'excluirFalta', idfalta: idFalta }), dataType: 'json',
         success: function (r) {
@@ -3519,7 +3556,7 @@ function salvarValeCLT(idFuncionario) {
         mostrarAlerta('Informe valor e data.', 'warning', '#alertaVale', 3000); return;
     }
     $.ajax({
-        url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerCLT',
+        url: AGRO_CTX + '/ControllerCLT',
         method: 'POST', contentType: 'application/json; charset=utf-8',
         data: JSON.stringify({
             acao: 'registrarVale', idpessoa: parseInt(idFuncionario),
@@ -3541,7 +3578,7 @@ function salvarValeCLT(idFuncionario) {
 function excluirValeCLT(idVale) {
     if (!confirm('Excluir este vale?')) return;
     $.ajax({
-        url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerCLT',
+        url: AGRO_CTX + '/ControllerCLT',
         method: 'POST', contentType: 'application/json; charset=utf-8',
         data: JSON.stringify({ acao: 'excluirVale', idvale: idVale }), dataType: 'json',
         success: function (r) {
@@ -3554,7 +3591,7 @@ function excluirValeCLT(idVale) {
 function marcarValeDescontadoCLT(idVale) {
     if (!confirm('Marcar este vale como descontado?')) return;
     $.ajax({
-        url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerCLT',
+        url: AGRO_CTX + '/ControllerCLT',
         method: 'POST', contentType: 'application/json; charset=utf-8',
         data: JSON.stringify({ acao: 'marcarValeDescontado', idvale: idVale }), dataType: 'json',
         success: function (r) {
@@ -3570,7 +3607,7 @@ function salvarSalarioCLT(idFuncionario) {
         mostrarAlerta('Informe um salário válido.', 'warning', '#alertaSalario', 3000); return;
     }
     $.ajax({
-        url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerCLT',
+        url: AGRO_CTX + '/ControllerCLT',
         method: 'POST', contentType: 'application/json; charset=utf-8',
         data: JSON.stringify({
             acao: 'atualizarSalario', idpessoa: parseInt(idFuncionario),
@@ -3599,7 +3636,7 @@ function desligarVinculoCLT(idFuncionario) {
     var iso = converterDataParaISO((data || '').trim());
     var motivo = prompt('Motivo do desligamento (opcional):', '') || '';
     $.ajax({
-        url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerCLT',
+        url: AGRO_CTX + '/ControllerCLT',
         method: 'POST', contentType: 'application/json; charset=utf-8',
         data: JSON.stringify({ acao: 'desligarvinculo', idpessoa: parseInt(idFuncionario),
                                datafim: iso, motivo: motivo }),
@@ -3619,7 +3656,7 @@ function readmitirVinculoCLT(idFuncionario) {
     var iso = converterDataParaISO((data || '').trim());
     var cargo = prompt('Cargo no novo vínculo:', $('#cargoMatricula').text().split(' · ')[0] || '') || '';
     $.ajax({
-        url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerCLT',
+        url: AGRO_CTX + '/ControllerCLT',
         method: 'POST', contentType: 'application/json; charset=utf-8',
         data: JSON.stringify({ acao: 'readmitir', idpessoa: parseInt(idFuncionario),
                                dataadmissao: iso, cargo: cargo }),
@@ -3636,7 +3673,7 @@ function readmitirVinculoCLT(idFuncionario) {
 function alterarStatus(status) {
     if (!window.__idCLT) return;
     $.ajax({
-        url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerCLT',
+        url: AGRO_CTX + '/ControllerCLT',
         method: 'POST', contentType: 'application/json; charset=utf-8',
         data: JSON.stringify({ acao: 'atualizarStatus', idpessoa: window.__idCLT, statusemprego: status }),
         dataType: 'json',
@@ -3655,7 +3692,7 @@ function calcularFechamentoCLT(idFuncionario, periodo) {
     if (!confirm('Calcular o fechamento de ' + periodo + '? Os vales pendentes do mês serão marcados como descontados.')) return;
     $('#btnCalcular').prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i>Calculando...');
     $.ajax({
-        url: (window.__ctxPath || '') + AGRO_CTX + '/ControllerCLT',
+        url: AGRO_CTX + '/ControllerCLT',
         method: 'POST', contentType: 'application/json; charset=utf-8',
         data: JSON.stringify({ acao: 'calcularFechamento', idpessoa: parseInt(idFuncionario), periodo: periodo }),
         dataType: 'json',
@@ -3976,10 +4013,10 @@ $(document).ready(function () {
 /******************************************************************************************************/
 /* DIÁRIO DE CAMPO — dentro do Perfil da Área (DetalheAreaProducao.jsp)                               */
 /******************************************************************************************************/
-var dcAreaId = null, dcCacheFunc = [], dcCacheIns = [], dcCacheMaq = [], dcCacheTalhao = [], dcCacheTipos = [], dcCulturaMap = {};
-var dcOptTalhao = '', dcOptTipo = '', dcOptFunc = '';
+var dcAreaId = null, dcCacheFunc = [], dcCacheIns = [], dcCacheMaq = [], dcCacheTalhao = [], dcCacheTipos = [], dcCacheDesp = [], dcCulturaMap = {};
+var dcOptTalhao = '', dcOptTipo = '', dcOptFunc = '', dcOptDesp = '';
 var dcSafraResolvida = false, dcTemSafra = false;
-var dcFuncPromise = null, dcTalhaoPromise = null;
+var dcFuncPromise = null, dcTalhaoPromise = null, dcDespPromise = null;
 
 function dcMoney(v) { return 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function dcBadgeStatus(s) {
@@ -4038,7 +4075,7 @@ function dcRecarregarFuncsPorData() {
     var url = AGRO_CTX + '/ControllerDiarioCampo?funcionarios=1' + (data ? '&data=' + data : '');
     $.getJSON(url, function (fs) {
         dcCacheFunc = fs; dcOptFunc = '<option value="">Selecione</option>';
-        fs.forEach(function (f) { dcOptFunc += '<option value="' + f.idPessoa + '" data-tipo="' + f.tipo + '" data-ref="' + (f.custoRef || 0) + '">' + f.nome + ' (' + f.tipo + ')</option>'; });
+        fs.forEach(function (f) { dcOptFunc += '<option value="' + f.idPessoa + '" data-tipo="' + f.tipo + '" data-ref="' + (f.custoRef || 0) + '" data-refextra="' + (f.custoRefExtra || 0) + '">' + f.nome + ' (' + f.tipo + ')</option>'; });
         // Reaplica nas linhas existentes. Preserva a pessoa já escolhida mesmo que ela não esteja
         // na lista filtrada da data (ex.: edição), acrescentando a opção original de volta.
         $('#dcFuncBody tr').each(function () {
@@ -4079,8 +4116,12 @@ function dcInit(areaId) {
     dcCarregarTipos();
     dcFuncPromise = $.getJSON(AGRO_CTX + '/ControllerDiarioCampo?funcionarios=1', function (fs) {
         dcCacheFunc = fs; dcOptFunc = '<option value="">Selecione</option>';
-        fs.forEach(function (f) { dcOptFunc += '<option value="' + f.idPessoa + '" data-tipo="' + f.tipo + '" data-ref="' + (f.custoRef || 0) + '">' + f.nome + ' (' + f.tipo + ')</option>'; });
+        fs.forEach(function (f) { dcOptFunc += '<option value="' + f.idPessoa + '" data-tipo="' + f.tipo + '" data-ref="' + (f.custoRef || 0) + '" data-refextra="' + (f.custoRefExtra || 0) + '">' + f.nome + ' (' + f.tipo + ')</option>'; });
         $('#dcResponsavel').html(dcOptFunc);
+    });
+    dcDespPromise = $.getJSON(AGRO_CTX + '/ControllerDiarioCampo?despesascatalogo=1', function (ds) {
+        dcCacheDesp = ds; dcOptDesp = '<option value="">Selecione</option>';
+        ds.forEach(function (x) { dcOptDesp += '<option value="' + x.idDespesaCusto + '" data-classificacao="' + x.classificacao + '" data-ref="' + (x.valorRef || 0) + '">' + x.nome + '</option>'; });
     });
     $.getJSON(AGRO_CTX + '/ControllerInsumo', function (is) { dcCacheIns = is.filter(function (i) { return i.situacao; }); });
     $.getJSON(AGRO_CTX + '/ControllerMaquina?ativas=true', function (ms) { dcCacheMaq = ms; });
@@ -4097,6 +4138,7 @@ function dcInit(areaId) {
     $('#btnAddFunc').off('click').on('click', function () { dcAddFuncRow(); });
     $('#btnAddMaq').off('click').on('click', function () { dcAddMaqRow(); });
     $('#btnAddIns').off('click').on('click', function () { dcAddInsRow(); });
+    $('#btnAddDesp').off('click').on('click', function () { dcAddDespRow(); });
     $('#btnAddTipo').off('click').on('click', dcAddTipo);
     $('#btnSalvarDiario').off('click').on('click', dcSalvar);
 
@@ -4113,11 +4155,19 @@ function dcInit(areaId) {
         .on('input.dc change.dc', '.dc-fpessoa,.dc-fhoras,.dc-fvalor,.dc-mmaq,.dc-muso,.dc-ipro,.dc-iqtd', dcRecalcPreview);
     $('#dcFuncBody').off('change.dc', '.dc-fpessoa').on('change.dc', '.dc-fpessoa', function () {
         var opt = $(this).find(':selected');
-        $(this).closest('tr').find('.dc-ftipo').val(opt.data('tipo') || '');
+        var $tr = $(this).closest('tr');
+        $tr.find('.dc-ftipo').val(opt.data('tipo') || '');
+        dcAtualizarCampoHoras($tr, dcFuncEditavel);
         dcAtualizarResponsavel();   // responsável só entre os funcionários adicionados
     });
     $('#dcMaqBody').off('change.dc', '.dc-mmaq').on('change.dc', '.dc-mmaq', function () { dcAtualizarLinhaMaquina($(this).closest('tr')); });
     $('#dcMaqBody').off('input.dc', '.dc-muso').on('input.dc', '.dc-muso', function () { dcAtualizarLinhaMaquina($(this).closest('tr')); });
+    $('#dcDespBody').off('change.dcd', '.dc-ditem').on('change.dcd', '.dc-ditem', function () {
+        dcAplicarDespesaSelecionada($(this).closest('tr'), 'dc'); dcRecalcPreview();
+    });
+    $('#dcDespBody').off('input.dcd', '.dc-dqtd,.dc-dvalor').on('input.dcd', '.dc-dqtd,.dc-dvalor', function () {
+        dcRecalcLinhaDespesa($(this).closest('tr'), 'dc'); dcRecalcPreview();
+    });
     $('#modalNovoDiario').off('click.dc', '.dc-rm').on('click.dc', '.dc-rm', function () {
         var eraFunc = $(this).closest('#dcFuncBody').length > 0;
         $(this).closest('tr').remove();
@@ -4131,9 +4181,21 @@ function dcInit(areaId) {
     $('#dcBlocoExecucao').off('input.ex change.ex', '.ex-fpessoa,.ex-fhoras')
         .on('input.ex change.ex', '.ex-fpessoa,.ex-fhoras', dcExecRecalcPreview);
     $('#exFuncBody').off('change.ex', '.ex-fpessoa').on('change.ex', '.ex-fpessoa', function () {
-        $(this).closest('tr').find('.ex-ftipo').val($(this).find(':selected').data('tipo') || '');
+        var $tr = $(this).closest('tr');
+        var tipo = $(this).find(':selected').data('tipo') || '';
+        $tr.find('.ex-ftipo').val(tipo);
+        var $horas = $tr.find('.ex-fhoras');
+        if (tipo === 'EMPREITA') { $horas.val('').prop('disabled', true); } else { $horas.prop('disabled', false); }
+        dcExecRecalcPreview();
     });
     $('#dcBlocoExecucao').off('click.ex', '.ex-rm').on('click.ex', '.ex-rm', function () { $(this).closest('tr').remove(); });
+    $('#btnAddExecDesp').off('click').on('click', function () { dcAddExecDespRow(); });
+    $('#exDespBody').off('change.exd', '.ex-ditem').on('change.exd', '.ex-ditem', function () {
+        dcAplicarDespesaSelecionada($(this).closest('tr'), 'ex');
+    });
+    $('#exDespBody').off('input.exd', '.ex-dqtd,.ex-dvalor').on('input.exd', '.ex-dqtd,.ex-dvalor', function () {
+        dcRecalcLinhaDespesa($(this).closest('tr'), 'ex');
+    });
 }
 
 function dcCarregarTipos() {
@@ -4231,22 +4293,23 @@ function dcResetForm() {
     $('#alertDiario').addClass('d-none').text('');
     $('#dcTalhao').html(dcOptTalhao);
     $('#dcResponsavel').html('<option value="">Selecione</option>'); $('#dcTipo').html(dcOptTipo);
-    $('#dcStatusSel').val('PLANEJADA');
+    $('#dcStatusSel').val('EM_ANDAMENTO');
     $('#dcId,#dcStatus,#dcNumero,#dcCultura,#dcCulturaNome').val('');
-    $('#dcDescricao,#dcObs,#dcDataPrev,#dcHoraIni,#dcHoraFim').val('');
+    $('#dcDescricao,#dcObs').val('');
     $('#dcData').val(new Date().toISOString().slice(0, 10));
-    $('#dcFuncBody,#dcMaqBody,#dcInsBody,#exFuncBody').empty();
+    $('#dcFuncBody,#dcMaqBody,#dcInsBody,#dcDespBody,#exFuncBody,#exDespBody').empty();
     $('#dcTotalPreview').text(dcMoney(0));
     dcSafraResolvida = false;
     dcFuncEditavel = true;
-    $('#btnAddFunc').removeClass('d-none');
-    $('#dcFuncSoNaExecucao,#dcBlocoExecucao').addClass('d-none');
+    dcDespEditavel = true;
+    $('#btnAddFunc,#btnAddDesp').removeClass('d-none');
+    $('#dcFuncSoNaExecucao,#dcDespSoNaExecucao,#dcBlocoExecucao').addClass('d-none');
 }
 function dcAbrirNovo() {
-    // Aguarda os carregamentos iniciais (funcionários/talhões) antes de checar pré-requisitos,
+    // Aguarda os carregamentos iniciais (funcionários/talhões/despesas) antes de checar pré-requisitos,
     // evitando falso alerta de "sem funcionário" quando o usuário clica antes do fetch terminar.
     var $btn = $('#btnNovoDiario').prop('disabled', true);
-    $.when(dcFuncPromise, dcTalhaoPromise).always(function () {
+    $.when(dcFuncPromise, dcTalhaoPromise, dcDespPromise).always(function () {
         $btn.prop('disabled', false);
         dcAbrirNovoInterno();
     });
@@ -4281,7 +4344,7 @@ function dcAbrirNovoInterno() {
 
 function dcAbrirAgendar() {
     var $btn = $('#btnAgendarDiario').prop('disabled', true);
-    $.when(dcFuncPromise, dcTalhaoPromise).always(function () {
+    $.when(dcFuncPromise, dcTalhaoPromise, dcDespPromise).always(function () {
         $btn.prop('disabled', false);
         if (!dcCacheTalhao.length) {
             preReqAlerta('#alertPerfil', 'Esta área não tem <strong>talhões</strong> cadastrados. Cadastre um talhão antes de agendar atividades.',
@@ -4333,13 +4396,23 @@ function dcSalvarAgendar() {
 }
 
 var dcFuncEditavel = true;   // false quando editando um diário já existente (funcionários viram somente leitura; use "Registrar execução")
+var dcDespEditavel = true;   // false quando editando um diário já existente (despesas viram somente leitura; use "Registrar execução")
 
+/** Empreita não trabalha por hora: esconde/desabilita o campo Horas e mantém o Valor(auto) = valor da empreitada. */
+function dcAtualizarCampoHoras($tr, funcEditavel) {
+    var tipo = $tr.find('.dc-ftipo').val();
+    var $horas = $tr.find('.dc-fhoras');
+    if (tipo === 'EMPREITA') {
+        $horas.val('').prop('disabled', true).attr('placeholder', '—');
+    } else {
+        $horas.prop('disabled', !funcEditavel).attr('placeholder', '2h30 / 45min / 1,5');
+    }
+}
 function dcAddFuncRow(f) {
     var dis = dcFuncEditavel ? '' : 'disabled';
     $('#dcFuncBody').append('<tr>' +
         '<td><select class="form-select form-select-sm dc-fpessoa" ' + dis + '>' + dcOptFunc + '</select></td>' +
         '<td><input class="form-control form-control-sm dc-ftipo" readonly placeholder="—" style="width:90px"></td>' +
-        '<td><input class="form-control form-control-sm dc-fexec bg-light" readonly placeholder="—" style="width:100px"></td>' +
         '<td><input type="text" class="form-control form-control-sm dc-fhoras" placeholder="2h30 / 45min / 1,5" title="Aceita horas e minutos: 2h30, 45min, 2:30 ou 1,5" value="" ' + dis + '></td>' +
         '<td><input type="number" class="form-control form-control-sm dc-fvalor bg-light" readonly title="Calculado automaticamente conforme o tipo de funcionário" value="0"></td>' +
         '<td class="text-center">' + (dcFuncEditavel ? '<button type="button" class="btn btn-sm btn-outline-danger dc-rm"><i class="fas fa-trash"></i></button>' : '') + '</td></tr>');
@@ -4353,9 +4426,9 @@ function dcAddFuncRow(f) {
             $sel.val(String(f.idPessoa));
         }
         $tr.find('.dc-ftipo').val(f.tipoFuncionario || '');
-        $tr.find('.dc-fexec').val(f.dataExecucao ? formatarData(f.dataExecucao) : '');
         $tr.find('.dc-fhoras').val(Number(f.horasTrabalhadas) > 0 ? dcFormatHoras(f.horasTrabalhadas) : '');
         $tr.find('.dc-fvalor').val(f.custo || f.valorContratado || 0);
+        dcAtualizarCampoHoras($tr, dcFuncEditavel);
     }
     dcAtualizarResponsavel();
 }
@@ -4407,7 +4480,97 @@ function dcAddInsRow(i) {
     }
 }
 
+/**
+ * Aplica classificação/valor de referência da despesa selecionada numa linha (Fixo trava o
+ * valor unitário no valor do catálogo; Variável libera edição, sugerindo o valor de referência
+ * — cada linha pode ter seu próprio preço, sem forçar média). Usado tanto no formulário
+ * principal (prefix 'dc') quanto no bloco de execução (prefix 'ex').
+ */
+function dcAplicarDespesaSelecionada($tr, prefix) {
+    var opt = $tr.find('.' + prefix + '-ditem :selected');
+    var classificacao = opt.data('classificacao') || '';
+    var ref = Number(opt.data('ref') || 0);
+    var variavel = classificacao === 'VARIAVEL';
+    $tr.find('.' + prefix + '-dclass').text(classificacao ? (variavel ? 'Variável' : 'Fixo') : '—')
+        .toggleClass('bg-warning text-dark', variavel).toggleClass('bg-secondary', !variavel);
+    $tr.find('.' + prefix + '-dvalor').prop('readonly', !variavel).val(ref.toFixed(2));
+    dcRecalcLinhaDespesa($tr, prefix);
+}
+function dcRecalcLinhaDespesa($tr, prefix) {
+    var qtd = Number($tr.find('.' + prefix + '-dqtd').val()) || 0;
+    var valor = Number($tr.find('.' + prefix + '-dvalor').val()) || 0;
+    $tr.find('.' + prefix + '-dsub').val(dcMoney(qtd * valor));
+}
+
+function dcAddDespRow(d) {
+    if (!d && !dcCacheDesp.length) {
+        preReqAlerta('#alertDiario', 'Não há <strong>Despesa/Custo</strong> cadastrada. Cadastre em Configuração → Custos e Despesas para usar aqui.',
+            CTX + '/view/admin/despesascustos.jsp', 'Cadastrar Despesa/Custo');
+        return;
+    }
+    var dis = dcDespEditavel ? '' : 'disabled';
+    $('#dcDespBody').append('<tr>' +
+        '<td><select class="form-select form-select-sm dc-ditem" ' + dis + '>' + dcOptDesp + '</select></td>' +
+        '<td><span class="badge dc-dclass bg-secondary">—</span></td>' +
+        '<td><input type="number" class="form-control form-control-sm dc-dqtd" min="0.01" step="0.01" value="1" ' + dis + '></td>' +
+        '<td><input type="number" class="form-control form-control-sm dc-dvalor" min="0" step="0.01" value="0" readonly></td>' +
+        '<td><input type="text" class="form-control form-control-sm dc-dsub bg-light" readonly value="R$ 0,00"></td>' +
+        '<td class="text-center">' + (dcDespEditavel ? '<button type="button" class="btn btn-sm btn-outline-danger dc-rm"><i class="fas fa-trash"></i></button>' : '') + '</td></tr>');
+    if (d) {
+        var $tr = $('#dcDespBody tr:last');
+        var $sel = $tr.find('.dc-ditem');
+        $sel.val(String(d.idDespesaCusto));
+        // Histórico de outra execução pode não estar na lista filtrada atual do select —
+        // garante que o nome apareça mesmo assim, adicionando a opção de volta.
+        if ($sel.val() !== String(d.idDespesaCusto)) {
+            $sel.append('<option value="' + d.idDespesaCusto + '">' + (d.descricao || ('#' + d.idDespesaCusto)) + '</option>');
+            $sel.val(String(d.idDespesaCusto));
+        }
+        var variavel = d.classificacao === 'VARIAVEL';
+        $tr.find('.dc-dclass').text(variavel ? 'Variável' : 'Fixo').toggleClass('bg-warning text-dark', variavel).toggleClass('bg-secondary', !variavel);
+        $tr.find('.dc-dqtd').val(d.quantidade != null ? d.quantidade : 1);
+        $tr.find('.dc-dvalor').val(Number(d.valorUnitario || 0).toFixed(2));
+        $tr.find('.dc-dsub').val(dcMoney(d.valor));
+    }
+}
+
+function dcAddExecDespRow() {
+    if (!dcCacheDesp.length) {
+        preReqAlerta('#alertDiario', 'Não há <strong>Despesa/Custo</strong> cadastrada. Cadastre em Configuração → Custos e Despesas para usar aqui.',
+            CTX + '/view/admin/despesascustos.jsp', 'Cadastrar Despesa/Custo');
+        return;
+    }
+    $('#exDespBody').append('<tr>' +
+        '<td><select class="form-select form-select-sm ex-ditem">' + dcOptDesp + '</select></td>' +
+        '<td><span class="badge ex-dclass bg-secondary">—</span></td>' +
+        '<td><input type="number" class="form-control form-control-sm ex-dqtd" min="0.01" step="0.01" value="1"></td>' +
+        '<td><input type="number" class="form-control form-control-sm ex-dvalor" min="0" step="0.01" value="0" readonly></td>' +
+        '<td><input type="text" class="form-control form-control-sm ex-dsub bg-light" readonly value="R$ 0,00"></td>' +
+        '<td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger ex-rm"><i class="fas fa-trash"></i></button></td></tr>');
+}
+
 /** Custo estimado ao vivo (Funcionários + Máquinas + Insumos). */
+/**
+ * Valor(auto) de um lançamento de mão de obra, conforme o tipo do funcionário:
+ *  - CLT: até 8h, horas × valor da hora normal; acima de 8h, 8h à hora normal
+ *    + as horas excedentes à hora extra (refExtra).
+ *  - DIARISTA: até 8h, prorateado (horas × diária/8); acima de 8h, a diária cheia.
+ *  - EMPREITA (e demais): valor fixo acordado, não depende de horas.
+ * Espelha o cálculo autoritativo do servidor em DiarioCampoDAO.recalcularCustos —
+ * aqui é só a prévia exibida antes de salvar.
+ */
+function dcValorFuncionario(tipo, ref, refExtra, horas) {
+    ref = Number(ref) || 0; refExtra = Number(refExtra) || 0; horas = Number(horas) || 0;
+    if (tipo === 'CLT') {
+        if (horas > 8) return (8 * ref) + ((horas - 8) * refExtra);
+        return horas * ref;
+    }
+    if (tipo === 'DIARISTA') {
+        if (horas > 8) return ref;
+        return horas * (ref / 8);
+    }
+    return ref;   // EMPREITA
+}
 function dcRecalcPreview() {
     var total = 0;
     $('#dcFuncBody tr').each(function () {
@@ -4418,10 +4581,10 @@ function dcRecalcPreview() {
             return;
         }
         var opt = $(this).find('.dc-fpessoa :selected'); if (!opt.val()) return;
-        var tipo = opt.data('tipo'); var ref = Number(opt.data('ref') || 0);
+        var tipo = opt.data('tipo'); var ref = Number(opt.data('ref') || 0); var refExtra = Number(opt.data('refextra') || 0);
         var horas = dcParseHoras($(this).find('.dc-fhoras').val());
         // Valor é sempre calculado a partir do cadastro do funcionário (custo/hora CLT, diária ou empreita fixa).
-        var valor = (tipo === 'CLT') ? ref * horas : ref;
+        var valor = dcValorFuncionario(tipo, ref, refExtra, horas);
         $(this).find('.dc-fvalor').val(valor.toFixed(2));
         total += valor;
     });
@@ -4434,6 +4597,12 @@ function dcRecalcPreview() {
     $('#dcInsBody tr').each(function () {
         var opt = $(this).find('.dc-ipro :selected'); if (!opt.val()) return;
         total += Number(opt.data('preco') || 0) * (Number($(this).find('.dc-iqtd').val()) || 0);
+    });
+    $('#dcDespBody tr').each(function () {
+        var opt = $(this).find('.dc-ditem :selected'); if (!opt.val()) return;
+        var qtd = Number($(this).find('.dc-dqtd').val()) || 0;
+        var valor = Number($(this).find('.dc-dvalor').val()) || 0;
+        total += qtd * valor;
     });
     $('#dcTotalPreview').text(dcMoney(total));
 }
@@ -4460,6 +4629,15 @@ function dcSalvar() {
         insumos.push({ idInsumo: parseInt(id), quantidade: qtd, doseAplicada: $(this).find('.dc-idose').val() });
     });
     if (insumoInvalido) { $('#alertDiario').removeClass('d-none').addClass('alert-danger').text('Cada insumo precisa de produto e quantidade > 0.'); return; }
+    var despesas = [], despesaInvalida = false;
+    $('#dcDespBody tr').each(function () {
+        var id = $(this).find('.dc-ditem').val();
+        var qtd = parseFloat($(this).find('.dc-dqtd').val()) || 0;
+        if (!id && qtd === 1) return;
+        if (!id || qtd <= 0) { despesaInvalida = true; return; }
+        despesas.push({ idDespesaCusto: parseInt(id), quantidade: qtd, valorUnitario: parseFloat($(this).find('.dc-dvalor').val()) || 0 });
+    });
+    if (despesaInvalida) { $('#alertDiario').removeClass('d-none').addClass('alert-danger').text('Cada despesa precisa de um item e quantidade > 0.'); return; }
 
     var editId = $('#dcId').val();
     var payload = {
@@ -4470,10 +4648,9 @@ function dcSalvar() {
         idCultura: $('#dcCultura').val() ? parseInt($('#dcCultura').val()) : null,
         idResponsavel: parseInt($('#dcResponsavel').val()) || null,
         idTipoAtividade: parseInt($('#dcTipo').val()) || 0,
-        status: ($('#dcStatusSel').val() || 'PLANEJADA'),
-        descricao: $('#dcDescricao').val(), dataPrevista: $('#dcDataPrev').val() || null,
-        horaInicio: $('#dcHoraIni').val() || null, horaFim: $('#dcHoraFim').val() || null,
-        observacoes: $('#dcObs').val(), funcionarios: funcionarios, maquinas: maquinas, insumos: insumos
+        status: ($('#dcStatusSel').val() || 'EM_ANDAMENTO'),
+        descricao: $('#dcDescricao').val(),
+        observacoes: $('#dcObs').val(), funcionarios: funcionarios, maquinas: maquinas, insumos: insumos, despesas: despesas
     };
     if (!payload.idQuadra || !payload.idResponsavel || !payload.idTipoAtividade) {
         $('#alertDiario').removeClass('d-none').addClass('alert-danger').text('Talhão, responsável e tipo de atividade são obrigatórios.'); return;
@@ -4506,20 +4683,22 @@ function dcEditar(id) {
     $.getJSON(AGRO_CTX + '/ControllerDiarioCampo?id=' + id, function (d) {
         dcResetForm();
         dcFuncEditavel = false;
-        $('#btnAddFunc').addClass('d-none');
-        $('#dcFuncSoNaExecucao').removeClass('d-none');
+        dcDespEditavel = false;
+        $('#btnAddFunc,#btnAddDesp').addClass('d-none');
+        $('#dcFuncSoNaExecucao,#dcDespSoNaExecucao').removeClass('d-none');
         $('#dcModalTitulo').text('Editar Diário ' + (d.numeroDiario || ''));
         $('#dcId').val(d.idDiario); $('#dcStatus').val(d.status); $('#dcNumero').val(d.numeroDiario);
-        $('#dcStatusSel').val(d.status === 'CONCLUIDA' ? 'CONCLUIDA' : (d.status === 'EM_ANDAMENTO' ? 'EM_ANDAMENTO' : 'PLANEJADA'));
+        // PLANEJADA (agendamento) não tem opção neste modal — "Iniciar execução" já entra como Execução.
+        $('#dcStatusSel').val(d.status === 'CONCLUIDA' ? 'CONCLUIDA' : 'EM_ANDAMENTO');
         $('#dcData').val(d.data || ''); $('#dcTalhao').val(d.idQuadra ? String(d.idQuadra) : '');
         $('#dcCultura').val(d.idCultura ? String(d.idCultura) : '');
         $('#dcCulturaNome').val(d.culturaNome || '');
         $('#dcTipo').val(String(d.idTipoAtividade));
-        $('#dcDescricao').val(d.descricao || ''); $('#dcDataPrev').val(d.dataPrevista || '');
-        $('#dcHoraIni').val(d.horaInicio || ''); $('#dcHoraFim').val(d.horaFim || ''); $('#dcObs').val(d.observacoes || '');
+        $('#dcDescricao').val(d.descricao || ''); $('#dcObs').val(d.observacoes || '');
         (d.funcionarios || []).forEach(function (f) { dcAddFuncRow(f); });
         (d.maquinas || []).forEach(function (m) { dcAddMaqRow(m); });
         (d.insumos || []).forEach(function (i) { dcAddInsRow(i); });
+        (d.despesas || []).forEach(function (x) { dcAddDespRow(x); });
         // Responsável definido após montar as linhas (as opções vêm dos funcionários adicionados)
         dcAtualizarResponsavel();
         $('#dcResponsavel').val(d.idResponsavel ? String(d.idResponsavel) : '');
@@ -4534,7 +4713,7 @@ function dcEditar(id) {
 
 function dcAbrirExecucaoForm() {
     $('#dcBlocoExecucao').removeClass('d-none');
-    $('#exFuncBody').empty();
+    $('#exFuncBody,#exDespBody').empty();
     $('#exData').val(new Date().toISOString().slice(0, 10));
     dcAddExecFuncRow();
 }
@@ -4551,9 +4730,9 @@ function dcAddExecFuncRow() {
 function dcExecRecalcPreview() {
     $('#exFuncBody tr').each(function () {
         var opt = $(this).find('.ex-fpessoa :selected'); if (!opt.val()) return;
-        var tipo = opt.data('tipo'); var ref = Number(opt.data('ref') || 0);
+        var tipo = opt.data('tipo'); var ref = Number(opt.data('ref') || 0); var refExtra = Number(opt.data('refextra') || 0);
         var horas = dcParseHoras($(this).find('.ex-fhoras').val());
-        var valor = (tipo === 'CLT') ? ref * horas : ref;
+        var valor = dcValorFuncionario(tipo, ref, refExtra, horas);
         $(this).find('.ex-fvalor').val(valor.toFixed(2));
     });
 }
@@ -4569,10 +4748,16 @@ function dcSalvarExecucao() {
             horasTrabalhadas: dcParseHoras($(this).find('.ex-fhoras').val()),
             valorContratado: parseFloat($(this).find('.ex-fvalor').val()) || 0 });
     });
-    if (!funcionarios.length) { $('#alertDiario').removeClass('d-none').addClass('alert-danger').text('Adicione ao menos um funcionário para a execução.'); return; }
+    var despesas = [];
+    $('#exDespBody tr').each(function () {
+        var id = $(this).find('.ex-ditem').val(); if (!id) return;
+        despesas.push({ idDespesaCusto: parseInt(id), quantidade: parseFloat($(this).find('.ex-dqtd').val()) || 1,
+            valorUnitario: parseFloat($(this).find('.ex-dvalor').val()) || 0 });
+    });
+    if (!funcionarios.length && !despesas.length) { $('#alertDiario').removeClass('d-none').addClass('alert-danger').text('Adicione ao menos um funcionário ou uma despesa para a execução.'); return; }
     $.ajax({
         url: AGRO_CTX + '/ControllerDiarioCampo', method: 'POST', contentType: 'application/json; charset=utf-8',
-        data: JSON.stringify({ acao: 'addexecucao', iddiario: iddiario, dataExecucao: dataExec, funcionarios: funcionarios }),
+        data: JSON.stringify({ acao: 'addexecucao', iddiario: iddiario, dataExecucao: dataExec, funcionarios: funcionarios, despesas: despesas }),
         success: function (res) {
             if (res.ok) { mostrarAlerta(res.msg, 'success', '#alertPerfil'); dcCarregarLista(); dcEditar(iddiario); }
             else $('#alertDiario').removeClass('d-none').addClass('alert-danger').text(res.msg);
@@ -4594,7 +4779,8 @@ function dcVerDetalhe(id) {
         h += '<table class="table table-sm"><tr><th>Mão de obra</th><td class="text-end">' + dcMoney(d.custoMaoObra) + '</td>' +
             '<th>Insumos</th><td class="text-end">' + dcMoney(d.custoInsumos) + '</td></tr>' +
             '<tr><th>Máquinas</th><td class="text-end">' + dcMoney(d.custoMaquinas) + '</td>' +
-            '<th>Custo Total</th><td class="text-end fw-bold">' + dcMoney(d.custoTotal) + '</td></tr></table>';
+            '<th>Despesas</th><td class="text-end">' + dcMoney(d.custoDespesas) + '</td></tr>' +
+            '<tr><th>Custo Total</th><td class="text-end fw-bold" colspan="3">' + dcMoney(d.custoTotal) + '</td></tr></table>';
         function bloco(t, arr, cols) {
             if (!arr || !arr.length) return '';
             var s = '<h6 class="fw-bold mt-2">' + t + '</h6><table class="table table-sm"><thead><tr>';
@@ -4605,6 +4791,7 @@ function dcVerDetalhe(id) {
         h += bloco('Funcionários', d.funcionarios, [['Nome', function (o) { return o.nomePessoa || o.idPessoa; }], ['Tipo', function (o) { return o.tipoFuncionario || ''; }], ['Execução', function (o) { return o.dataExecucao ? formatarData(o.dataExecucao) : ''; }], ['Horas', function (o) { return o.horasTrabalhadas; }], ['Custo', function (o) { return dcMoney(o.custo); }]]);
         h += bloco('Máquinas', d.maquinas, [['Maquinário', function (o) { return o.nome || ''; }], ['Categoria', function (o) { return o.categoria || ''; }], ['Uso', function (o) { return (o.categoria === 'VEICULO' ? o.km + ' km' : o.horasTrabalhadas + ' h'); }], ['Custo', function (o) { return dcMoney(o.custo); }]]);
         h += bloco('Insumos', d.insumos, [['Insumo', function (o) { return o.insumoNome || o.idInsumo; }], ['Qtd', function (o) { return o.quantidade + ' ' + (o.unidade || ''); }], ['Custo', function (o) { return dcMoney(o.custo); }], ['Baixado', function (o) { return o.baixado ? 'Sim' : 'Não'; }]]);
+        h += bloco('Despesas', d.despesas, [['Despesa', function (o) { return o.descricao || o.idDespesaCusto; }], ['Classif.', function (o) { return o.classificacao === 'VARIAVEL' ? 'Variável' : 'Fixo'; }], ['Execução', function (o) { return o.dataExecucao ? formatarData(o.dataExecucao) : ''; }], ['Qtd', function (o) { return o.quantidade; }], ['Valor unit.', function (o) { return dcMoney(o.valorUnitario); }], ['Subtotal', function (o) { return dcMoney(o.valor); }]]);
         $('#ddCorpo').html(h);
         var podeFinalizar = (d.status === 'PLANEJADA' || d.status === 'EM_ANDAMENTO');
         $('#btnFinalizarDiario').toggleClass('d-none', !podeFinalizar).off('click').on('click', function () { dcFinalizar(d.idDiario); });
@@ -4861,13 +5048,16 @@ $(document).ready(function () {
         $('#rsPorHa').text(sfMoney(r.custoPorHa)); $('#rsPorSaca').text(sfMoney(r.custoPorUnidade));
         $('#rsIns').text(sfMoney(r.custoInsumos)); $('#rsMaq').text(sfMoney(r.custoMaquinas));
         $('#rsMo').text(sfMoney(r.custoMaoObra)); $('#rsFix').text(sfMoney(r.despesasFixas));
+        $('#rsDesp').text(sfMoney(r.custoDespesas));
         $('#rsPctIns').text((r.pctInsumos || 0) + '%'); $('#rsPctMaq').text((r.pctMaquinas || 0) + '%');
         $('#rsPctMo').text((r.pctMaoObra || 0) + '%'); $('#rsPctFix').text((r.pctDespesasFixas || 0) + '%');
+        $('#rsPctDesp').text((r.pctDespesas || 0) + '%');
         $('#rsTotalFoot').text(sfMoney(r.custoTotal));
         var barra = '';
         barra += '<div class="progress-bar bg-primary" style="width:' + (r.pctInsumos || 0) + '%" title="Insumos"></div>';
         barra += '<div class="progress-bar bg-secondary" style="width:' + (r.pctMaquinas || 0) + '%" title="Maquinário"></div>';
         barra += '<div class="progress-bar bg-success" style="width:' + (r.pctMaoObra || 0) + '%" title="Mão de obra"></div>';
+        barra += '<div class="progress-bar bg-info" style="width:' + (r.pctDespesas || 0) + '%" title="Despesas de execução"></div>';
         barra += '<div class="progress-bar bg-warning" style="width:' + (r.pctDespesasFixas || 0) + '%" title="Despesas fixas"></div>';
         $('#rsBarra').html(barra);
         rsCacheRateio = r.rateio || [];

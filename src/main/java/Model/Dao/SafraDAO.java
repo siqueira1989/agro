@@ -191,18 +191,20 @@ public class SafraDAO {
             // COE por componente (só atividades CONCLUÍDAS: custo efetivamente realizado.
             // PLANEJADA/EM_ANDAMENTO são pré-agendamentos e não entram no custo consolidado —
             // coerente com o card da Área e com os relatórios de agregação.)
-            BigDecimal cInsumos = BigDecimal.ZERO, cMaq = BigDecimal.ZERO, cMo = BigDecimal.ZERO;
+            BigDecimal cInsumos = BigDecimal.ZERO, cMaq = BigDecimal.ZERO, cMo = BigDecimal.ZERO, cDesp = BigDecimal.ZERO;
             String sqlCoe = "SELECT COALESCE(SUM(d.custo_insumos),0) i, COALESCE(SUM(d.custo_maquinas),0) m, "
-                    + "COALESCE(SUM(d.custo_mao_obra),0) mo, COUNT(*) n FROM diario_campo d "
+                    + "COALESCE(SUM(d.custo_mao_obra),0) mo, COALESCE(SUM(d.custo_despesas),0) desp, COUNT(*) n FROM diario_campo d "
                     + "JOIN safra_talhao st ON st.id_quadra=d.id_quadra AND st.id_safra=? "
                     + "WHERE d.data BETWEEN ? AND ? AND d.status = 'CONCLUIDA'";
             int nAtiv = 0;
             try (PreparedStatement ps = c.prepareStatement(sqlCoe)) {
                 ps.setInt(1, idSafra); ps.setDate(2, Date.valueOf(s.getDataInicial())); ps.setDate(3, Date.valueOf(s.getDataFinal()));
                 ResultSet rs = ps.executeQuery();
-                if (rs.next()) { cInsumos = rs.getBigDecimal("i"); cMaq = rs.getBigDecimal("m"); cMo = rs.getBigDecimal("mo"); nAtiv = rs.getInt("n"); }
+                if (rs.next()) { cInsumos = rs.getBigDecimal("i"); cMaq = rs.getBigDecimal("m"); cMo = rs.getBigDecimal("mo"); cDesp = rs.getBigDecimal("desp"); nAtiv = rs.getInt("n"); }
             }
-            BigDecimal coe = cInsumos.add(cMaq).add(cMo);
+            // Despesas lançadas por execução no Diário (ex.: marmita comprada no dia) — distintas
+            // das "despesas fixas" da própria Safra (custo administrativo fixo por safra).
+            BigDecimal coe = cInsumos.add(cMaq).add(cMo).add(cDesp);
             BigDecimal despFixas = nz(s.getDespesasFixas());
             BigDecimal custoTotal = coe.add(despFixas);
 
@@ -233,12 +235,14 @@ public class SafraDAO {
             out.put("safra", s);
             out.put("qtdAtividades", nAtiv);
             out.put("custoInsumos", cInsumos); out.put("custoMaquinas", cMaq); out.put("custoMaoObra", cMo);
+            out.put("custoDespesas", cDesp);
             out.put("coe", coe); out.put("despesasFixas", despFixas); out.put("custoTotal", custoTotal);
             out.put("totalPlantas", totalPlantas); out.put("totalAreaHa", totalArea);
             out.put("custoPorPlanta", custoPorPlanta); out.put("custoPorHa", custoPorHa);
             out.put("custoPorUnidade", custoPorSaca);
             out.put("pctInsumos", pct(cInsumos, custoTotal)); out.put("pctMaquinas", pct(cMaq, custoTotal));
             out.put("pctMaoObra", pct(cMo, custoTotal)); out.put("pctDespesasFixas", pct(despFixas, custoTotal));
+            out.put("pctDespesas", pct(cDesp, custoTotal));
             out.put("rateio", rateio);
         }
         return out;
