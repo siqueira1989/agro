@@ -37,7 +37,7 @@ import java.util.Map;
  * GET  ?funcionarios=1                 → funcionários (idpessoa+nome+tipo) p/ selects
  * GET  ?despesascatalogo=1             → catálogo de despesas/custos (nome+classificação+valor ref.) p/ selects
  * GET  ?relatorio=talhao|cultura|atividade|area|responsavel &de=&ate=  → agregação de custo
- * POST acao=create|update|finalizar|status|addtipoatividade
+ * POST acao=create|update|finalizar|addexecucao|removerfuncionario|removerdespesa|status|addtipoatividade|recalcularpessoa
  */
 public class ControllerDiarioCampo extends HttpServlet {
 
@@ -117,6 +117,8 @@ public class ControllerDiarioCampo extends HttpServlet {
                 case "update":          handleSalvar(jo, resp, true); break;
                 case "finalizar":       handleFinalizar(jo, resp); break;
                 case "addexecucao":     handleAddExecucao(jo, resp); break;
+                case "removerfuncionario": handleRemoverFuncionario(jo, resp); break;
+                case "removerdespesa":  handleRemoverDespesa(jo, resp); break;
                 case "status":          handleStatus(jo, resp); break;
                 case "addtipoatividade":handleAddTipo(jo, resp); break;
                 case "recalcularpessoa":handleRecalcularPessoa(jo, resp); break;
@@ -161,9 +163,23 @@ public class ControllerDiarioCampo extends HttpServlet {
                 writeJson(resp, 400, false, "Horas trabalhadas não podem ser negativas."); return;
             }
         }
+        if (!validarRegimeColheita(d.getIdTipoAtividade(), d.getFuncionarios(), resp)) return;
+        // Nova regra: quantidade não é digitada — é calculada no servidor (DiarioCampoDAO.inserirInsumo),
+        // de uma de duas formas mutuamente exclusivas: dosePorUnidade × doseTotalAplicada (DEFENSIVO,
+        // aplicação por calda) OU quantidadeDireta (ADUBO, aplicação direta — ex.: nº de sacos × peso do
+        // saco, já calculado no cliente). Aqui só valida que UMA das duas formas veio completa e positiva;
+        // o valor de i.getQuantidade() enviado pelo cliente é sempre ignorado.
         for (DiarioInsumo i : d.getInsumos()) {
-            if (i.getIdInsumo() == 0 || i.getQuantidade() == null || i.getQuantidade().signum() <= 0) {
-                writeJson(resp, 400, false, "Cada insumo precisa de um produto e quantidade maior que zero."); return;
+            if (i.getIdInsumo() == 0) {
+                writeJson(resp, 400, false, "Cada insumo precisa de um produto selecionado."); return;
+            }
+            boolean temQuantidadeDireta = i.getQuantidadeDireta() != null && i.getQuantidadeDireta().signum() > 0;
+            boolean temDose = i.getDosePorUnidade() != null && i.getDosePorUnidade().signum() > 0
+                    && i.getDoseTotalAplicada() != null && i.getDoseTotalAplicada().signum() > 0;
+            if (!temQuantidadeDireta && !temDose) {
+                writeJson(resp, 400, false,
+                        "Informe a quantidade aplicada de cada insumo: dose por litro/kg + dose total aplicada (defensivo), "
+                        + "ou a quantidade aplicada direta (adubo)."); return;
             }
         }
         for (DiarioDespesa dsp : d.getDespesas()) {
@@ -243,8 +259,29 @@ public class ControllerDiarioCampo extends HttpServlet {
         if (funcionarios.isEmpty() && despesas.isEmpty()) {
             writeJson(resp, 400, false, "Informe ao menos um funcionário ou uma despesa para a execução."); return;
         }
+        DiarioCampo atual = dao.buscarPorId(id);
+        if (atual == null) { writeJson(resp, 400, false, "Diário não encontrado."); return; }
+        if (!validarRegimeColheita(atual.getIdTipoAtividade(), funcionarios, resp)) return;
         dao.adicionarExecucao(id, dataExec, funcionarios, despesas);
         writeJson(resp, 200, true, "Execução registrada com sucesso! Custo total recalculado.");
+    }
+
+    /** Remove um lançamento de mão de obra já salvo (funcionário/horas errados numa execução). */
+    private void handleRemoverFuncionario(JsonObject jo, HttpServletResponse resp) throws Exception {
+        int idDiario = getInt(jo, "iddiario");
+        int idLinha = getInt(jo, "id");
+        if (idDiario == 0 || idLinha == 0) { writeJson(resp, 400, false, "ID do diário e do lançamento são obrigatórios."); return; }
+        dao.removerFuncionario(idDiario, idLinha);
+        writeJson(resp, 200, true, "Lançamento removido. Custo recalculado.");
+    }
+
+    /** Remove uma despesa já salva (item/valor errado numa execução). */
+    private void handleRemoverDespesa(JsonObject jo, HttpServletResponse resp) throws Exception {
+        int idDiario = getInt(jo, "iddiario");
+        int idLinha = getInt(jo, "id");
+        if (idDiario == 0 || idLinha == 0) { writeJson(resp, 400, false, "ID do diário e da despesa são obrigatórios."); return; }
+        dao.removerDespesa(idDiario, idLinha);
+        writeJson(resp, 200, true, "Despesa removida. Custo recalculado.");
     }
 
     private void handleFinalizar(JsonObject jo, HttpServletResponse resp) throws Exception {
@@ -291,6 +328,51 @@ public class ControllerDiarioCampo extends HttpServlet {
     }
 
     /* ------------------------- helpers ------------------------- */
+
+    /**
+     * Na Colheita, cada funcionário precisa indicar o regime de trabalho (sistema padrão do
+     * contrato, ou produção por caixa) e a quantidade de caixas que colheu — isso vale pros DOIS
+     * regimes, porque é volume físico colhido, não forma de pagamento: se só quem está em
+     * PRODUCAO informasse caixa, o total do lote (Módulo Colheita) subcontaria a colheita de quem
+     * ficou no regime normal do contrato. Preço por caixa continua exclusivo de PRODUCAO, já que
+     * só ali o preço afeta o pagamento. Fora da Colheita, regime é NULO à força (nunca confia no
+     * que o cliente mandou): o formulário reaproveita a mesma linha entre trocas de tipo de
+     * atividade no navegador, e uma linha deixada preenchida antes de o usuário mudar o tipo não
+     * pode vazar quantidade_caixas/valor_regime para fora da Colheita.
+     * Escreve o erro na resposta e devolve false quando a validação falha.
+     */
+    private boolean validarRegimeColheita(int idTipoAtividade, List<DiarioFuncionario> funcionarios,
+            HttpServletResponse resp) throws Exception {
+        String nomeTipo = tipoDAO.buscarNome(idTipoAtividade);
+        boolean ehColheita = nomeTipo != null && nomeTipo.toLowerCase().contains("colh");
+        if (!ehColheita) {
+            for (DiarioFuncionario f : funcionarios) {
+                f.setRegimeTrabalho(null); f.setQuantidadeCaixas(null); f.setPrecoPorCaixa(null);
+            }
+            return true;
+        }
+        for (DiarioFuncionario f : funcionarios) {
+            String regime = f.getRegimeTrabalho();
+            if (regime == null || regime.isBlank()) {
+                writeJson(resp, 400, false, "Indique o regime de trabalho de cada funcionário na colheita (sistema ou produção por caixa).");
+                return false;
+            }
+            if (!"REGIME_SISTEMA".equals(regime) && !"PRODUCAO".equals(regime)) {
+                writeJson(resp, 400, false, "Regime de trabalho inválido: " + regime + "."); return false;
+            }
+            if (f.getQuantidadeCaixas() == null || f.getQuantidadeCaixas().signum() <= 0) {
+                writeJson(resp, 400, false, "Informe a quantidade de caixas colhidas (maior que zero) para cada funcionário.");
+                return false;
+            }
+            if ("PRODUCAO".equals(regime)) {
+                if (f.getPrecoPorCaixa() == null || f.getPrecoPorCaixa().signum() <= 0) {
+                    writeJson(resp, 400, false, "Informe o preço por caixa (maior que zero) para funcionários em regime de produção.");
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
 
     private boolean quadraPertenceArea(int idQuadra, int idArea) throws Exception {
         try (Connection c = new Util.PostgresConnection().getConnection();

@@ -21,7 +21,7 @@ public class InsumoDAO {
 
     public void inserir(Insumo i) throws SQLException {
         String sql = "INSERT INTO insumo (nome, categoria, grandeza, unidade, "
-                   + "estoque_minimo, id_fornecedor, situacao) VALUES (?, ?, ?, ?, ?, ?, ?)";
+                   + "estoque_minimo, id_fornecedor, situacao, peso_embalagem) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
         try (Connection c = new PostgresConnection().getConnection();
              PreparedStatement st = c.prepareStatement(sql)) {
             st.setString(1, i.getNome());
@@ -31,6 +31,7 @@ public class InsumoDAO {
             st.setBigDecimal(5, i.getEstoqueMinimo() != null ? i.getEstoqueMinimo() : BigDecimal.ZERO);
             if (i.getIdFornecedor() != null) st.setInt(6, i.getIdFornecedor()); else st.setNull(6, Types.INTEGER);
             st.setBoolean(7, i.isSituacao());
+            if (i.getPesoEmbalagem() != null) st.setBigDecimal(8, i.getPesoEmbalagem()); else st.setNull(8, Types.NUMERIC);
             st.executeUpdate();
         }
     }
@@ -38,7 +39,7 @@ public class InsumoDAO {
     /** Atualiza apenas o cadastro (não mexe em saldo/preço médio). */
     public void atualizar(Insumo i) throws SQLException {
         String sql = "UPDATE insumo SET nome=?, categoria=?, grandeza=?, unidade=?, "
-                   + "estoque_minimo=?, id_fornecedor=?, situacao=? WHERE idinsumo=?";
+                   + "estoque_minimo=?, id_fornecedor=?, situacao=?, peso_embalagem=? WHERE idinsumo=?";
         try (Connection c = new PostgresConnection().getConnection();
              PreparedStatement st = c.prepareStatement(sql)) {
             st.setString(1, i.getNome());
@@ -48,7 +49,8 @@ public class InsumoDAO {
             st.setBigDecimal(5, i.getEstoqueMinimo() != null ? i.getEstoqueMinimo() : BigDecimal.ZERO);
             if (i.getIdFornecedor() != null) st.setInt(6, i.getIdFornecedor()); else st.setNull(6, Types.INTEGER);
             st.setBoolean(7, i.isSituacao());
-            st.setInt(8, i.getIdInsumo());
+            if (i.getPesoEmbalagem() != null) st.setBigDecimal(8, i.getPesoEmbalagem()); else st.setNull(8, Types.NUMERIC);
+            st.setInt(9, i.getIdInsumo());
             st.executeUpdate();
         }
     }
@@ -110,6 +112,10 @@ public class InsumoDAO {
                 m.put("fornecedorNome", rs.getString("fornecedor_nome"));
                 m.put("situacao", rs.getBoolean("situacao"));
                 m.put("abaixoMinimo", rs.getBoolean("abaixo_minimo"));
+                m.put("pesoEmbalagem", rs.getBigDecimal("peso_embalagem"));
+                BigDecimal disp = rs.getBigDecimal("quantidade_disponivel");
+                BigDecimal preco = rs.getBigDecimal("preco_medio");
+                m.put("valorTotal", (disp != null && preco != null) ? disp.multiply(preco) : BigDecimal.ZERO);
                 lista.add(m);
             }
         }
@@ -155,6 +161,7 @@ public class InsumoDAO {
         i.setEstoqueMinimo(rs.getBigDecimal("estoque_minimo"));
         i.setIdFornecedor((Integer) rs.getObject("id_fornecedor"));
         i.setSituacao(rs.getBoolean("situacao"));
+        i.setPesoEmbalagem(rs.getBigDecimal("peso_embalagem"));
         return i;
     }
 }

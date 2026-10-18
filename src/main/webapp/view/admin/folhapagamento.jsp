@@ -66,6 +66,7 @@
       </div>
     </div>
     <div class="card-body">
+      <div class="table-responsive">
       <table id="tabelaFolha" class="table table-bordered table-striped" style="width:100%">
         <thead class="thead-green">
           <tr>
@@ -85,6 +86,7 @@
           </tr>
         </tfoot>
       </table>
+      </div>
     </div>
   </div>
 </div>

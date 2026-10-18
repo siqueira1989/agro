@@ -1,4 +1,5 @@
-<nav class="navbar navbar-expand-lg navbar-dark bg-success">
+<%@ page pageEncoding="UTF-8" %>
+<nav class="navbar navbar-expand-lg navbar-dark bg-success ps-3">
     <a class="navbar-brand" href="<%=request.getContextPath()%>/view/admin/index.jsp">
         <h3 class="fw-bold text-white mb-0">AgroFazenda</h3>
     </a>
@@ -56,6 +57,9 @@
                     <a class="dropdown-item" href="<%=request.getContextPath()%>/view/admin/safra.jsp">
                         <i class="fas fa-seedling me-1"></i>Safra
                     </a>
+                    <a class="dropdown-item" href="<%=request.getContextPath()%>/view/admin/colheitaestoque.jsp">
+                        <i class="fas fa-boxes-stacked me-1"></i>Colheita e Estoque
+                    </a>
                 </div>
             </li>
 
@@ -67,7 +71,7 @@
                 </a>
                 <div class="dropdown-menu">
                     <a class="dropdown-item" href="<%=request.getContextPath()%>/view/admin/Colaboradores.jsp">
-                        <i class="fas fa-user-tie me-1"></i>Funcionários
+                        <i class="fas fa-user-tie me-1"></i>Funcionarios
                     </a>
                     <a class="dropdown-item" href="<%=request.getContextPath()%>/view/admin/folhapagamento.jsp">
                         <i class="fas fa-money-bill-wave me-1"></i>Folha de Pagamento
@@ -78,7 +82,7 @@
                     </a>
                     <div class="dropdown-divider"></div>
                     <a class="dropdown-item fw-semibold text-success" href="<%=request.getContextPath()%>/view/admin/Colaboradores.jsp?tipo=CLT">
-                        <i class="fas fa-id-badge me-1 text-success"></i>CLT — Perfis e Fechamento
+                        <i class="fas fa-id-badge me-1 text-success"></i> Perfis e Fechamento
                     </a>
                 </div>
             </li>
@@ -91,10 +95,10 @@
                 </a>
                 <div class="dropdown-menu">
                     <a class="dropdown-item" href="<%=request.getContextPath()%>/RelatorioExportServlet?tipo=excel&modulo=funcionario">
-                        <i class="fas fa-file-excel me-1 text-success"></i>Funcionário (Excel)
+                        <i class="fas fa-file-excel me-1 text-success"></i>Funcionario (Excel)
                     </a>
                     <a class="dropdown-item" href="<%=request.getContextPath()%>/RelatorioExportServlet?tipo=pdf&modulo=funcionario">
-                        <i class="fas fa-file-pdf me-1 text-danger"></i>Funcionário (PDF)
+                        <i class="fas fa-file-pdf me-1 text-danger"></i>Funcionario (PDF)
                     </a>
                     <div class="dropdown-divider"></div>
                     <a class="dropdown-item" href="<%=request.getContextPath()%>/RelatorioExportServlet?tipo=excel&modulo=areaproducao">

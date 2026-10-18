@@ -69,7 +69,7 @@
 
 <!-- ===== Modal Editar ===== -->
 <div class="modal fade" id="modalEditar" tabindex="-1" role="dialog" aria-hidden="true">
-    <div class="modal-dialog modal-lg" role="document">
+    <div class="modal-dialog modal-lg modal-fullscreen-sm-down" role="document">
         <form id="formEditar" class="modal-content needs-validation" novalidate>
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title"><i class="fas fa-user-edit me-1"></i> Editar Funcionário</h5>

@@ -179,6 +179,7 @@
                     </button>
                 </div>
                 <div class="card-body p-0">
+                    <div class="table-responsive">
                     <table class="table table-sm table-hover mb-0" id="tabelaFaltas">
                         <thead class="table-light">
                             <tr>
@@ -192,6 +193,7 @@
                             <tr><td colspan="4" class="text-center text-muted py-3">Nenhuma falta no período.</td></tr>
                         </tbody>
                     </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -210,6 +212,7 @@
                     </button>
                 </div>
                 <div class="card-body p-0">
+                    <div class="table-responsive">
                     <table class="table table-sm table-hover mb-0">
                         <thead class="table-light">
                             <tr>
@@ -224,6 +227,7 @@
                             <tr><td colspan="5" class="text-center text-muted py-3">Nenhum vale no período.</td></tr>
                         </tbody>
                     </table>
+                    </div>
                 </div>
             </div>
 

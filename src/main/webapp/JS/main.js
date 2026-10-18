@@ -229,6 +229,74 @@ function formatarValorParaBR(valor) {
 }
 
 /**
+ * Máscara decimal para campos de QUANTIDADE (dose, peso, nº de sacos) — diferente da máscara
+ * monetária reversa (`#.##0,00`) usada em salário/valor: aqui o usuário digita a vírgula explicitamente,
+ * como escreveria no papel ("1,5"), em vez de "preencher da direita pra esquerda" como dinheiro.
+ *
+ * MOTIVO (bug real, reproduzido 2026-10-05): os campos de dose/quantidade do Insumo no Diário de
+ * Campo eram <input type="number"> puro. A RENDERIZAÇÃO desse tipo de campo (vírgula ou ponto como
+ * separador decimal) depende da configuração de localidade do navegador/SO do usuário — fora do
+ * nosso controle e inconsistente entre máquinas. O resultado calculado 1,5 × 100 = 150 aparecia como
+ * "150,000" numa máquina (vírgula — OK) e pode aparecer "150.000" (ponto) em outra; um usuário
+ * brasileiro lendo "150.000" em notação BR entende "cento e cinquenta mil", não "150". Trocar para
+ * <input type="text"> com esta máscara elimina a dependência da localidade do navegador: a exibição
+ * é sempre em vírgula, controlada por nós, em qualquer máquina.
+ */
+/**
+ * @param casas Não limita mais a digitação (ver bug abaixo) — mantido só por compatibilidade
+ *              com quem já chama esta função; pode ser omitido.
+ *
+ * BUG REAL CONFIRMADO (2026-10-12): esta função costumava truncar o valor em `casas` dígitos
+ * decimais DURANTE a digitação. Ao EDITAR um diário já salvo, o campo vinha pré-preenchido já
+ * com o máximo de casas (ex.: "0,0300", 4 casas) — qualquer tecla nova que o usuário digitasse
+ * no fim/meio do valor resultava num valor truncado de volta ao que já estava lá, então a tela
+ * "não mudava nada" e parecia travada. O banco já arredonda pra escala da coluna
+ * (NUMERIC(14,4)/NUMERIC(14,3)) ao gravar — não há necessidade nem motivo de truncar no cliente.
+ */
+function aplicarMascaraDecimal($el, casas) {
+    $el.attr('type', 'text').attr('inputmode', 'decimal').attr('autocomplete', 'off');
+    $el.off('input.decbr').on('input.decbr', function () {
+        var el = this;
+        var posAntes = el.selectionStart;
+        var bruto = el.value;
+        // Aceita "." como decimal também (teclado numérico de muitos notebooks/SOs manda ponto
+        // mesmo em layout BR) — convertido pra vírgula antes de filtrar.
+        var limpar = function (s) { return s.replace(/\./g, ',').replace(/[^\d,]/g, ''); };
+        var limpo = limpar(bruto);
+        var partes = limpo.split(',');
+        if (partes.length > 2) limpo = partes[0] + ',' + partes.slice(1).join('');  // só 1 vírgula
+        if (limpo === bruto) return;   // nada precisou mudar: não mexe no valor nem no cursor
+        // Preserva a posição relativa do cursor (sem isso, toda tecla jogava o cursor pro fim do
+        // campo, impedindo editar/corrigir no meio do valor já digitado).
+        var novaPos = Math.min(limpar(bruto.slice(0, posAntes)).length, limpo.length);
+        el.value = limpo;
+        el.setSelectionRange(novaPos, novaPos);
+    });
+}
+
+/** Lê um campo com máscara decimal BR ("1.234,5") como Number — nunca use parseFloat/Number direto nesses campos. */
+function lerDecimalBR(v) {
+    if (v == null || v === '') return 0;
+    var n = parseFloat(String(v).replace(/\./g, '').replace(',', '.'));
+    return isNaN(n) ? 0 : n;
+}
+
+/** Formata um Number para texto BR com casas fixas, pronto para preencher um campo com máscara decimal. */
+function exibirDecimalBR(n, casas) {
+    casas = casas || 3;
+    return Number(n || 0).toLocaleString('pt-BR', { minimumFractionDigits: casas, maximumFractionDigits: casas });
+}
+
+/**
+ * Como exibirDecimalBR, mas sem forçar zeros à direita — "0,03" em vez de "0,0300". Usada pra
+ * PRÉ-PREENCHER campos editáveis ao abrir um diário pra edição: mostrar logo o valor "cheio" de
+ * zeros deixava o campo visualmente no limite de casas decimais, mesmo sem precisar.
+ */
+function exibirDecimalNatural(n, casasMax) {
+    return Number(n || 0).toLocaleString('pt-BR', { maximumFractionDigits: casasMax || 4 });
+}
+
+/**
  * Consulta o ViaCEP e preenche os campos #logradouro, #bairro, #cidade, #uf.
  * Usado em: ColaboCadastro.jsp, CadastroParceiro.jsp, AtualizarParceiro.jsp
  */
@@ -463,6 +531,19 @@ function abrirModalExclusaoDespesasCustos(id, despesa) {
     $('#modalExclusao').modal('show');
 }
 
+/** Atualiza os cards de KPI (total/fixas/variáveis). Usado em: despesascustos.jsp */
+function atualizarKpisDespesasCustos(lista) {
+    if (!$('#kpiDcTotal').length) return;
+    let total = lista.length;
+    let fixo = 0, variavel = 0;
+    lista.forEach(function (item) {
+        if (item.classificacao === 'VARIAVEL') variavel++; else fixo++;
+    });
+    $('#kpiDcTotal').text(total);
+    $('#kpiDcFixo').text(fixo);
+    $('#kpiDcVariavel').text(variavel);
+}
+
 /** Inicializa/recarrega o DataTable de despesas e custos via DespesasCustosServlet. Usado em: despesascustos.jsp */
 function CarregarDadosDespesasCustos() {
     // Já inicializada: recarrega sem destruir (preserva busca/ordenação/página).
@@ -477,7 +558,10 @@ function CarregarDadosDespesasCustos() {
         "ajax": {
             "url": AGRO_CTX + "/DespesasCustosServlet", // URL da servlet para buscar os dados
             "method": "GET",
-            "dataSrc": "" // Define que os dados virão no formato de array
+            "dataSrc": function (json) {
+                atualizarKpisDespesasCustos(json);
+                return json;
+            }
         },
         "columns": [
             {"data": "iddespesascusto"},
@@ -4008,6 +4092,15 @@ $(document).ready(function () {
         });
     });
     dcInit(id);   // Diário de Campo escopado a esta área
+    // Vindo do Módulo Colheita ("Cadastrar Colheita" escolhe a área e redireciona pra cá) — abre o
+    // "Novo Diário" já com Colheita pré-selecionada (é o mesmo cadastro, só evita o clique extra).
+    if (apGetParam('abrirColheita') === '1') {
+        $.when(dcFuncPromise, dcTalhaoPromise, dcDespPromise).always(function () {
+            dcAbrirNovoInterno();
+            var tipoColheita = dcCacheTipos.filter(function (t) { return t.nome.toLowerCase().indexOf('colh') > -1; })[0];
+            if (tipoColheita) $('#dcTipo').val(String(tipoColheita.idTipo)).trigger('change');
+        });
+    }
 });
 
 /******************************************************************************************************/
@@ -4101,6 +4194,36 @@ function dcCategoriaPorTipo() {
     return null;   // demais: todos os insumos
 }
 
+/** O tipo de atividade selecionado é "Colheita"? Mesmo padrão de dcCategoriaPorTipo (busca por nome no cache). */
+function dcEhColheita() {
+    var idt = parseInt($('#dcTipo').val()) || 0;
+    var t = dcCacheTipos.filter(function (x) { return x.idTipo === idt; })[0];
+    var nome = (t ? t.nome : '').toLowerCase();
+    return nome.indexOf('colh') > -1;
+}
+
+/**
+ * Mostra/esconde a coluna "Regime" (Sistema x Produção por caixa) nas tabelas de Funcionários
+ * (principal e "Registrar Nova Execução") conforme o tipo de atividade selecionado — regime só
+ * faz sentido na Colheita. Recalcula a prévia de custo em seguida, pois trocar de/para Colheita
+ * muda como cada linha existente deve ser exibida (horas x caixas).
+ */
+function dcAtualizarVisibilidadeColheita() {
+    var colheita = dcEhColheita();
+    $('.dc-col-regime').toggleClass('d-none', !colheita);
+    if (!colheita) {
+        // Fora da Colheita o regime não existe: reseta para Sistema para não deixar uma linha
+        // "presa" em Produção (caixa) de quando o tipo de atividade era Colheita há pouco — o
+        // servidor também nunca confiaria nesse valor fora da Colheita, mas aqui evita a UI
+        // mostrar Horas=0/valor calculado por caixa de forma incoerente com a atividade atual.
+        $('#dcFuncBody .dc-fregime, #exFuncBody .ex-fregime').val('REGIME_SISTEMA');
+    }
+    $('#dcFuncBody tr').each(function () { dcAtualizarCampoHoras($(this), dcFuncEditavel); });
+    $('#exFuncBody tr').each(function () { dcAtualizarCampoHorasExec($(this)); });
+    dcRecalcPreview();
+    dcExecRecalcPreview();
+}
+
 function dcInit(areaId) {
     dcAreaId = areaId;
     $('#dcData').val(new Date().toISOString().slice(0, 10));
@@ -4137,7 +4260,8 @@ function dcInit(areaId) {
     $('#btnSalvarAgendar').off('click').on('click', dcSalvarAgendar);
     $('#btnAddFunc').off('click').on('click', function () { dcAddFuncRow(); });
     $('#btnAddMaq').off('click').on('click', function () { dcAddMaqRow(); });
-    $('#btnAddIns').off('click').on('click', function () { dcAddInsRow(); });
+    $('#btnAddInsDef').off('click').on('click', function () { dcAddInsRowDef(); });
+    $('#btnAddInsAdu').off('click').on('click', function () { dcAddInsRowAdu(); });
     $('#btnAddDesp').off('click').on('click', function () { dcAddDespRow(); });
     $('#btnAddTipo').off('click').on('click', dcAddTipo);
     $('#btnSalvarDiario').off('click').on('click', dcSalvar);
@@ -4146,19 +4270,24 @@ function dcInit(areaId) {
     $('#dcTalhao').off('change.dc').on('change.dc', dcAplicarCulturaDoTalhao);
     // Data -> resolve a safra (talhão + data) e recarrega os funcionários ativos na data
     $('#dcData').off('change.dc').on('change.dc', function () { dcResolverSafra(); dcRecarregarFuncsPorData(); });
-    // Tipo de atividade -> filtra insumos (Adubação=adubo, Pulverização=defensivo)
-    $('#dcTipo').off('change.dc').on('change.dc', dcRefiltrarInsumos);
+    // Tipo de atividade -> mostra só a seção de Insumos correspondente (Adubação=Adubo,
+    // Pulverização=Defensivo, demais=as duas) e mostra/esconde a coluna Regime (só existe na Colheita)
+    $('#dcTipo').off('change.dc').on('change.dc', function () { dcAtualizarVisibilidadeInsumos(); dcAtualizarVisibilidadeColheita(); });
 
     // recálculo do custo estimado ao vivo
     var body = '#modalNovoDiario';
-    $(body).off('input.dc change.dc', '.dc-fpessoa,.dc-fhoras,.dc-fvalor,.dc-mmaq,.dc-muso,.dc-ipro,.dc-iqtd')
-        .on('input.dc change.dc', '.dc-fpessoa,.dc-fhoras,.dc-fvalor,.dc-mmaq,.dc-muso,.dc-ipro,.dc-iqtd', dcRecalcPreview);
+    $(body).off('input.dc change.dc', '.dc-fpessoa,.dc-fhoras,.dc-fvalor,.dc-fcaixas,.dc-fprecocaixa,.dc-mmaq,.dc-muso,.dc-ipro,.dc-idosepu,.dc-idosetotal,.dc-isacos,.dc-iqtddireta')
+        .on('input.dc change.dc', '.dc-fpessoa,.dc-fhoras,.dc-fvalor,.dc-fcaixas,.dc-fprecocaixa,.dc-mmaq,.dc-muso,.dc-ipro,.dc-idosepu,.dc-idosetotal,.dc-isacos,.dc-iqtddireta', dcRecalcPreview);
     $('#dcFuncBody').off('change.dc', '.dc-fpessoa').on('change.dc', '.dc-fpessoa', function () {
         var opt = $(this).find(':selected');
         var $tr = $(this).closest('tr');
         $tr.find('.dc-ftipo').val(opt.data('tipo') || '');
         dcAtualizarCampoHoras($tr, dcFuncEditavel);
         dcAtualizarResponsavel();   // responsável só entre os funcionários adicionados
+    });
+    $('#dcFuncBody').off('change.dc', '.dc-fregime').on('change.dc', '.dc-fregime', function () {
+        dcAtualizarCampoHoras($(this).closest('tr'), dcFuncEditavel);
+        dcRecalcPreview();
     });
     $('#dcMaqBody').off('change.dc', '.dc-mmaq').on('change.dc', '.dc-mmaq', function () { dcAtualizarLinhaMaquina($(this).closest('tr')); });
     $('#dcMaqBody').off('input.dc', '.dc-muso').on('input.dc', '.dc-muso', function () { dcAtualizarLinhaMaquina($(this).closest('tr')); });
@@ -4174,18 +4303,40 @@ function dcInit(areaId) {
         if (eraFunc) dcAtualizarResponsavel();
         dcRecalcPreview();
     });
+    // Remove um lançamento JÁ SALVO (funcionário/despesa de uma execução anterior) — diferente do
+    // .dc-rm acima, que só tira uma linha ainda não salva do formulário: aqui é preciso apagar de
+    // verdade no banco e recalcular o custo, por isso vai ao servidor em vez de só manipular o DOM.
+    $('#modalNovoDiario').off('click.dcrmhist', '.dc-rm-hist').on('click.dcrmhist', '.dc-rm-hist', function () {
+        var tipo = $(this).data('tipo'), idLinha = $(this).data('id');
+        var iddiario = parseInt($('#dcId').val()) || 0;
+        if (!iddiario || !idLinha) return;
+        if (!confirm('Remover este lançamento? O custo do diário será recalculado.')) return;
+        var acao = tipo === 'funcionario' ? 'removerfuncionario' : 'removerdespesa';
+        $.ajax({
+            url: AGRO_CTX + '/ControllerDiarioCampo', method: 'POST', contentType: 'application/json; charset=utf-8',
+            data: JSON.stringify({ acao: acao, iddiario: iddiario, id: idLinha }),
+            success: function (res) {
+                if (res.ok) { mostrarAlerta(res.msg, 'success', '#alertPerfil'); dcCarregarLista(); dcEditar(iddiario); }
+                else { $('#alertDiario').removeClass('d-none').addClass('alert-danger').text(res.msg); }
+            },
+            error: function (xhr) { var m = 'Erro ao remover lançamento.'; try { m = JSON.parse(xhr.responseText).msg || m; } catch (e) {} $('#alertDiario').removeClass('d-none').addClass('alert-danger').text(m); }
+        });
+    });
 
     // Bloco "Registrar Nova Execução" (diário EM_ANDAMENTO, múltiplos dias/equipes)
     $('#btnAddExecFunc').off('click').on('click', function () { dcAddExecFuncRow(); });
     $('#btnSalvarExecucao').off('click').on('click', dcSalvarExecucao);
-    $('#dcBlocoExecucao').off('input.ex change.ex', '.ex-fpessoa,.ex-fhoras')
-        .on('input.ex change.ex', '.ex-fpessoa,.ex-fhoras', dcExecRecalcPreview);
+    $('#dcBlocoExecucao').off('input.ex change.ex', '.ex-fpessoa,.ex-fhoras,.ex-fcaixas,.ex-fprecocaixa')
+        .on('input.ex change.ex', '.ex-fpessoa,.ex-fhoras,.ex-fcaixas,.ex-fprecocaixa', dcExecRecalcPreview);
     $('#exFuncBody').off('change.ex', '.ex-fpessoa').on('change.ex', '.ex-fpessoa', function () {
         var $tr = $(this).closest('tr');
         var tipo = $(this).find(':selected').data('tipo') || '';
         $tr.find('.ex-ftipo').val(tipo);
-        var $horas = $tr.find('.ex-fhoras');
-        if (tipo === 'EMPREITA') { $horas.val('').prop('disabled', true); } else { $horas.prop('disabled', false); }
+        dcAtualizarCampoHorasExec($tr);
+        dcExecRecalcPreview();
+    });
+    $('#exFuncBody').off('change.ex', '.ex-fregime').on('change.ex', '.ex-fregime', function () {
+        dcAtualizarCampoHorasExec($(this).closest('tr'));
         dcExecRecalcPreview();
     });
     $('#dcBlocoExecucao').off('click.ex', '.ex-rm').on('click.ex', '.ex-rm', function () { $(this).closest('tr').remove(); });
@@ -4238,19 +4389,26 @@ function dcResolverSafra() {
     });
 }
 
-function dcInsumoOpts() {
-    var cat = dcCategoriaPorTipo();
+/** Options do select de insumo, restritas a uma categoria fixa (DEFENSIVO ou ADUBO) — cada uma
+ * das duas tabelas de Insumos só lista a sua categoria, então não depende mais do tipo de atividade. */
+function dcInsumoOptsCategoria(cat) {
     var opt = '<option value="">Selecione</option>';
-    dcCacheIns.filter(function (i) { return !cat || i.categoria === cat; })
-        .forEach(function (i) { opt += '<option value="' + i.idInsumo + '" data-preco="' + (i.precoMedio || 0) + '">' + i.nome + ' (' + i.unidade + ')</option>'; });
+    dcCacheIns.filter(function (i) { return i.categoria === cat; })
+        .forEach(function (i) { opt += '<option value="' + i.idInsumo + '" data-preco="' + (i.precoMedio || 0) + '" data-unidade="' + (i.unidade || '') +
+            '" data-embalagem="' + (i.pesoEmbalagem || '') + '">' + i.nome + ' (' + i.unidade + ')</option>'; });
     return opt;
 }
-function dcRefiltrarInsumos() {
-    $('#dcInsBody tr').each(function () {
-        var sel = $(this).find('.dc-ipro'); var atual = sel.val();
-        sel.html(dcInsumoOpts()); sel.val(atual);
-    });
-    dcRecalcPreview();
+
+/**
+ * Mostra só a seção de Insumos (Defensivo/Adubo) correspondente ao tipo de atividade escolhido —
+ * Adubação só precisa de Adubo, Pulverização só de Defensivo; nos demais tipos não há restrição,
+ * então mostra as duas. Linhas já lançadas numa seção que fica escondida continuam no formulário
+ * e são enviadas normalmente ao salvar — só a exibição muda.
+ */
+function dcAtualizarVisibilidadeInsumos() {
+    var cat = dcCategoriaPorTipo();
+    $('#dcInsDefHeader,#dcInsDefAjuda,#dcInsDefTableWrap').toggleClass('d-none', cat === 'ADUBO');
+    $('#dcInsAduHeader,#dcInsAduAjuda,#dcInsAduTableWrap').toggleClass('d-none', cat === 'DEFENSIVO');
 }
 
 function dcCarregarLista() {
@@ -4265,9 +4423,9 @@ function dcCarregarLista() {
             else if (d.status === 'PLANEJADA' || d.status === 'EM_ANDAMENTO') pend++;
             if (d.status === 'PLANEJADA') planejadas.push(d);
             var acoes = '<button class="btn btn-sm btn-outline-dark" title="Ver" onclick="dcVerDetalhe(' + d.idDiario + ')"><i class="fas fa-eye"></i></button>';
-            if (d.status === 'PLANEJADA') acoes += ' <button class="btn btn-sm btn-outline-success" title="Iniciar execução" onclick="dcEditar(' + d.idDiario + ')"><i class="fas fa-play"></i></button>';
+            if (d.status === 'PLANEJADA') acoes += ' <button class="btn btn-sm btn-outline-success" title="Iniciar execução" onclick="dcIniciarExecucao(' + d.idDiario + ')"><i class="fas fa-play"></i></button>';
             else if (d.status !== 'CONCLUIDA') acoes += ' <button class="btn btn-sm btn-outline-primary" title="Editar" onclick="dcEditar(' + d.idDiario + ')"><i class="fas fa-pen-to-square"></i></button>';
-            $b.append('<tr><td>' + (d.numeroDiario || '') + '</td><td>' + (d.data || '') + '</td><td>' + (d.quadraNome || '—') +
+            $b.append('<tr><td>' + (d.numeroDiario || '') + '</td><td>' + formatarData(d.data) + '</td><td>' + (d.quadraNome || '—') +
                 '</td><td>' + (d.culturaNome || '—') + '</td><td>' + (d.tipoAtividadeNome || '—') + '</td><td>' + dcBadgeStatus(d.status) +
                 '</td><td class="text-end">' + dcMoney(d.custoTotal) + '</td><td class="text-end">' + acoes + '</td></tr>');
         });
@@ -4280,7 +4438,7 @@ function dcCarregarLista() {
             planejadas.forEach(function (d) {
                 $lista.append('<li><a class="dropdown-item small" href="#" onclick="dcVerDetalhe(' + d.idDiario + ');return false;">' +
                     '<i class="fas fa-calendar-check me-1 text-warning"></i>' + (d.tipoAtividadeNome || 'Atividade') +
-                    ' — ' + (d.quadraNome || '') + ' <span class="text-muted">(' + (d.dataPrevista || d.data || '') + ')</span></a></li>');
+                    ' — ' + (d.quadraNome || '') + ' <span class="text-muted">(' + formatarData(d.dataPrevista || d.data) + ')</span></a></li>');
             });
         } else {
             $badge.addClass('d-none').text('0');
@@ -4297,13 +4455,14 @@ function dcResetForm() {
     $('#dcId,#dcStatus,#dcNumero,#dcCultura,#dcCulturaNome').val('');
     $('#dcDescricao,#dcObs').val('');
     $('#dcData').val(new Date().toISOString().slice(0, 10));
-    $('#dcFuncBody,#dcMaqBody,#dcInsBody,#dcDespBody,#exFuncBody,#exDespBody').empty();
+    $('#dcFuncBody,#dcMaqBody,#dcInsDefBody,#dcInsAduBody,#dcDespBody,#exFuncBody,#exDespBody').empty();
     $('#dcTotalPreview').text(dcMoney(0));
     dcSafraResolvida = false;
     dcFuncEditavel = true;
     dcDespEditavel = true;
-    $('#btnAddFunc,#btnAddDesp').removeClass('d-none');
+    $('#btnAddFunc,#btnAddDesp,#dcFuncHeader,#dcFuncTableWrap,#dcDespHeader,#dcDespTableWrap').removeClass('d-none');
     $('#dcFuncSoNaExecucao,#dcDespSoNaExecucao,#dcBlocoExecucao').addClass('d-none');
+    dcAtualizarVisibilidadeInsumos();
 }
 function dcAbrirNovo() {
     // Aguarda os carregamentos iniciais (funcionários/talhões/despesas) antes de checar pré-requisitos,
@@ -4398,24 +4557,86 @@ function dcSalvarAgendar() {
 var dcFuncEditavel = true;   // false quando editando um diário já existente (funcionários viram somente leitura; use "Registrar execução")
 var dcDespEditavel = true;   // false quando editando um diário já existente (despesas viram somente leitura; use "Registrar execução")
 
-/** Empreita não trabalha por hora: esconde/desabilita o campo Horas e mantém o Valor(auto) = valor da empreitada. */
+/**
+ * Empreita não trabalha por hora: esconde/desabilita o campo Horas e mantém o Valor(auto) = valor
+ * da empreitada. Regime PRODUCAO (Colheita por caixa) troca o campo Horas por Qtd caixas + Preço/
+ * caixa, independente do tipo de contrato — CLT/DIARISTA/EMPREITA podem estar em regime PRODUCAO.
+ */
+/**
+ * Caixas colhidas é sempre pedido na Colheita (é volume físico, vale pros dois regimes); Preço/
+ * caixa é exclusivo de PRODUCAO (só ali o preço afeta o pagamento); Horas some quando PRODUCAO
+ * (não é pago por hora) e quando EMPREITA (valor fixo, não depende de horas).
+ */
 function dcAtualizarCampoHoras($tr, funcEditavel) {
     var tipo = $tr.find('.dc-ftipo').val();
+    var regime = $tr.find('.dc-fregime').val();
+    var colheita = dcEhColheita();
     var $horas = $tr.find('.dc-fhoras');
-    if (tipo === 'EMPREITA') {
-        $horas.val('').prop('disabled', true).attr('placeholder', '—');
+    var $caixas = $tr.find('.dc-fcaixas');
+    var $preco = $tr.find('.dc-fprecocaixa');
+
+    if (!colheita) {
+        $caixas.addClass('d-none'); $preco.addClass('d-none'); $horas.removeClass('d-none');
+        if (tipo === 'EMPREITA') { $horas.val('').prop('disabled', true).attr('placeholder', '—'); }
+        else { $horas.prop('disabled', !funcEditavel).attr('placeholder', '2h30 / 45min / 1,5'); }
+        return;
+    }
+    $caixas.removeClass('d-none').prop('disabled', !funcEditavel);
+    if (regime === 'PRODUCAO') {
+        $horas.addClass('d-none').prop('disabled', true);
+        $preco.removeClass('d-none').prop('disabled', !funcEditavel);
     } else {
-        $horas.prop('disabled', !funcEditavel).attr('placeholder', '2h30 / 45min / 1,5');
+        $preco.addClass('d-none');
+        $horas.removeClass('d-none');
+        if (tipo === 'EMPREITA') { $horas.val('').prop('disabled', true).attr('placeholder', '—'); }
+        else { $horas.prop('disabled', !funcEditavel).attr('placeholder', '2h30 / 45min / 1,5'); }
+    }
+}
+
+/** Mesma lógica de dcAtualizarCampoHoras, para as linhas do bloco "Registrar Nova Execução" (prefixo ex-). */
+function dcAtualizarCampoHorasExec($tr) {
+    var tipo = $tr.find('.ex-ftipo').val();
+    var regime = $tr.find('.ex-fregime').val();
+    var colheita = dcEhColheita();
+    var $horas = $tr.find('.ex-fhoras');
+    var $caixas = $tr.find('.ex-fcaixas');
+    var $preco = $tr.find('.ex-fprecocaixa');
+
+    if (!colheita) {
+        $caixas.addClass('d-none'); $preco.addClass('d-none'); $horas.removeClass('d-none');
+        if (tipo === 'EMPREITA') { $horas.val('').prop('disabled', true); } else { $horas.prop('disabled', false); }
+        return;
+    }
+    $caixas.removeClass('d-none');
+    if (regime === 'PRODUCAO') {
+        $horas.addClass('d-none').prop('disabled', true);
+        $preco.removeClass('d-none');
+    } else {
+        $preco.addClass('d-none');
+        $horas.removeClass('d-none');
+        if (tipo === 'EMPREITA') { $horas.val('').prop('disabled', true); } else { $horas.prop('disabled', false); }
     }
 }
 function dcAddFuncRow(f) {
     var dis = dcFuncEditavel ? '' : 'disabled';
+    // Linha nova (ainda não salva): remove só do formulário (.dc-rm). Linha histórica (já persistida,
+    // f.id vindo do servidor): remove de verdade via API (.dc-rm-hist), pois foi lançada errada e
+    // precisa recalcular o custo — não dá pra simplesmente tirar da tela, como faz uma linha nova.
+    var btnCell = dcFuncEditavel
+        ? '<button type="button" class="btn btn-sm btn-outline-danger dc-rm" title="Remover"><i class="fas fa-trash"></i></button>'
+        : (f && f.id ? '<button type="button" class="btn btn-sm btn-outline-danger dc-rm-hist" data-tipo="funcionario" data-id="' + f.id + '" title="Remover este lançamento (recalcula o custo)"><i class="fas fa-trash"></i></button>' : '');
     $('#dcFuncBody').append('<tr>' +
         '<td><select class="form-select form-select-sm dc-fpessoa" ' + dis + '>' + dcOptFunc + '</select></td>' +
         '<td><input class="form-control form-control-sm dc-ftipo" readonly placeholder="—" style="width:90px"></td>' +
-        '<td><input type="text" class="form-control form-control-sm dc-fhoras" placeholder="2h30 / 45min / 1,5" title="Aceita horas e minutos: 2h30, 45min, 2:30 ou 1,5" value="" ' + dis + '></td>' +
+        '<td class="dc-col-regime d-none"><select class="form-select form-select-sm dc-fregime" ' + dis + '>' +
+            '<option value="REGIME_SISTEMA">Sistema</option><option value="PRODUCAO">Produção (caixa)</option></select></td>' +
+        '<td>' +
+            '<input type="text" class="form-control form-control-sm dc-fhoras" placeholder="2h30 / 45min / 1,5" title="Aceita horas e minutos: 2h30, 45min, 2:30 ou 1,5" value="" ' + dis + '>' +
+            '<input type="number" class="form-control form-control-sm dc-fcaixas mt-1 d-none" placeholder="Caixas colhidas" min="0.01" step="0.01" ' + dis + '>' +
+            '<input type="number" class="form-control form-control-sm dc-fprecocaixa mt-1 d-none" placeholder="Preço/caixa" min="0.01" step="0.01" ' + dis + '>' +
+        '</td>' +
         '<td><input type="number" class="form-control form-control-sm dc-fvalor bg-light" readonly title="Calculado automaticamente conforme o tipo de funcionário" value="0"></td>' +
-        '<td class="text-center">' + (dcFuncEditavel ? '<button type="button" class="btn btn-sm btn-outline-danger dc-rm"><i class="fas fa-trash"></i></button>' : '') + '</td></tr>');
+        '<td class="text-center">' + btnCell + '</td></tr>');
     if (f) {
         var $tr = $('#dcFuncBody tr:last'); var $sel = $tr.find('.dc-fpessoa');
         $sel.val(String(f.idPessoa));
@@ -4426,13 +4647,23 @@ function dcAddFuncRow(f) {
             $sel.val(String(f.idPessoa));
         }
         $tr.find('.dc-ftipo').val(f.tipoFuncionario || '');
+        $tr.find('.dc-fregime').val(f.regimeTrabalho || 'REGIME_SISTEMA');
         $tr.find('.dc-fhoras').val(Number(f.horasTrabalhadas) > 0 ? dcFormatHoras(f.horasTrabalhadas) : '');
-        $tr.find('.dc-fvalor').val(f.custo || f.valorContratado || 0);
+        if (f.quantidadeCaixas != null) $tr.find('.dc-fcaixas').val(f.quantidadeCaixas);
+        if (f.regimeTrabalho === 'PRODUCAO') {
+            $tr.find('.dc-fprecocaixa').val(f.precoPorCaixa || 0);
+            $tr.find('.dc-fvalor').val(f.custo || f.valorRegime || 0);
+        } else {
+            $tr.find('.dc-fvalor').val(f.custo || f.valorContratado || 0);
+        }
         dcAtualizarCampoHoras($tr, dcFuncEditavel);
     }
     dcAtualizarResponsavel();
+    dcAtualizarVisibilidadeColheita();
 }
-function dcAddMaqRow(m) {
+/** @param bodySel corpo da tabela de destino — permite reuso no modal dedicado de Colheita (#chMaqBody). */
+function dcAddMaqRow(m, bodySel) {
+    bodySel = bodySel || '#dcMaqBody';
     if (!m && !dcCacheMaq.length) {
         preReqAlerta('#alertDiario', 'Não há <strong>Maquinário</strong> cadastrado. Cadastre em Configuração → Maquinário para usar aqui.',
             CTX + '/view/admin/maquina.jsp', 'Cadastrar Maquinário');
@@ -4440,13 +4671,13 @@ function dcAddMaqRow(m) {
     }
     var opt = '<option value="">Selecione</option>';
     dcCacheMaq.forEach(function (mq) { opt += '<option value="' + mq.idMaquina + '" data-tipo="' + mq.tipo + '" data-ch="' + (mq.custoHora || 0) + '" data-ck="' + (mq.custoKm || 0) + '">' + mq.nome + ' (' + mq.tipo + ')</option>'; });
-    $('#dcMaqBody').append('<tr>' +
+    $(bodySel).append('<tr>' +
         '<td><select class="form-select form-select-sm dc-mmaq">' + opt + '</select></td>' +
         '<td class="d-flex align-items-center gap-1"><input type="number" class="form-control form-control-sm dc-muso" min="0" step="0.1" value="0"><span class="dc-mun small text-muted">h</span></td>' +
         '<td class="text-end dc-mcusto">R$ 0,00</td>' +
         '<td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger dc-rm"><i class="fas fa-trash"></i></button></td></tr>');
     if (m) {
-        var $tr = $('#dcMaqBody tr:last');
+        var $tr = $(bodySel + ' tr:last');
         if (m.idMaquina) $tr.find('.dc-mmaq').val(String(m.idMaquina));
         var opt2 = $tr.find('.dc-mmaq :selected');
         var isVeic = (opt2.data('tipo') === 'VEICULO');
@@ -4463,21 +4694,86 @@ function dcAtualizarLinhaMaquina($tr) {
     $tr.find('.dc-mcusto').text(dcMoney(unit * uso));
     dcRecalcPreview();
 }
-function dcAddInsRow(i) {
-    if (!i && !dcCacheIns.length) {
-        preReqAlerta('#alertDiario', 'Não há <strong>Insumo</strong> cadastrado. Cadastre no Estoque de Insumos para usar aqui.',
+function dcAddInsRowDef(i) {
+    if (!i && !dcCacheIns.some(function (x) { return x.categoria === 'DEFENSIVO'; })) {
+        preReqAlerta('#alertDiario', 'Não há <strong>Insumo Defensivo</strong> cadastrado. Cadastre no Estoque de Insumos para usar aqui.',
             CTX + '/view/admin/estoque.jsp', 'Cadastrar Insumo');
         return;
     }
-    $('#dcInsBody').append('<tr>' +
-        '<td><select class="form-select form-select-sm dc-ipro">' + dcInsumoOpts() + '</select></td>' +
-        '<td><input type="number" class="form-control form-control-sm dc-iqtd" min="0" step="0.001" value="0"></td>' +
-        '<td><input class="form-control form-control-sm dc-idose" maxlength="60"></td>' +
+    $('#dcInsDefBody').append('<tr>' +
+        '<td><select class="form-select form-select-sm dc-ipro">' + dcInsumoOptsCategoria('DEFENSIVO') + '</select></td>' +
+        '<td><div class="input-group input-group-sm">' +
+            '<input type="text" inputmode="decimal" class="form-control dc-idosepu" value="" placeholder="0,0000" title="Quantidade do produto, na unidade do cadastro, por litro ou kg de calda">' +
+            '<span class="input-group-text dc-iunid">—</span>' +
+        '</div></td>' +
+        '<td><input type="text" inputmode="decimal" class="form-control dc-idosetotal" value="" placeholder="0,000" title="Total de calda efetivamente aplicada"></td>' +
+        '<td><div class="input-group input-group-sm"><input type="text" class="form-control dc-iqtdtotal bg-light" readonly value="0" title="Quantidade total consumida, debitada do estoque"><span class="input-group-text dc-iunid2">—</span></div></td>' +
         '<td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger dc-rm"><i class="fas fa-trash"></i></button></td></tr>');
+    var $tr = $('#dcInsDefBody tr:last');
+    aplicarMascaraDecimal($tr.find('.dc-idosepu'), 4);
+    aplicarMascaraDecimal($tr.find('.dc-idosetotal'), 3);
     if (i) {
-        var $tr = $('#dcInsBody tr:last');
-        $tr.find('.dc-ipro').val(String(i.idInsumo)); $tr.find('.dc-iqtd').val(i.quantidade || 0); $tr.find('.dc-idose').val(i.doseAplicada || '');
+        $tr.find('.dc-ipro').val(String(i.idInsumo));
+        if (i.dosePorUnidade != null) $tr.find('.dc-idosepu').val(exibirDecimalNatural(i.dosePorUnidade, 4));
+        if (i.doseTotalAplicada != null) $tr.find('.dc-idosetotal').val(exibirDecimalNatural(i.doseTotalAplicada, 3));
     }
+    dcAtualizarLinhaInsumoDef($tr);
+}
+
+function dcAddInsRowAdu(i) {
+    if (!i && !dcCacheIns.some(function (x) { return x.categoria === 'ADUBO'; })) {
+        preReqAlerta('#alertDiario', 'Não há <strong>Insumo Adubo</strong> cadastrado. Cadastre no Estoque de Insumos para usar aqui.',
+            CTX + '/view/admin/estoque.jsp', 'Cadastrar Insumo');
+        return;
+    }
+    $('#dcInsAduBody').append('<tr>' +
+        '<td><select class="form-select form-select-sm dc-ipro">' + dcInsumoOptsCategoria('ADUBO') + '</select></td>' +
+        '<td>' +
+            '<small class="text-muted dc-irotulo1 d-block" style="line-height:1.1">Sem saco cadastrado</small>' +
+            '<input type="text" inputmode="decimal" class="form-control dc-isacos d-none" value="" placeholder="ex.: 10" title="Nº de sacos aplicados — preenche a Quantidade Aplicada automaticamente (nº sacos × peso do saco cadastrado)">' +
+        '</td>' +
+        '<td><div class="input-group input-group-sm">' +
+            '<input type="text" inputmode="decimal" class="form-control dc-iqtddireta" value="" placeholder="0,000" title="Quantidade aplicada direto, já na unidade do insumo (kg/tonelada)">' +
+            '<span class="input-group-text dc-iunid">—</span>' +
+        '</div></td>' +
+        '<td><div class="input-group input-group-sm"><input type="text" class="form-control dc-iqtdtotal bg-light" readonly value="0" title="Quantidade total consumida, debitada do estoque"><span class="input-group-text dc-iunid2">—</span></div></td>' +
+        '<td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger dc-rm"><i class="fas fa-trash"></i></button></td></tr>');
+    var $tr = $('#dcInsAduBody tr:last');
+    aplicarMascaraDecimal($tr.find('.dc-isacos'), 3);
+    aplicarMascaraDecimal($tr.find('.dc-iqtddireta'), 3);
+    if (i) {
+        $tr.find('.dc-ipro').val(String(i.idInsumo));
+        if (i.quantidadeDireta != null) $tr.find('.dc-iqtddireta').val(exibirDecimalNatural(i.quantidadeDireta, 3));
+    }
+    dcAtualizarLinhaInsumoAdu($tr);
+}
+
+/** Mostra a unidade do insumo escolhido e recalcula a quantidade total consumida (linha Defensivo: dose do produto × total de calda aplicada). */
+function dcAtualizarLinhaInsumoDef($tr) {
+    var opt = $tr.find('.dc-ipro :selected');
+    var unidade = opt.data('unidade') || '—';
+    $tr.find('.dc-iunid,.dc-iunid2').text(unidade);
+    var dosePu = lerDecimalBR($tr.find('.dc-idosepu').val());
+    var doseTotal = lerDecimalBR($tr.find('.dc-idosetotal').val());
+    $tr.find('.dc-iqtdtotal').val(exibirDecimalBR(dosePu * doseTotal, 3));
+}
+
+/**
+ * Mostra a unidade do insumo escolhido e recalcula a quantidade total consumida (linha Adubo:
+ * quantidade aplicada direto, com atalho opcional de nº de sacos × peso do saco cadastrado —
+ * mesmo padrão já usado na Entrada de Insumo do Estoque).
+ */
+function dcAtualizarLinhaInsumoAdu($tr) {
+    var opt = $tr.find('.dc-ipro :selected');
+    var unidade = opt.data('unidade') || '—';
+    var pesoEmbalagem = parseFloat(opt.data('embalagem')) || 0;
+    $tr.find('.dc-iunid,.dc-iunid2').text(unidade);
+    $tr.find('.dc-isacos').toggleClass('d-none', pesoEmbalagem <= 0);
+    $tr.find('.dc-irotulo1').text(pesoEmbalagem > 0 ? 'Nº de sacos (saco de ' + exibirDecimalNatural(pesoEmbalagem, 3) + ' ' + unidade + ', opcional)' : 'Sem saco cadastrado');
+    var sacos = lerDecimalBR($tr.find('.dc-isacos').val());
+    if (pesoEmbalagem > 0 && sacos > 0) $tr.find('.dc-iqtddireta').val(exibirDecimalNatural(sacos * pesoEmbalagem, 3));
+    var qtd = lerDecimalBR($tr.find('.dc-iqtddireta').val());
+    $tr.find('.dc-iqtdtotal').val(exibirDecimalBR(qtd, 3));
 }
 
 /**
@@ -4509,13 +4805,16 @@ function dcAddDespRow(d) {
         return;
     }
     var dis = dcDespEditavel ? '' : 'disabled';
+    var btnCell = dcDespEditavel
+        ? '<button type="button" class="btn btn-sm btn-outline-danger dc-rm" title="Remover"><i class="fas fa-trash"></i></button>'
+        : (d && d.id ? '<button type="button" class="btn btn-sm btn-outline-danger dc-rm-hist" data-tipo="despesa" data-id="' + d.id + '" title="Remover esta despesa (recalcula o custo)"><i class="fas fa-trash"></i></button>' : '');
     $('#dcDespBody').append('<tr>' +
         '<td><select class="form-select form-select-sm dc-ditem" ' + dis + '>' + dcOptDesp + '</select></td>' +
         '<td><span class="badge dc-dclass bg-secondary">—</span></td>' +
         '<td><input type="number" class="form-control form-control-sm dc-dqtd" min="0.01" step="0.01" value="1" ' + dis + '></td>' +
         '<td><input type="number" class="form-control form-control-sm dc-dvalor" min="0" step="0.01" value="0" readonly></td>' +
         '<td><input type="text" class="form-control form-control-sm dc-dsub bg-light" readonly value="R$ 0,00"></td>' +
-        '<td class="text-center">' + (dcDespEditavel ? '<button type="button" class="btn btn-sm btn-outline-danger dc-rm"><i class="fas fa-trash"></i></button>' : '') + '</td></tr>');
+        '<td class="text-center">' + btnCell + '</td></tr>');
     if (d) {
         var $tr = $('#dcDespBody tr:last');
         var $sel = $tr.find('.dc-ditem');
@@ -4581,10 +4880,19 @@ function dcRecalcPreview() {
             return;
         }
         var opt = $(this).find('.dc-fpessoa :selected'); if (!opt.val()) return;
-        var tipo = opt.data('tipo'); var ref = Number(opt.data('ref') || 0); var refExtra = Number(opt.data('refextra') || 0);
-        var horas = dcParseHoras($(this).find('.dc-fhoras').val());
-        // Valor é sempre calculado a partir do cadastro do funcionário (custo/hora CLT, diária ou empreita fixa).
-        var valor = dcValorFuncionario(tipo, ref, refExtra, horas);
+        var valor;
+        if ($(this).find('.dc-fregime').val() === 'PRODUCAO') {
+            // Colheita por caixa: independe do cadastro do funcionário (CLT/diária/empreita) —
+            // anula o cálculo padrão do contrato para esta linha.
+            var caixas = Number($(this).find('.dc-fcaixas').val()) || 0;
+            var precoCx = Number($(this).find('.dc-fprecocaixa').val()) || 0;
+            valor = caixas * precoCx;
+        } else {
+            var tipo = opt.data('tipo'); var ref = Number(opt.data('ref') || 0); var refExtra = Number(opt.data('refextra') || 0);
+            var horas = dcParseHoras($(this).find('.dc-fhoras').val());
+            // Valor é sempre calculado a partir do cadastro do funcionário (custo/hora CLT, diária ou empreita fixa).
+            valor = dcValorFuncionario(tipo, ref, refExtra, horas);
+        }
         $(this).find('.dc-fvalor').val(valor.toFixed(2));
         total += valor;
     });
@@ -4594,9 +4902,17 @@ function dcRecalcPreview() {
         var unit = isVeic ? Number(opt.data('ck') || 0) : Number(opt.data('ch') || 0);
         total += unit * (Number($(this).find('.dc-muso').val()) || 0);
     });
-    $('#dcInsBody tr').each(function () {
+    $('#dcInsDefBody tr').each(function () {
         var opt = $(this).find('.dc-ipro :selected'); if (!opt.val()) return;
-        total += Number(opt.data('preco') || 0) * (Number($(this).find('.dc-iqtd').val()) || 0);
+        dcAtualizarLinhaInsumoDef($(this));
+        var qtdTotal = lerDecimalBR($(this).find('.dc-iqtdtotal').val());
+        total += Number(opt.data('preco') || 0) * qtdTotal;
+    });
+    $('#dcInsAduBody tr').each(function () {
+        var opt = $(this).find('.dc-ipro :selected'); if (!opt.val()) return;
+        dcAtualizarLinhaInsumoAdu($(this));
+        var qtdTotal = lerDecimalBR($(this).find('.dc-iqtdtotal').val());
+        total += Number(opt.data('preco') || 0) * qtdTotal;
     });
     $('#dcDespBody tr').each(function () {
         var opt = $(this).find('.dc-ditem :selected'); if (!opt.val()) return;
@@ -4608,27 +4924,64 @@ function dcRecalcPreview() {
 }
 
 function dcSalvar() {
-    var funcionarios = [];
+    var ehColheita = dcEhColheita();
+    var funcionarios = [], caixasInvalidas = false, precoInvalido = false;
     $('#dcFuncBody tr').each(function () {
         var id = $(this).find('.dc-fpessoa').val(); if (!id) return;
+        var regime = ehColheita ? ($(this).find('.dc-fregime').val() || null) : null;
+        var caixas = null, precoCx = null;
+        if (ehColheita) {
+            // Caixas colhidas vale pros dois regimes (é volume físico, não forma de pagamento);
+            // preço/caixa só importa em PRODUCAO, que é quem tem o pagamento calculado por ele.
+            caixas = parseFloat($(this).find('.dc-fcaixas').val()) || 0;
+            if (caixas <= 0) caixasInvalidas = true;
+            if (regime === 'PRODUCAO') {
+                precoCx = parseFloat($(this).find('.dc-fprecocaixa').val()) || 0;
+                if (precoCx <= 0) precoInvalido = true;
+            }
+        }
         funcionarios.push({ idPessoa: parseInt(id), tipoFuncionario: $(this).find('.dc-ftipo').val(),
             horasTrabalhadas: dcParseHoras($(this).find('.dc-fhoras').val()),
-            valorContratado: parseFloat($(this).find('.dc-fvalor').val()) || 0 });
+            valorContratado: parseFloat($(this).find('.dc-fvalor').val()) || 0,
+            regimeTrabalho: regime, quantidadeCaixas: caixas, precoPorCaixa: precoCx });
     });
+    if (caixasInvalidas) {
+        $('#alertDiario').removeClass('d-none').addClass('alert-danger')
+            .text('Informe a quantidade de caixas colhidas (maior que zero) para cada funcionário.');
+        return;
+    }
+    if (precoInvalido) {
+        $('#alertDiario').removeClass('d-none').addClass('alert-danger')
+            .text('Para funcionários em regime de produção, informe o preço por caixa maior que zero.');
+        return;
+    }
     var maquinas = [];
     $('#dcMaqBody tr').each(function () {
         var opt = $(this).find('.dc-mmaq :selected'); var idMaq = opt.val(); if (!idMaq) return;
         var isVeic = (opt.data('tipo') === 'VEICULO'); var uso = parseFloat($(this).find('.dc-muso').val()) || 0;
         maquinas.push({ idMaquina: parseInt(idMaq), horasTrabalhadas: isVeic ? 0 : uso, km: isVeic ? uso : 0 });
     });
+    // quantidade não é mais enviada: o servidor calcula dosePorUnidade × doseTotalAplicada (defensivo)
+    // ou usa quantidadeDireta direto (adubo) — ver DiarioCampoDAO.inserirInsumo. Qual das duas formas
+    // vale é determinado por qual das duas tabelas (Defensivo/Adubo) a linha está, não mais por um
+    // atributo de categoria no próprio insumo.
     var insumos = [], insumoInvalido = false;
-    $('#dcInsBody tr').each(function () {
-        var id = $(this).find('.dc-ipro').val(); var qtd = parseFloat($(this).find('.dc-iqtd').val()) || 0;
-        if (!id && qtd === 0) return;
-        if (!id || qtd <= 0) { insumoInvalido = true; return; }
-        insumos.push({ idInsumo: parseInt(id), quantidade: qtd, doseAplicada: $(this).find('.dc-idose').val() });
+    $('#dcInsDefBody tr').each(function () {
+        var id = $(this).find('.dc-ipro').val();
+        var dosePu = lerDecimalBR($(this).find('.dc-idosepu').val());
+        var doseTotal = lerDecimalBR($(this).find('.dc-idosetotal').val());
+        if (!id && dosePu === 0 && doseTotal === 0) return;
+        if (!id || dosePu <= 0 || doseTotal <= 0) { insumoInvalido = true; return; }
+        insumos.push({ idInsumo: parseInt(id), dosePorUnidade: dosePu, doseTotalAplicada: doseTotal });
     });
-    if (insumoInvalido) { $('#alertDiario').removeClass('d-none').addClass('alert-danger').text('Cada insumo precisa de produto e quantidade > 0.'); return; }
+    $('#dcInsAduBody tr').each(function () {
+        var id = $(this).find('.dc-ipro').val();
+        var qtdDireta = lerDecimalBR($(this).find('.dc-iqtddireta').val());
+        if (!id && qtdDireta === 0) return;
+        if (!id || qtdDireta <= 0) { insumoInvalido = true; return; }
+        insumos.push({ idInsumo: parseInt(id), quantidadeDireta: qtdDireta });
+    });
+    if (insumoInvalido) { $('#alertDiario').removeClass('d-none').addClass('alert-danger').text('Cada insumo precisa de produto e quantidade aplicada: dose por litro/kg + dose total aplicada (defensivo), ou quantidade aplicada (adubo), todos maiores que zero.'); return; }
     var despesas = [], despesaInvalida = false;
     $('#dcDespBody tr').each(function () {
         var id = $(this).find('.dc-ditem').val();
@@ -4678,6 +5031,26 @@ function dcSalvar() {
     });
 }
 
+/**
+ * Transição PLANEJADA→EM_ANDAMENTO (mesma regra de negócio do endpoint "status")
+ * antes de abrir o modal de edição. Sem isso, "Iniciar execução" chamava dcEditar
+ * direto com o diário ainda PLANEJADA — a seção "Registrar Nova Execução" só
+ * aparece quando o status já é EM_ANDAMENTO, então o usuário via a mensagem
+ * "use Registrar nova execução abaixo" apontando para uma seção escondida, sem
+ * nenhum jeito de lançar funcionário/despesa na primeira abertura.
+ */
+function dcIniciarExecucao(id) {
+    $.ajax({
+        url: AGRO_CTX + '/ControllerDiarioCampo', method: 'POST', contentType: 'application/json; charset=utf-8',
+        data: JSON.stringify({ acao: 'status', iddiario: id, status: 'EM_ANDAMENTO' }),
+        success: function (res) {
+            if (res.ok) { dcCarregarLista(); dcEditar(id); }
+            else mostrarAlerta(res.msg, 'danger', '#alertPerfil');
+        },
+        error: function (xhr) { var m = 'Erro ao iniciar execução.'; try { m = JSON.parse(xhr.responseText).msg || m; } catch (e) {} mostrarAlerta(m, 'danger', '#alertPerfil'); }
+    });
+}
+
 /** Carrega um diário existente no formulário para edição. */
 function dcEditar(id) {
     $.getJSON(AGRO_CTX + '/ControllerDiarioCampo?id=' + id, function (d) {
@@ -4685,7 +5058,13 @@ function dcEditar(id) {
         dcFuncEditavel = false;
         dcDespEditavel = false;
         $('#btnAddFunc,#btnAddDesp').addClass('d-none');
-        $('#dcFuncSoNaExecucao,#dcDespSoNaExecucao').removeClass('d-none');
+        // Sem lançamento anterior (ex.: diário recém-passado de PLANEJADA para Execução), a tabela
+        // de cima ficaria vazia e somente-leitura ao lado da mesma coisa em "Registrar Nova
+        // Execução" — redundante. Só mostra a tabela/aviso de cima quando há histórico para revisar.
+        var temFunc = (d.funcionarios || []).length > 0;
+        var temDesp = (d.despesas || []).length > 0;
+        $('#dcFuncHeader,#dcFuncTableWrap,#dcFuncSoNaExecucao').toggleClass('d-none', !temFunc);
+        $('#dcDespHeader,#dcDespTableWrap,#dcDespSoNaExecucao').toggleClass('d-none', !temDesp);
         $('#dcModalTitulo').text('Editar Diário ' + (d.numeroDiario || ''));
         $('#dcId').val(d.idDiario); $('#dcStatus').val(d.status); $('#dcNumero').val(d.numeroDiario);
         // PLANEJADA (agendamento) não tem opção neste modal — "Iniciar execução" já entra como Execução.
@@ -4694,10 +5073,12 @@ function dcEditar(id) {
         $('#dcCultura').val(d.idCultura ? String(d.idCultura) : '');
         $('#dcCulturaNome').val(d.culturaNome || '');
         $('#dcTipo').val(String(d.idTipoAtividade));
+        dcAtualizarVisibilidadeInsumos();
         $('#dcDescricao').val(d.descricao || ''); $('#dcObs').val(d.observacoes || '');
         (d.funcionarios || []).forEach(function (f) { dcAddFuncRow(f); });
         (d.maquinas || []).forEach(function (m) { dcAddMaqRow(m); });
-        (d.insumos || []).forEach(function (i) { dcAddInsRow(i); });
+        // quantidadeDireta preenchido = foi lançado como Adubo; senão, Defensivo (dose×calda).
+        (d.insumos || []).forEach(function (i) { if (i.quantidadeDireta != null) dcAddInsRowAdu(i); else dcAddInsRowDef(i); });
         (d.despesas || []).forEach(function (x) { dcAddDespRow(x); });
         // Responsável definido após montar as linhas (as opções vêm dos funcionários adicionados)
         dcAtualizarResponsavel();
@@ -4722,17 +5103,31 @@ function dcAddExecFuncRow() {
     $('#exFuncBody').append('<tr>' +
         '<td><select class="form-select form-select-sm ex-fpessoa">' + dcOptFunc + '</select></td>' +
         '<td><input class="form-control form-control-sm ex-ftipo" readonly placeholder="—" style="width:90px"></td>' +
-        '<td><input type="text" class="form-control form-control-sm ex-fhoras" placeholder="2h30 / 45min / 1,5" value=""></td>' +
+        '<td class="dc-col-regime d-none"><select class="form-select form-select-sm ex-fregime">' +
+            '<option value="REGIME_SISTEMA">Sistema</option><option value="PRODUCAO">Produção (caixa)</option></select></td>' +
+        '<td>' +
+            '<input type="text" class="form-control form-control-sm ex-fhoras" placeholder="2h30 / 45min / 1,5" value="">' +
+            '<input type="number" class="form-control form-control-sm ex-fcaixas mt-1 d-none" placeholder="Caixas colhidas" min="0.01" step="0.01">' +
+            '<input type="number" class="form-control form-control-sm ex-fprecocaixa mt-1 d-none" placeholder="Preço/caixa" min="0.01" step="0.01">' +
+        '</td>' +
         '<td><input type="number" class="form-control form-control-sm ex-fvalor bg-light" readonly value="0"></td>' +
         '<td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger ex-rm"><i class="fas fa-trash"></i></button></td></tr>');
+    dcAtualizarVisibilidadeColheita();
 }
 
 function dcExecRecalcPreview() {
     $('#exFuncBody tr').each(function () {
         var opt = $(this).find('.ex-fpessoa :selected'); if (!opt.val()) return;
-        var tipo = opt.data('tipo'); var ref = Number(opt.data('ref') || 0); var refExtra = Number(opt.data('refextra') || 0);
-        var horas = dcParseHoras($(this).find('.ex-fhoras').val());
-        var valor = dcValorFuncionario(tipo, ref, refExtra, horas);
+        var valor;
+        if ($(this).find('.ex-fregime').val() === 'PRODUCAO') {
+            var caixas = Number($(this).find('.ex-fcaixas').val()) || 0;
+            var precoCx = Number($(this).find('.ex-fprecocaixa').val()) || 0;
+            valor = caixas * precoCx;
+        } else {
+            var tipo = opt.data('tipo'); var ref = Number(opt.data('ref') || 0); var refExtra = Number(opt.data('refextra') || 0);
+            var horas = dcParseHoras($(this).find('.ex-fhoras').val());
+            valor = dcValorFuncionario(tipo, ref, refExtra, horas);
+        }
         $(this).find('.ex-fvalor').val(valor.toFixed(2));
     });
 }
@@ -4741,13 +5136,35 @@ function dcSalvarExecucao() {
     var iddiario = parseInt($('#dcId').val()) || 0;
     var dataExec = $('#exData').val();
     if (!iddiario || !dataExec) { $('#alertDiario').removeClass('d-none').addClass('alert-danger').text('Data da execução é obrigatória.'); return; }
-    var funcionarios = [];
+    var ehColheita = dcEhColheita();
+    var funcionarios = [], caixasInvalidas = false, precoInvalido = false;
     $('#exFuncBody tr').each(function () {
         var id = $(this).find('.ex-fpessoa').val(); if (!id) return;
+        var regime = ehColheita ? ($(this).find('.ex-fregime').val() || null) : null;
+        var caixas = null, precoCx = null;
+        if (ehColheita) {
+            caixas = parseFloat($(this).find('.ex-fcaixas').val()) || 0;
+            if (caixas <= 0) caixasInvalidas = true;
+            if (regime === 'PRODUCAO') {
+                precoCx = parseFloat($(this).find('.ex-fprecocaixa').val()) || 0;
+                if (precoCx <= 0) precoInvalido = true;
+            }
+        }
         funcionarios.push({ idPessoa: parseInt(id), tipoFuncionario: $(this).find('.ex-ftipo').val(),
             horasTrabalhadas: dcParseHoras($(this).find('.ex-fhoras').val()),
-            valorContratado: parseFloat($(this).find('.ex-fvalor').val()) || 0 });
+            valorContratado: parseFloat($(this).find('.ex-fvalor').val()) || 0,
+            regimeTrabalho: regime, quantidadeCaixas: caixas, precoPorCaixa: precoCx });
     });
+    if (caixasInvalidas) {
+        $('#alertDiario').removeClass('d-none').addClass('alert-danger')
+            .text('Informe a quantidade de caixas colhidas (maior que zero) para cada funcionário.');
+        return;
+    }
+    if (precoInvalido) {
+        $('#alertDiario').removeClass('d-none').addClass('alert-danger')
+            .text('Para funcionários em regime de produção, informe o preço por caixa maior que zero.');
+        return;
+    }
     var despesas = [];
     $('#exDespBody tr').each(function () {
         var id = $(this).find('.ex-ditem').val(); if (!id) return;
@@ -4770,7 +5187,7 @@ function dcVerDetalhe(id) {
     $.getJSON(AGRO_CTX + '/ControllerDiarioCampo?id=' + id, function (d) {
         $('#ddNumero').text(d.numeroDiario || '');
         var h = '<div class="row g-2 mb-2">' +
-            '<div class="col-4"><small class="text-muted">Data</small><div>' + (d.data || '—') + '</div></div>' +
+            '<div class="col-4"><small class="text-muted">Data</small><div>' + formatarData(d.data) + '</div></div>' +
             '<div class="col-4"><small class="text-muted">Talhão</small><div>' + (d.quadraNome || '—') + '</div></div>' +
             '<div class="col-4"><small class="text-muted">Cultura</small><div>' + (d.culturaNome || '—') + '</div></div>' +
             '<div class="col-4"><small class="text-muted">Atividade</small><div>' + (d.tipoAtividadeNome || '—') + '</div></div>' +
@@ -4788,9 +5205,9 @@ function dcVerDetalhe(id) {
             arr.forEach(function (o) { s += '<tr>'; cols.forEach(function (c) { s += '<td>' + c[1](o) + '</td>'; }); s += '</tr>'; });
             return s + '</tbody></table>';
         }
-        h += bloco('Funcionários', d.funcionarios, [['Nome', function (o) { return o.nomePessoa || o.idPessoa; }], ['Tipo', function (o) { return o.tipoFuncionario || ''; }], ['Execução', function (o) { return o.dataExecucao ? formatarData(o.dataExecucao) : ''; }], ['Horas', function (o) { return o.horasTrabalhadas; }], ['Custo', function (o) { return dcMoney(o.custo); }]]);
+        h += bloco('Funcionários', d.funcionarios, [['Nome', function (o) { return o.nomePessoa || o.idPessoa; }], ['Tipo', function (o) { return o.tipoFuncionario || ''; }], ['Execução', function (o) { return o.dataExecucao ? formatarData(o.dataExecucao) : ''; }], ['Regime', function (o) { return o.regimeTrabalho === 'PRODUCAO' ? 'Produção' : (o.regimeTrabalho === 'REGIME_SISTEMA' ? 'Sistema' : ''); }], ['Horas', function (o) { return o.horasTrabalhadas; }], ['Caixas', function (o) { return o.quantidadeCaixas != null ? o.quantidadeCaixas : '—'; }], ['Custo', function (o) { return dcMoney(o.custo); }]]);
         h += bloco('Máquinas', d.maquinas, [['Maquinário', function (o) { return o.nome || ''; }], ['Categoria', function (o) { return o.categoria || ''; }], ['Uso', function (o) { return (o.categoria === 'VEICULO' ? o.km + ' km' : o.horasTrabalhadas + ' h'); }], ['Custo', function (o) { return dcMoney(o.custo); }]]);
-        h += bloco('Insumos', d.insumos, [['Insumo', function (o) { return o.insumoNome || o.idInsumo; }], ['Qtd', function (o) { return o.quantidade + ' ' + (o.unidade || ''); }], ['Custo', function (o) { return dcMoney(o.custo); }], ['Baixado', function (o) { return o.baixado ? 'Sim' : 'Não'; }]]);
+        h += bloco('Insumos', d.insumos, [['Insumo', function (o) { return o.insumoNome || o.idInsumo; }], ['Dose (por L/kg)', function (o) { return o.dosePorUnidade != null ? o.dosePorUnidade : '—'; }], ['Dose Total Aplicada', function (o) { return o.doseTotalAplicada != null ? o.doseTotalAplicada : '—'; }], ['Qtd. Total Aplicada', function (o) { return o.quantidade + ' ' + (o.unidade || ''); }], ['Custo', function (o) { return dcMoney(o.custo); }], ['Baixado', function (o) { return o.baixado ? 'Sim' : 'Não'; }]]);
         h += bloco('Despesas', d.despesas, [['Despesa', function (o) { return o.descricao || o.idDespesaCusto; }], ['Classif.', function (o) { return o.classificacao === 'VARIAVEL' ? 'Variável' : 'Fixo'; }], ['Execução', function (o) { return o.dataExecucao ? formatarData(o.dataExecucao) : ''; }], ['Qtd', function (o) { return o.quantidade; }], ['Valor unit.', function (o) { return dcMoney(o.valorUnitario); }], ['Subtotal', function (o) { return dcMoney(o.valor); }]]);
         $('#ddCorpo').html(h);
         var podeFinalizar = (d.status === 'PLANEJADA' || d.status === 'EM_ANDAMENTO');
@@ -5546,6 +5963,7 @@ function CarregarInsumos() {
                 }
             },
             { "data": "precoMedio", "className": "text-end", "render": function (v) { return "R$ " + formatBRLnum(v); } },
+            { "data": "valorTotal", "className": "text-end", "render": function (v) { return "R$ " + formatBRLnum(v); } },
             { "data": null, "className": "text-end", "render": function (row) { return fmtQtd(row.estoqueMinimo) + " " + (row.unidade || ""); } },
             {
                 "data": "situacao", "render": function (v) {
@@ -5603,6 +6021,7 @@ function abrirModalNovoInsumo() {
     $("#insGrandeza").val("MASSA");
     popularUnidades("MASSA");
     $("#insMinimo").val("0");
+    $("#insPesoEmbalagem").val("");
     carregarFornecedoresInsumo("insFornecedor", true, dcAtualizarHintFornecedor);
     $("#modalInsumo").modal("show");
 }
@@ -5621,7 +6040,8 @@ function abrirModalEditarInsumo(id) {
         $("#insCategoria").val(i.categoria);
         $("#insGrandeza").val(i.grandeza);
         popularUnidades(i.grandeza, i.unidade);
-        $("#insMinimo").val(i.estoqueMinimo);
+        $("#insMinimo").val(exibirDecimalNatural(i.estoqueMinimo, 3));
+        $("#insPesoEmbalagem").val(i.pesoEmbalagem != null ? exibirDecimalNatural(i.pesoEmbalagem, 3) : "");
         // seta o fornecedor só APÓS carregar as opções (evita corrida)
         carregarFornecedoresInsumo("insFornecedor", true, function (lista) {
             dcAtualizarHintFornecedor(lista);
@@ -5640,7 +6060,8 @@ function salvarInsumo() {
         categoria: $("#insCategoria").val(),
         grandeza: $("#insGrandeza").val(),
         unidade: $("#insUnidade").val(),
-        estoqueMinimo: parseFloat($("#insMinimo").val() || "0"),
+        estoqueMinimo: lerDecimalBR($("#insMinimo").val()),
+        pesoEmbalagem: lerDecimalBR($("#insPesoEmbalagem").val()),
         idFornecedor: $("#insFornecedor").val() ? parseInt($("#insFornecedor").val()) : 0,
         situacao: true
     };
@@ -5677,8 +6098,34 @@ function toggleInsumo(id, situacaoAtual) {
 function preencherSelectInsumos(selectId) {
     const $s = $("#" + selectId).empty();
     insumosCache.filter(i => i.situacao).forEach(function (i) {
-        $s.append(`<option value="${i.idInsumo}" data-disp="${i.quantidadeDisponivel}" data-un="${i.unidade}">${i.nome} (${i.unidade})</option>`);
+        $s.append(`<option value="${i.idInsumo}" data-disp="${i.quantidadeDisponivel}" data-un="${i.unidade}" data-embalagem="${i.pesoEmbalagem || ''}">${i.nome} (${i.unidade})</option>`);
     });
+}
+
+/** Mostra/esconde o atalho "nº de sacos" na Entrada conforme o insumo escolhido tenha peso de embalagem cadastrado. */
+function atualizarBlocoSacosEntrada() {
+    const opt = $("#entInsumo").find(":selected");
+    const peso = parseFloat(opt.data("embalagem")) || 0;
+    $("#entSacos,#entPrecoSaco").val("");
+    if (peso > 0) {
+        $("#entPesoSaco").text(fmtQtd(peso) + " " + (opt.data("un") || ""));
+        $("#entBlocoSacos").removeClass("d-none");
+    } else {
+        $("#entBlocoSacos").addClass("d-none");
+    }
+}
+
+/**
+ * Nº de sacos × peso do saco preenche a Quantidade automaticamente, e preço por saco ÷ peso do
+ * saco preenche o Preço unitário — ambos só um atalho; os dois campos continuam editáveis.
+ */
+function calcularQtdPorSacos() {
+    const opt = $("#entInsumo").find(":selected");
+    const peso = parseFloat(opt.data("embalagem")) || 0;
+    const sacos = lerDecimalBR($("#entSacos").val());
+    const precoSaco = lerDecimalBR($("#entPrecoSaco").val());
+    if (peso > 0 && sacos > 0) $("#entQtd").val(exibirDecimalNatural(peso * sacos, 3));
+    if (peso > 0 && precoSaco > 0) $("#entPreco").val(exibirDecimalBR(precoSaco / peso, 2));
 }
 
 function abrirEntrada() {
@@ -5699,6 +6146,7 @@ function abrirEntrada() {
         forns.forEach(function (f) { $s.append('<option value="' + f.idPessoa + '">' + f.nome + '</option>'); });
         $("#entQtd").val(""); $("#entPreco").val(""); $("#entObs").val("");
         $("#entData").val(new Date().toISOString().slice(0, 10));
+        atualizarBlocoSacosEntrada();
         $("#modalEntrada").modal("show");
     });
 }
@@ -5708,8 +6156,8 @@ function salvarEntrada() {
         acao: "entrada",
         idInsumo: parseInt($("#entInsumo").val()),
         idParceiro: $("#entFornecedor").val() ? parseInt($("#entFornecedor").val()) : 0,
-        quantidade: parseFloat($("#entQtd").val() || "0"),
-        precoUnitario: parseFloat($("#entPreco").val() || "0"),
+        quantidade: lerDecimalBR($("#entQtd").val()),
+        precoUnitario: lerDecimalBR($("#entPreco").val()),
         data: $("#entData").val(),
         observacao: $("#entObs").val()
     };
@@ -5752,7 +6200,7 @@ function salvarSaida() {
     const data = {
         acao: "saida",
         idInsumo: parseInt($("#saiInsumo").val()),
-        quantidade: parseFloat($("#saiQtd").val() || "0"),
+        quantidade: lerDecimalBR($("#saiQtd").val()),
         data: $("#saiData").val(),
         observacao: $("#saiObs").val()
     };
@@ -5805,6 +6253,17 @@ $(document).ready(function () {
     carregarResumoEstoque();
     autoRefreshTabela('insumos', function () { CarregarInsumos(); carregarResumoEstoque(); }, 15000);
 
+    // Máscara decimal BR nos campos de quantidade/peso (nunca <input type="number"> puro — ver
+    // aplicarMascaraDecimal). Precisa ser aplicada ANTES dos handlers de input abaixo, pra quem lê o
+    // valor (calcularQtdPorSacos) sempre receber o texto já higienizado.
+    aplicarMascaraDecimal($('#insMinimo'), 3);
+    aplicarMascaraDecimal($('#insPesoEmbalagem'), 3);
+    aplicarMascaraDecimal($('#entQtd'), 3);
+    aplicarMascaraDecimal($('#entSacos'), 2);
+    aplicarMascaraDecimal($('#entPrecoSaco'), 2);
+    aplicarMascaraDecimal($('#entPreco'), 2);
+    aplicarMascaraDecimal($('#saiQtd'), 3);
+
     $("#filtroCategoria").on("change", CarregarInsumos);
     $("#insGrandeza").on("change", function () { popularUnidades($(this).val()); });
     $("#btnNovoInsumo").on("click", abrirModalNovoInsumo);
@@ -5814,4 +6273,118 @@ $(document).ready(function () {
     $("#btnSaida").on("click", abrirSaida);
     $("#btnSalvarSaida").on("click", salvarSaida);
     $("#saiInsumo").on("change", atualizarDisponivelSaida);
+    $("#entInsumo").on("change", atualizarBlocoSacosEntrada);
+    $("#entSacos,#entPrecoSaco").on("input", calcularQtdPorSacos);
+});
+
+/* ========================================================================================== */
+/* MÓDULO COLHEITA E ESTOQUE — colheitaestoque.jsp                                            */
+/* ========================================================================================== */
+
+function ceBadgeStatus(s) {
+    var map = { COLHEIDO: 'bg-info text-dark', ESTOQUE: 'bg-warning text-dark', PROCESSADO: 'bg-primary', FINALIZADO: 'bg-secondary' };
+    var rot = { COLHEIDO: 'Colhido', ESTOQUE: 'Em estoque', PROCESSADO: 'Processado', FINALIZADO: 'Finalizado' };
+    return '<span class="badge ' + (map[s] || 'bg-secondary') + '">' + (rot[s] || s || '') + '</span>';
+}
+
+function ceCarregarIndicadores() {
+    $.getJSON(AGRO_CTX + '/ControllerColheita?indicadores=1', function (ind) {
+        $('#ceCardTotal').text(Number(ind.totalGeral || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }));
+        var porStatus = ind.porStatus || {};
+        function saldo(st) { return porStatus[st] ? Number(porStatus[st].qtdTotal || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '0,00'; }
+        $('#ceCardEstoque').text(saldo('ESTOQUE'));
+        $('#ceCardProcessado').text(saldo('PROCESSADO'));
+        $('#ceCardFinalizado').text(saldo('FINALIZADO'));
+    });
+}
+
+function ceCarregarLista() {
+    var status = $('#ceFiltroStatus').val();
+    var url = AGRO_CTX + '/ControllerColheita' + (status ? '?status=' + status : '');
+    $.getJSON(url, function (lista) {
+        var $b = $('#ceTabelaBody').empty();
+        if (!lista.length) { $b.append('<tr><td colspan="10" class="text-center text-muted py-3">Nenhum lote de colheita.</td></tr>'); return; }
+        lista.forEach(function (l) {
+            var saldoQtd = (Number(l.quantidadeTotal || 0) - Number(l.quantidadeProcessada || 0));
+            var acoes = '';
+            if (l.status !== 'FINALIZADO') {
+                if (saldoQtd > 0) acoes += '<button class="btn btn-sm btn-outline-primary ms-1" onclick="ceProcessar(' + l.idLote + ',' + saldoQtd + ')">Processar</button>';
+                acoes += '<button class="btn btn-sm btn-outline-secondary ms-1" onclick="ceFinalizar(' + l.idLote + ')">Finalizar</button>';
+            }
+            $b.append('<tr><td>' + (l.numeroDiario || '') + '</td><td>' + formatarData(l.dataColheita) + '</td>' +
+                '<td>' + (l.quadraNome || '—') + '</td><td>' + (l.siglaArea || '—') + '</td><td>' + (l.culturaNome || '—') + '</td>' +
+                '<td class="text-end">' + Number(l.quantidadeTotal || 0).toFixed(2) + ' ' + (l.unidade || 'CX') + '</td>' +
+                '<td class="text-end">' + Number(l.quantidadeProcessada || 0).toFixed(2) + '</td>' +
+                '<td class="text-end">' + saldoQtd.toFixed(2) + '</td>' +
+                '<td>' + ceBadgeStatus(l.status) + '</td>' +
+                '<td class="text-end">' + acoes + '</td></tr>');
+        });
+    });
+}
+
+/**
+ * Processa uma QUANTIDADE do saldo em estoque — não precisa ser o saldo inteiro (o que não for
+ * processado agora continua em estoque, e pode ser processado depois em outra chamada). É a forma
+ * dinâmica de lidar com "nem sempre vai ser processado tudo": o lote só vira PROCESSADO quando o
+ * acumulado bater a quantidade total; até lá fica em ESTOQUE com o saldo restante.
+ */
+function ceProcessar(idLote, saldoAtual) {
+    var txt = prompt('Quantidade a processar agora (saldo em estoque: ' + Number(saldoAtual).toFixed(2) + '):', Number(saldoAtual).toFixed(2));
+    if (txt === null) return;
+    var qtd = parseFloat(txt.replace(',', '.'));
+    if (!qtd || qtd <= 0) { mostrarAlerta('Quantidade inválida.', 'danger', '#alertaColheita'); return; }
+    $.ajax({
+        url: AGRO_CTX + '/ControllerColheita', method: 'POST', contentType: 'application/json; charset=utf-8',
+        data: JSON.stringify({ acao: 'processar', idlote: idLote, quantidade: qtd }),
+        success: function (res) {
+            mostrarAlerta(res.msg, res.ok ? 'success' : 'danger', '#alertaColheita');
+            ceCarregarLista(); ceCarregarIndicadores();
+        },
+        error: function (xhr) { var m = 'Erro ao registrar processamento.'; try { m = JSON.parse(xhr.responseText).msg || m; } catch (e) {} mostrarAlerta(m, 'danger', '#alertaColheita'); }
+    });
+}
+
+function ceFinalizar(idLote) {
+    if (!confirm('Finalizar este lote? Não será possível processar mais nada nele depois.')) return;
+    $.ajax({
+        url: AGRO_CTX + '/ControllerColheita', method: 'POST', contentType: 'application/json; charset=utf-8',
+        data: JSON.stringify({ acao: 'finalizar', idlote: idLote }),
+        success: function (res) {
+            mostrarAlerta(res.msg, res.ok ? 'success' : 'danger', '#alertaColheita');
+            ceCarregarLista(); ceCarregarIndicadores();
+        },
+        error: function (xhr) { var m = 'Erro ao finalizar lote.'; try { m = JSON.parse(xhr.responseText).msg || m; } catch (e) {} mostrarAlerta(m, 'danger', '#alertaColheita'); }
+    });
+}
+
+/** Botão "Cadastrar Colheita": escolhe a área e redireciona pro Diário de Campo dela (modal abre sozinho). */
+function ceCarregarAreas() {
+    $.getJSON(AGRO_CTX + '/ControllerAreaProducao', function (areas) {
+        var opt = '<option value="">Selecione</option>';
+        areas.filter(function (a) { return a.situacao; }).forEach(function (a) {
+            opt += '<option value="' + a.idAreaProducao + '">' + a.PropriedadeAreaProducao + ' (' + a.SiglasAreaProducao + ')</option>';
+        });
+        $('#ceSelecionarArea').html(opt);
+    });
+}
+
+function initColheitaEstoque() {
+    ceCarregarIndicadores();
+    ceCarregarLista();
+    $('#ceFiltroStatus').off('change').on('change', ceCarregarLista);
+    $('#btnCadastrarColheita').off('click').on('click', function () {
+        ceCarregarAreas();
+        $('#modalEscolherArea').modal('show');
+    });
+    $('#btnIrParaColheita').off('click').on('click', function () {
+        var idArea = $('#ceSelecionarArea').val();
+        if (!idArea) { mostrarAlerta('Selecione uma área.', 'danger', '#alertaColheita'); return; }
+        window.location.href = AGRO_CTX + '/view/admin/DetalheAreaProducao.jsp?id=' + idArea + '&abrirColheita=1';
+    });
+}
+
+/* ========== colheitaestoque.jsp init ========== */
+$(document).ready(function () {
+    if (!$('#ceTabelaBody').length) return;
+    initColheitaEstoque();
 });

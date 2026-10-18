@@ -40,6 +40,7 @@
     <div class="col-12"><div class="card shadow-sm">
       <div class="card-header bg-white fw-bold"><i class="fas fa-layer-group me-2"></i>Composição do Custo (COE + Fixas)</div>
       <div class="card-body">
+        <div class="table-responsive">
         <table class="table table-sm">
           <thead class="table-light"><tr><th>Componente</th><th class="text-end">Valor</th><th class="text-end">%</th></tr></thead>
           <tbody>
@@ -51,6 +52,7 @@
           </tbody>
           <tfoot><tr class="fw-bold"><td>Custo Total</td><td class="text-end" id="rsTotalFoot">R$ 0,00</td><td class="text-end">100%</td></tr></tfoot>
         </table>
+        </div>
         <div class="progress" style="height:22px;" id="rsBarra"></div>
       </div>
     </div></div>

@@ -198,13 +198,39 @@ public class DiarioCampoDAO {
 
     private void inserirFuncionario(Connection c, int idDiario, DiarioFuncionario f, LocalDate dataExecucao) throws SQLException {
         String tipo = f.getTipoFuncionario() != null ? f.getTipoFuncionario() : resolverTipo(c, f.getIdPessoa());
+
+        // Regime PRODUCAO (colheita por caixa) é independente do tipo de contrato: qualquer
+        // CLT/DIARISTA/EMPREITA pode ser pago só pela caixa nesta atividade. O valor é
+        // calculado aqui (nunca confia no total enviado pelo cliente); horas_trabalhadas é
+        // forçado a zero — essa linha não entra no rateio de diária/hora do dia (P1-6/P1-11
+        // continuam valendo para quem estiver em REGIME_SISTEMA).
+        //
+        // quantidade_caixas é INDEPENDENTE do regime: é o volume que a pessoa colheu, registrado
+        // sempre que a linha pertence a uma atividade de Colheita (regimeTrabalho não-nulo),
+        // mesmo que ela continue sendo paga pelo regime normal do contrato — senão o total do
+        // lote (Módulo Colheita) subcontaria a colheita de quem não está em regime de produção.
+        // preco_por_caixa/valor_regime continuam exclusivos de PRODUCAO: só ali o preço afeta o
+        // pagamento.
+        boolean ehLinhaColheita = f.getRegimeTrabalho() != null;
+        boolean regimeProducao = "PRODUCAO".equals(f.getRegimeTrabalho());
+        BigDecimal horas = regimeProducao ? BigDecimal.ZERO : nz(f.getHorasTrabalhadas());
+        BigDecimal qtdCaixas = ehLinhaColheita ? nz(f.getQuantidadeCaixas()) : null;
+        BigDecimal precoCaixa = regimeProducao ? nz(f.getPrecoPorCaixa()) : null;
+        BigDecimal valorRegime = regimeProducao
+                ? nz(f.getQuantidadeCaixas()).multiply(nz(f.getPrecoPorCaixa())).setScale(2, RoundingMode.HALF_UP)
+                : null;
+
         String sql = "INSERT INTO diario_funcionario (iddiario, idpessoa, tipo_funcionario, funcao_exercida, "
-                + "horas_trabalhadas, custo_hora, valor_contratado, custo, data_execucao) VALUES (?,?,?,?,?,0,?,0,?)";
+                + "horas_trabalhadas, custo_hora, valor_contratado, custo, data_execucao, "
+                + "regime_trabalho, quantidade_caixas, preco_por_caixa, valor_regime) VALUES (?,?,?,?,?,0,?,0,?,?,?,?,?)";
         try (PreparedStatement st = c.prepareStatement(sql)) {
             st.setInt(1, idDiario); st.setInt(2, f.getIdPessoa()); st.setString(3, tipo);
-            st.setString(4, f.getFuncaoExercida()); st.setBigDecimal(5, nz(f.getHorasTrabalhadas()));
+            st.setString(4, f.getFuncaoExercida()); st.setBigDecimal(5, horas);
             st.setBigDecimal(6, nz(f.getValorContratado()));
             st.setDate(7, Date.valueOf(f.getDataExecucao() != null ? f.getDataExecucao() : dataExecucao));
+            st.setString(8, f.getRegimeTrabalho());
+            setBigDecimalOrNull(st, 9, qtdCaixas); setBigDecimalOrNull(st, 10, precoCaixa);
+            setBigDecimalOrNull(st, 11, valorRegime);
             st.executeUpdate();
         }
     }
@@ -229,13 +255,34 @@ public class DiarioCampoDAO {
         }
     }
 
+    /**
+     * quantidade (o que será debitado do estoque ao finalizar) NUNCA vem do cliente — é calculada
+     * aqui de uma de duas formas, mutuamente exclusivas:
+     *   - DEFENSIVO (aplicação por calda): dosePorUnidade × doseTotalAplicada. Ex.: dose de 2 mL
+     *     por litro de calda, 300 L de calda aplicados → 600 mL do produto consumidos.
+     *   - ADUBO (aplicação direta, sem calda): quantidadeDireta usada como veio — já é a
+     *     quantidade final na unidade do insumo (normalmente calculada no cliente a partir do nº
+     *     de sacos × peso do saco cadastrado, mas o "nº de sacos" em si não é enviado nem
+     *     conferido aqui, só o resultado).
+     * Quem decide qual delas vale é a presença de quantidadeDireta>0; sem ela, cai no modelo dose×
+     * total (mesmo que venha tudo zerado — a validação de obrigatoriedade é do Controller).
+     */
     private void inserirInsumo(Connection c, int idDiario, DiarioInsumo i) throws SQLException {
         String unidade = unidadeInsumo(c, i.getIdInsumo());
-        String sql = "INSERT INTO diario_insumo (iddiario, id_insumo, quantidade, unidade, dose_aplicada, "
-                + "custo_unitario, custo, baixado) VALUES (?,?,?,?,?,0,0,false)";
+        boolean porQuantidadeDireta = i.getQuantidadeDireta() != null && i.getQuantidadeDireta().signum() > 0;
+        BigDecimal dosePorUnidade = porQuantidadeDireta ? null : nz(i.getDosePorUnidade());
+        BigDecimal doseTotalAplicada = porQuantidadeDireta ? null : nz(i.getDoseTotalAplicada());
+        BigDecimal quantidade = porQuantidadeDireta
+                ? i.getQuantidadeDireta().setScale(3, RoundingMode.HALF_UP)
+                : dosePorUnidade.multiply(doseTotalAplicada).setScale(3, RoundingMode.HALF_UP);
+        String sql = "INSERT INTO diario_insumo (iddiario, id_insumo, quantidade, unidade, "
+                + "dose_por_unidade, dose_total_aplicada, quantidade_direta, custo_unitario, custo, baixado) "
+                + "VALUES (?,?,?,?,?,?,?,0,0,false)";
         try (PreparedStatement st = c.prepareStatement(sql)) {
-            st.setInt(1, idDiario); st.setInt(2, i.getIdInsumo()); st.setBigDecimal(3, nz(i.getQuantidade()));
-            st.setString(4, unidade); st.setString(5, i.getDoseAplicada());
+            st.setInt(1, idDiario); st.setInt(2, i.getIdInsumo()); st.setBigDecimal(3, quantidade);
+            st.setString(4, unidade);
+            setBigDecimalOrNull(st, 5, dosePorUnidade); setBigDecimalOrNull(st, 6, doseTotalAplicada);
+            setBigDecimalOrNull(st, 7, porQuantidadeDireta ? quantidade : null);
             st.executeUpdate();
         }
     }
@@ -296,9 +343,17 @@ public class DiarioCampoDAO {
             BigDecimal valorContratado = (BigDecimal) f[4];
             int idpessoa = (int) f[5];
             LocalDate dataExec = (LocalDate) f[6];
+            String regime = (String) f[7]; BigDecimal valorRegime = (BigDecimal) f[8];
             BigDecimal custoHora = BigDecimal.ZERO, custo;
 
-            if ("CLT".equalsIgnoreCase(tipo)) {
+            if ("PRODUCAO".equals(regime)) {
+                // Colheita por caixa: independente do tipo de contrato (CLT/DIARISTA/EMPREITA),
+                // esta linha é paga só pelo valor já calculado no lançamento — anula diária/
+                // hora/valor-contratado do dia para esta pessoa. Não entra no rateio de diária
+                // (só as linhas DIARISTA em REGIME_SISTEMA, abaixo, alimentam esse rateio).
+                custo = nz(valorRegime).setScale(2, RoundingMode.HALF_UP);
+
+            } else if ("CLT".equalsIgnoreCase(tipo)) {
                 // Acima de 8h: as 8h normais ao valor da hora normal + o excedente
                 // ao valor da hora extra (cadastrado no vínculo/funcionarioclt, ou
                 // 1,5x a hora normal na ausência de valor cadastrado — mesma regra
@@ -522,9 +577,87 @@ public class DiarioCampoDAO {
                         + "data_realizada=COALESCE(data_realizada, CURRENT_DATE) WHERE iddiario=?")) {
                     st.setInt(1, idDiario); st.executeUpdate();
                 }
+                criarLoteColheitaSeAplicavel(c, idDiario);
                 c.commit();
             } catch (SQLException | EstoqueInsuficienteException e) { c.rollback(); throw e; }
             finally { c.setAutoCommit(true); }
+        }
+    }
+
+    /**
+     * Ao finalizar um diário cujo tipo de atividade é "Colheita", consolida num lote (1 por
+     * diário, {@code uk_colheita_lote_diario}) a soma de {@code quantidade_caixas} de todas as
+     * linhas em regime PRODUCAO — módulo de Colheita e Estoque. Diário sem nenhum lançamento em
+     * regime PRODUCAO não gera lote (nada foi colhido por caixa; colheita em REGIME_SISTEMA não
+     * produz volume rastreado aqui). Idempotente (ON CONFLICT) porque finalizar só roda uma vez,
+     * mas fica seguro caso essa consolidação precise ser reexecutada no futuro.
+     */
+    private void criarLoteColheitaSeAplicavel(Connection c, int idDiario) throws SQLException {
+        String nomeTipo; Integer idQuadra; Integer idCultura; LocalDate data; BigDecimal qtd;
+        // Soma de TODAS as linhas de mão de obra desta atividade (regime_trabalho não-nulo =
+        // linha de Colheita), independente de PRODUCAO ou REGIME_SISTEMA — o volume colhido por
+        // quem está no regime normal do contrato conta pro total do lote do mesmo jeito.
+        String sql = "SELECT t.nome, d.id_quadra, d.id_cultura, d.data, "
+                + "COALESCE((SELECT SUM(df.quantidade_caixas) FROM diario_funcionario df "
+                + "           WHERE df.iddiario=d.iddiario AND df.regime_trabalho IS NOT NULL),0) AS qtd "
+                + "FROM diario_campo d JOIN diario_tipo_atividade t ON t.idtipo=d.id_tipo_atividade "
+                + "WHERE d.iddiario=?";
+        try (PreparedStatement st = c.prepareStatement(sql)) {
+            st.setInt(1, idDiario);
+            try (ResultSet rs = st.executeQuery()) {
+                if (!rs.next()) return;
+                nomeTipo = rs.getString(1);
+                idQuadra = (Integer) rs.getObject(2);
+                idCultura = (Integer) rs.getObject(3);
+                Date d = rs.getDate(4); data = d != null ? d.toLocalDate() : LocalDate.now();
+                qtd = nz(rs.getBigDecimal(5));
+            }
+        }
+        if (nomeTipo == null || !nomeTipo.toLowerCase().contains("colh")) return;
+        if (qtd.signum() <= 0) return;
+
+        try (PreparedStatement st = c.prepareStatement(
+                "INSERT INTO colheita_lote (iddiario, id_quadra, id_cultura, data_colheita, quantidade_total, status) "
+              + "VALUES (?,?,?,?,?,'COLHEIDO') "
+              + "ON CONFLICT (iddiario) DO UPDATE SET quantidade_total=EXCLUDED.quantidade_total, atualizado_em=now()")) {
+            st.setInt(1, idDiario); setIntOrNull(st, 2, idQuadra); setIntOrNull(st, 3, idCultura);
+            st.setDate(4, Date.valueOf(data)); st.setBigDecimal(5, qtd);
+            st.executeUpdate();
+        }
+    }
+
+    /**
+     * Datas em que a pessoa foi paga em regime PRODUCAO (colheita por caixa) num diário, no mês
+     * informado — usado pela folha (ex. {@link Service.FolhaCalculoRuralService}) para tratar
+     * esses dias como "modo alternativo" (mesmo mecanismo já usado para produção/empreita
+     * avulsos): não conta falta nem hora extra CLT, porque a pessoa já foi paga pela caixa.
+     */
+    public List<LocalDate> listarDiasRegimeProducao(int idpessoa, String periodo) throws SQLException {
+        String sql = "SELECT DISTINCT df.data_execucao FROM diario_funcionario df "
+                + "JOIN diario_campo d ON d.iddiario = df.iddiario "
+                + "WHERE df.idpessoa=? AND df.regime_trabalho='PRODUCAO' "
+                + "AND TO_CHAR(df.data_execucao,'YYYY-MM')=? AND COALESCE(d.status,'') <> 'CANCELADA'";
+        List<LocalDate> out = new ArrayList<>();
+        try (Connection c = new PostgresConnection().getConnection();
+             PreparedStatement st = c.prepareStatement(sql)) {
+            st.setInt(1, idpessoa); st.setString(2, periodo);
+            try (ResultSet rs = st.executeQuery()) {
+                while (rs.next()) { Date d = rs.getDate(1); if (d != null) out.add(d.toLocalDate()); }
+            }
+        }
+        return out;
+    }
+
+    /** Soma paga em regime PRODUCAO (colheita por caixa) no mês — some ao bruto da folha (CLT). */
+    public BigDecimal somarValorRegimeProducao(int idpessoa, String periodo) throws SQLException {
+        String sql = "SELECT COALESCE(SUM(df.valor_regime),0) FROM diario_funcionario df "
+                + "JOIN diario_campo d ON d.iddiario = df.iddiario "
+                + "WHERE df.idpessoa=? AND df.regime_trabalho='PRODUCAO' "
+                + "AND TO_CHAR(df.data_execucao,'YYYY-MM')=? AND COALESCE(d.status,'') <> 'CANCELADA'";
+        try (Connection c = new PostgresConnection().getConnection();
+             PreparedStatement st = c.prepareStatement(sql)) {
+            st.setInt(1, idpessoa); st.setString(2, periodo);
+            try (ResultSet rs = st.executeQuery()) { return rs.next() ? nz(rs.getBigDecimal(1)) : BigDecimal.ZERO; }
         }
     }
 
@@ -562,6 +695,72 @@ public class DiarioCampoDAO {
                 recalcularCustos(c, idDiario);
                 c.commit();
             } catch (SQLException e) { c.rollback(); throw e; }
+            finally { c.setAutoCommit(true); }
+        }
+    }
+
+    /**
+     * Remove um lançamento de mão de obra já salvo (ex.: funcionário/horas errados numa execução)
+     * e recalcula os custos. Diário CONCLUIDA não pode ser alterado — o custo já é um retrato
+     * fechado e o estoque já foi baixado.
+     *
+     * <p>Cuidado com DIARISTA: {@link #recalcularCustos(Connection, int)} só repropaga o rateio da
+     * diária para os OUTROS diários do mesmo dia quando sobra alguma linha desta pessoa/data NESTE
+     * diário (é o loop sobre {@code carregarFuncBrutos} que alimenta a lista a ratear). Se a linha
+     * removida era a ÚNICA desta pessoa/data aqui, esse loop não tem mais nada para ratear e os
+     * demais diários ficariam com o rateio antigo — cada um pensando que ainda dividia a diária com
+     * uma linha que não existe mais, ou seja, subestimando o próprio valor. Por isso a repropagação
+     * é chamada aqui explicitamente, com os dados da linha ANTES de apagá-la.</p>
+     */
+    public void removerFuncionario(int idDiario, int idLinha) throws SQLException {
+        try (Connection c = new PostgresConnection().getConnection()) {
+            c.setAutoCommit(false);
+            try {
+                String status = statusAtual(c, idDiario);
+                if (status == null) throw new IllegalArgumentException("Diário não encontrado.");
+                if ("CONCLUIDA".equals(status))
+                    throw new IllegalArgumentException("Diário concluído não pode ser editado.");
+
+                String tipo = null; int idpessoa = 0; LocalDate dataExec = null;
+                try (PreparedStatement st = c.prepareStatement(
+                        "SELECT tipo_funcionario, idpessoa, data_execucao FROM diario_funcionario WHERE id=? AND iddiario=?")) {
+                    st.setInt(1, idLinha); st.setInt(2, idDiario);
+                    try (ResultSet rs = st.executeQuery()) {
+                        if (!rs.next()) throw new IllegalArgumentException("Lançamento não encontrado neste diário.");
+                        tipo = rs.getString(1); idpessoa = rs.getInt(2);
+                        Date d = rs.getDate(3); dataExec = d != null ? d.toLocalDate() : null;
+                    }
+                }
+                try (PreparedStatement st = c.prepareStatement("DELETE FROM diario_funcionario WHERE id=?")) {
+                    st.setInt(1, idLinha); st.executeUpdate();
+                }
+                recalcularCustos(c, idDiario);
+                if ("DIARISTA".equalsIgnoreCase(tipo) && dataExec != null) {
+                    ratearDiariaNosDemaisDiarios(c, idpessoa, dataExec, idDiario);
+                }
+                c.commit();
+            } catch (SQLException | RuntimeException e) { c.rollback(); throw e; }
+            finally { c.setAutoCommit(true); }
+        }
+    }
+
+    /** Remove uma despesa já salva (ex.: item/valor errado numa execução) e recalcula os custos. */
+    public void removerDespesa(int idDiario, int idLinha) throws SQLException {
+        try (Connection c = new PostgresConnection().getConnection()) {
+            c.setAutoCommit(false);
+            try {
+                String status = statusAtual(c, idDiario);
+                if (status == null) throw new IllegalArgumentException("Diário não encontrado.");
+                if ("CONCLUIDA".equals(status))
+                    throw new IllegalArgumentException("Diário concluído não pode ser editado.");
+                int n;
+                try (PreparedStatement st = c.prepareStatement("DELETE FROM diario_despesa WHERE id=? AND iddiario=?")) {
+                    st.setInt(1, idLinha); st.setInt(2, idDiario); n = st.executeUpdate();
+                }
+                if (n == 0) throw new IllegalArgumentException("Despesa não encontrada neste diário.");
+                recalcularCustos(c, idDiario);
+                c.commit();
+            } catch (SQLException | RuntimeException e) { c.rollback(); throw e; }
             finally { c.setAutoCommit(true); }
         }
     }
@@ -977,13 +1176,14 @@ public class DiarioCampoDAO {
         List<Object[]> l = new ArrayList<>();
         try (PreparedStatement st = c.prepareStatement(
                 "SELECT id, tipo_funcionario, horas_trabalhadas, custo_hora, valor_contratado, "
-              + "idpessoa, data_execucao FROM diario_funcionario WHERE iddiario=?")) {
+              + "idpessoa, data_execucao, regime_trabalho, valor_regime FROM diario_funcionario WHERE iddiario=?")) {
             st.setInt(1, idDiario);
             try (ResultSet rs = st.executeQuery()) {
                 while (rs.next()) l.add(new Object[]{
                     rs.getInt(1), rs.getString(2), rs.getBigDecimal(3), rs.getBigDecimal(4),
                     rs.getBigDecimal(5), rs.getInt(6),
-                    rs.getDate(7) != null ? rs.getDate(7).toLocalDate() : null });
+                    rs.getDate(7) != null ? rs.getDate(7).toLocalDate() : null,
+                    rs.getString(8), rs.getBigDecimal(9) });
             }
         }
         return l;
@@ -1020,6 +1220,10 @@ public class DiarioCampoDAO {
                 f.setCustoHora(rs.getBigDecimal("custo_hora")); f.setValorContratado(rs.getBigDecimal("valor_contratado"));
                 f.setCusto(rs.getBigDecimal("custo"));
                 Date de = rs.getDate("data_execucao"); f.setDataExecucao(de != null ? de.toLocalDate() : null);
+                f.setRegimeTrabalho(rs.getString("regime_trabalho"));
+                f.setQuantidadeCaixas(rs.getBigDecimal("quantidade_caixas"));
+                f.setPrecoPorCaixa(rs.getBigDecimal("preco_por_caixa"));
+                f.setValorRegime(rs.getBigDecimal("valor_regime"));
                 l.add(f);
             }
         }
@@ -1049,7 +1253,10 @@ public class DiarioCampoDAO {
                 DiarioInsumo i = new DiarioInsumo();
                 i.setId(rs.getInt("id")); i.setIdDiario(idDiario); i.setIdInsumo(rs.getInt("id_insumo"));
                 i.setInsumoNome(rs.getString("insumo_nome")); i.setQuantidade(rs.getBigDecimal("quantidade"));
-                i.setUnidade(rs.getString("unidade")); i.setDoseAplicada(rs.getString("dose_aplicada"));
+                i.setUnidade(rs.getString("unidade"));
+                i.setDosePorUnidade(rs.getBigDecimal("dose_por_unidade"));
+                i.setDoseTotalAplicada(rs.getBigDecimal("dose_total_aplicada"));
+                i.setQuantidadeDireta(rs.getBigDecimal("quantidade_direta"));
                 i.setCustoUnitario(rs.getBigDecimal("custo_unitario")); i.setCusto(rs.getBigDecimal("custo"));
                 i.setBaixado(rs.getBoolean("baixado")); l.add(i);
             }
@@ -1108,5 +1315,8 @@ public class DiarioCampoDAO {
     }
     private static void setTimeOrNull(PreparedStatement st, int i, java.time.LocalTime t) throws SQLException {
         if (t != null) st.setTime(i, Time.valueOf(t)); else st.setNull(i, Types.TIME);
+    }
+    private static void setBigDecimalOrNull(PreparedStatement st, int i, BigDecimal v) throws SQLException {
+        if (v != null) st.setBigDecimal(i, v); else st.setNull(i, Types.NUMERIC);
     }
 }

@@ -136,6 +136,9 @@ public class ControllerInsumo extends HttpServlet {
         i.setEstoqueMinimo(getBD(jo, "estoqueMinimo"));
         i.setIdFornecedor(getIntObj(jo, "idFornecedor"));
         i.setSituacao(!jo.has("situacao") || jo.get("situacao").getAsBoolean());
+        // Opcional: 0/ausente vira NULL (o CHECK do banco só aceita peso_embalagem > 0 ou NULL).
+        BigDecimal pesoEmbalagem = getBD(jo, "pesoEmbalagem");
+        i.setPesoEmbalagem(pesoEmbalagem != null && pesoEmbalagem.signum() > 0 ? pesoEmbalagem : null);
 
         if (update) {
             i.setIdInsumo(getInt(jo, "idInsumo"));

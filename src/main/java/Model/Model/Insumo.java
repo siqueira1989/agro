@@ -20,6 +20,10 @@ public class Insumo {
     private Integer idFornecedor;         // parceiro tipo INSUMO (opcional/padrão)
     private String fornecedorNome;        // preenchido só para exibição
     private boolean situacao = true;
+    // Peso/volume de 1 saco ou embalagem padrão (mesma unidade do insumo, ex.: 50 = saco de 50kg).
+    // Opcional — atalho de conversão na Entrada de estoque; não afeta o saldo em si (que continua
+    // sempre em `unidade`).
+    private BigDecimal pesoEmbalagem;
 
     public int getIdInsumo() { return idInsumo; }
     public void setIdInsumo(int idInsumo) { this.idInsumo = idInsumo; }
@@ -53,4 +57,7 @@ public class Insumo {
 
     public boolean isSituacao() { return situacao; }
     public void setSituacao(boolean situacao) { this.situacao = situacao; }
+
+    public BigDecimal getPesoEmbalagem() { return pesoEmbalagem; }
+    public void setPesoEmbalagem(BigDecimal pesoEmbalagem) { this.pesoEmbalagem = pesoEmbalagem; }
 }

@@ -169,10 +169,12 @@
             <div id="alertaPreco" class="alert d-none"></div>
             <p class="small text-muted">Defina o preço por caixa. Marque "só este funcionário" para um preço específico
             (competência) que sobrepõe o preço geral do ano.</p>
+            <div class="table-responsive">
             <table class="table table-sm align-middle">
                 <thead class="table-light"><tr><th>Tipo de Caixa</th><th style="width:130px;">Preço (R$)</th><th style="width:130px;">Escopo</th><th></th></tr></thead>
                 <tbody id="bodyPrecos"></tbody>
             </table>
+            </div>
         </div>
         <div class="modal-footer">
             <button class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>

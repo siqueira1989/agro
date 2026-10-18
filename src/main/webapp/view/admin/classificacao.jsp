@@ -12,19 +12,17 @@
         </header>
 
         <div class="container-fluid content mt-3">
-            <div class="bg-success text-white p-3 rounded mb-4">
+            <div class="bg-success text-white p-3 rounded mb-3 d-flex justify-content-between align-items-center">
                 <h2 class="m-0"><i class="fas fa-tags"></i> Classificações</h2>
+                      <button id="btnCadastro" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalCadastro">
+                    <i class="fas fa-plus"></i> Nova Classificação
+                </button>
             </div>
 
             <!--  Alert principal -->
 
             <div id="alerta" class="alert d-none" role="alert"></div>
 
-            <div class="mb-3">
-                <button id="btnCadastro" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalCadastro">
-                    <i class="fas fa-plus"></i> Nova Classificação
-                </button>
-            </div>
 
             <div class="table-responsive rounded shadow-custom m-2 p-2">
                 <table id="tabelaClassificacao" class="table table-bordered table-striped">

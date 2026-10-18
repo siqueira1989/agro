@@ -46,6 +46,15 @@ public class TipoAtividadeDAO {
         }
     }
 
+    /** Nome do tipo pelo id, ou null se não existir. */
+    public String buscarNome(int idTipo) throws SQLException {
+        try (Connection c = new PostgresConnection().getConnection();
+             PreparedStatement st = c.prepareStatement("SELECT nome FROM diario_tipo_atividade WHERE idtipo=?")) {
+            st.setInt(1, idTipo);
+            try (ResultSet rs = st.executeQuery()) { return rs.next() ? rs.getString(1) : null; }
+        }
+    }
+
     public boolean existe(int idTipo) throws SQLException {
         try (Connection c = new PostgresConnection().getConnection();
              PreparedStatement st = c.prepareStatement("SELECT 1 FROM diario_tipo_atividade WHERE idtipo=?")) {

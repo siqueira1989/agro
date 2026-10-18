@@ -104,7 +104,7 @@
 
 <!-- MODAL: Novo Diário -->
 <div class="modal fade" id="modalNovoDiario" tabindex="-1">
-  <div class="modal-dialog modal-xl"><div class="modal-content">
+  <div class="modal-dialog modal-xl modal-fullscreen-sm-down"><div class="modal-content">
     <div class="modal-header bg-success text-white">
       <h5 class="modal-title"><i class="fas fa-book me-2"></i><span id="dcModalTitulo">Novo Diário de Campo</span></h5>
       <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
@@ -144,16 +144,16 @@
       </div>
       <div class="mt-2"><span class="badge bg-light text-dark border"><i class="fas fa-seedling me-1 text-success"></i>Safra vinculada: <strong id="dcSafraNome">—</strong></span></div>
 
-      <!-- Funcionários -->
-      <div class="d-flex justify-content-between align-items-center mt-3 mb-1">
+      <!-- Funcionários (escondido na edição quando não há lançamento anterior — evita duplicar com "Registrar Nova Execução" abaixo) -->
+      <div id="dcFuncHeader" class="d-flex justify-content-between align-items-center mt-3 mb-1">
         <h6 class="fw-bold text-secondary mb-0"><i class="fas fa-users me-1"></i>Funcionários</h6>
-        <button class="btn btn-outline-secondary btn-sm" type="button" id="btnAddFunc"><i class="fas fa-plus me-1"></i>Adicionar</button>
+        <button class="btn btn-outline-primary btn-sm" type="button" id="btnAddFunc"><i class="fas fa-user-plus me-1"></i>Funcionário</button>
       </div>
-      <div class="table-responsive"><table class="table table-sm align-middle mb-2">
-        <thead class="table-light"><tr><th style="width:30%">Funcionário</th><th>Tipo</th><th style="width:14%">Horas</th><th style="width:18%">Valor (auto)</th><th></th></tr></thead>
+      <div id="dcFuncTableWrap" class="table-responsive"><table class="table table-sm align-middle mb-2">
+        <thead class="table-light"><tr><th style="width:26%">Funcionário</th><th>Tipo</th><th class="dc-col-regime d-none" style="width:14%">Regime</th><th style="width:16%">Horas / Caixas</th><th style="width:16%">Valor (auto)</th><th></th></tr></thead>
         <tbody id="dcFuncBody"></tbody></table></div>
       <div id="dcFuncSoNaExecucao" class="alert alert-info py-2 small d-none">
-        <i class="fas fa-circle-info me-1"></i>Ao editar um diário já criado, os funcionários ficam somente leitura — use
+        <i class="fas fa-circle-info me-1"></i>Estes são os lançamentos de execuções anteriores, agora somente leitura — use
         <strong>"Registrar nova execução"</strong> abaixo para adicionar colaboradores de outro dia (o custo soma tudo).
       </div>
       <div id="dcBlocoExecucao" class="border rounded p-2 mb-2 d-none">
@@ -164,15 +164,15 @@
           <div class="col-md-4"><label class="form-label small mb-0">Data da execução *</label><input type="date" class="form-control form-control-sm" id="exData"></div>
         </div>
         <div class="table-responsive mt-2"><table class="table table-sm align-middle mb-2">
-          <thead class="table-light"><tr><th style="width:30%">Funcionário</th><th>Tipo</th><th style="width:16%">Horas</th><th style="width:18%">Valor (auto)</th><th></th></tr></thead>
+          <thead class="table-light"><tr><th style="width:26%">Funcionário</th><th>Tipo</th><th class="dc-col-regime d-none" style="width:14%">Regime</th><th style="width:16%">Horas / Caixas</th><th style="width:16%">Valor (auto)</th><th></th></tr></thead>
           <tbody id="exFuncBody"></tbody></table></div>
-        <button type="button" class="btn btn-outline-secondary btn-sm" id="btnAddExecFunc"><i class="fas fa-plus me-1"></i>Adicionar colaborador</button>
+        <button type="button" class="btn btn-outline-primary btn-sm" id="btnAddExecFunc"><i class="fas fa-user-plus me-1"></i>Colaborador</button>
 
         <h6 class="fw-bold text-secondary mb-0 mt-3"><i class="fas fa-receipt me-1"></i>Despesas desta execução</h6>
         <div class="table-responsive mt-2"><table class="table table-sm align-middle mb-2">
           <thead class="table-light"><tr><th style="width:26%">Despesa</th><th>Classif.</th><th style="width:12%">Qtd</th><th style="width:16%">Valor unit.</th><th style="width:16%">Subtotal</th><th></th></tr></thead>
           <tbody id="exDespBody"></tbody></table></div>
-        <button type="button" class="btn btn-outline-secondary btn-sm" id="btnAddExecDesp"><i class="fas fa-plus me-1"></i>Adicionar despesa</button>
+        <button type="button" class="btn btn-outline-warning btn-sm" id="btnAddExecDesp"><i class="fas fa-receipt me-1"></i>Despesa</button>
 
         <button type="button" class="btn btn-success btn-sm float-end" id="btnSalvarExecucao"><i class="fas fa-save me-1"></i>Salvar Execução</button>
       </div>
@@ -180,31 +180,42 @@
       <!-- Máquinas -->
       <div class="d-flex justify-content-between align-items-center mt-2 mb-1">
         <h6 class="fw-bold text-secondary mb-0"><i class="fas fa-tractor me-1"></i>Máquinas</h6>
-        <button class="btn btn-outline-secondary btn-sm" type="button" id="btnAddMaq"><i class="fas fa-plus me-1"></i>Adicionar</button>
+        <button class="btn btn-outline-dark btn-sm" type="button" id="btnAddMaq"><i class="fas fa-tractor me-1"></i>Máquina</button>
       </div>
       <div class="table-responsive"><table class="table table-sm align-middle mb-2">
         <thead class="table-light"><tr><th style="width:40%">Maquinário</th><th>Uso (Horas/KM)</th><th class="text-end">Custo</th><th></th></tr></thead>
         <tbody id="dcMaqBody"></tbody></table></div>
 
-      <!-- Insumos -->
-      <div class="d-flex justify-content-between align-items-center mt-2 mb-1">
-        <h6 class="fw-bold text-secondary mb-0"><i class="fas fa-flask me-1"></i>Insumos</h6>
-        <button class="btn btn-outline-secondary btn-sm" type="button" id="btnAddIns"><i class="fas fa-plus me-1"></i>Adicionar</button>
+      <!-- Insumos - Defensivo -->
+      <div id="dcInsDefHeader" class="d-flex justify-content-between align-items-center mt-2 mb-1">
+        <h6 class="fw-bold text-secondary mb-0"><i class="fas fa-spray-can me-1"></i>Insumos — Defensivo</h6>
+        <button class="btn btn-outline-success btn-sm" type="button" id="btnAddInsDef"><i class="fas fa-flask me-1"></i>Insumo</button>
       </div>
-      <div class="table-responsive"><table class="table table-sm align-middle mb-0">
-        <thead class="table-light"><tr><th style="width:34%">Insumo</th><th>Quantidade</th><th>Dose aplicada</th><th></th></tr></thead>
-        <tbody id="dcInsBody"></tbody></table></div>
+      <small id="dcInsDefAjuda" class="text-muted d-block mb-1">Informe a dose do produto por L/kg de calda e o total de calda aplicada — a quantidade total consumida (debitada do estoque) é calculada automaticamente.</small>
+      <div id="dcInsDefTableWrap" class="table-responsive"><table class="table table-sm align-middle mb-2">
+        <thead class="table-light"><tr><th style="width:26%">Insumo</th><th style="width:22%">Dose do Produto</th><th style="width:20%">Dose Total Aplicada</th><th style="width:20%">Qtd. Total Aplicada</th><th></th></tr></thead>
+        <tbody id="dcInsDefBody"></tbody></table></div>
 
-      <!-- Despesas -->
-      <div class="d-flex justify-content-between align-items-center mt-2 mb-1">
-        <h6 class="fw-bold text-secondary mb-0"><i class="fas fa-receipt me-1"></i>Despesas</h6>
-        <button class="btn btn-outline-secondary btn-sm" type="button" id="btnAddDesp"><i class="fas fa-plus me-1"></i>Adicionar</button>
+      <!-- Insumos - Adubo -->
+      <div id="dcInsAduHeader" class="d-flex justify-content-between align-items-center mt-2 mb-1">
+        <h6 class="fw-bold text-secondary mb-0"><i class="fas fa-seedling me-1"></i>Insumos — Adubo</h6>
+        <button class="btn btn-outline-success btn-sm" type="button" id="btnAddInsAdu"><i class="fas fa-flask me-1"></i>Insumo</button>
       </div>
-      <div class="table-responsive"><table class="table table-sm align-middle mb-2">
+      <small id="dcInsAduAjuda" class="text-muted d-block mb-1">Informe a quantidade aplicada direto (ou o nº de sacos, quando o insumo tiver peso de saco cadastrado) — a quantidade total consumida (debitada do estoque) é calculada automaticamente.</small>
+      <div id="dcInsAduTableWrap" class="table-responsive"><table class="table table-sm align-middle mb-0">
+        <thead class="table-light"><tr><th style="width:26%">Insumo</th><th style="width:22%">Nº de Sacos</th><th style="width:20%">Quantidade Aplicada</th><th style="width:20%">Qtd. Total Aplicada</th><th></th></tr></thead>
+        <tbody id="dcInsAduBody"></tbody></table></div>
+
+      <!-- Despesas (escondido na edição quando não há lançamento anterior — evita duplicar com "Despesas desta execução" acima) -->
+      <div id="dcDespHeader" class="d-flex justify-content-between align-items-center mt-2 mb-1">
+        <h6 class="fw-bold text-secondary mb-0"><i class="fas fa-receipt me-1"></i>Despesas</h6>
+        <button class="btn btn-outline-warning btn-sm" type="button" id="btnAddDesp"><i class="fas fa-receipt me-1"></i>Despesa</button>
+      </div>
+      <div id="dcDespTableWrap" class="table-responsive"><table class="table table-sm align-middle mb-2">
         <thead class="table-light"><tr><th style="width:26%">Despesa</th><th>Classif.</th><th style="width:12%">Qtd</th><th style="width:16%">Valor unit.</th><th style="width:16%">Subtotal</th><th></th></tr></thead>
         <tbody id="dcDespBody"></tbody></table></div>
       <div id="dcDespSoNaExecucao" class="alert alert-info py-2 small d-none">
-        <i class="fas fa-circle-info me-1"></i>Ao editar um diário já criado, as despesas ficam somente leitura — use
+        <i class="fas fa-circle-info me-1"></i>Estes são os lançamentos de execuções anteriores, agora somente leitura — use
         <strong>"Registrar nova execução"</strong> acima para lançar novas compras (o custo soma tudo, nunca faz média).
       </div>
       <small class="text-muted">A baixa de estoque ocorre ao <strong>finalizar</strong> a atividade. O custo total é calculado e salvo automaticamente.</small>
@@ -253,7 +264,7 @@
 
 <!-- MODAL: Detalhe/Finalizar Diário -->
 <div class="modal fade" id="modalDetalheDiario" tabindex="-1">
-  <div class="modal-dialog modal-lg"><div class="modal-content">
+  <div class="modal-dialog modal-lg modal-fullscreen-sm-down"><div class="modal-content">
     <div class="modal-header bg-dark text-white">
       <h5 class="modal-title"><i class="fas fa-book me-2"></i>Diário <span id="ddNumero"></span></h5>
       <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>

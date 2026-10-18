@@ -125,7 +125,7 @@
 
         <!-- MODAL EDITAR PARCEIRO -->
         <div class="modal fade" id="modalParceiro" tabindex="-1" aria-hidden="true">
-            <div class="modal-dialog modal-lg">
+            <div class="modal-dialog modal-lg modal-fullscreen-sm-down">
                 <div class="modal-content">
                     <div class="modal-header bg-success text-white">
                         <h5 class="modal-title"><i class="fas fa-user-edit me-2"></i>Editar Parceiro</h5>

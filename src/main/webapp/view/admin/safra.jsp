@@ -30,7 +30,7 @@
 </div>
 
 <!-- MODAL Cadastro/Edição -->
-<div class="modal fade" id="modalSafra" tabindex="-1"><div class="modal-dialog modal-xl"><div class="modal-content">
+<div class="modal fade" id="modalSafra" tabindex="-1"><div class="modal-dialog modal-xl modal-fullscreen-sm-down"><div class="modal-content">
   <div class="modal-header bg-success text-white">
     <h5 class="modal-title" id="modalSafraTitulo"><i class="fas fa-seedling me-2"></i>Nova Safra</h5>
     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>

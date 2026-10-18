@@ -381,6 +381,7 @@
                             <span id="fechNome" class="float-end small opacity-75"></span>
                         </div>
                         <div class="card-body p-0">
+                            <div class="table-responsive">
                             <table class="table table-borderless mb-0">
                                 <tbody>
                                     <tr><td class="text-muted ps-3">Período</td>
@@ -406,6 +407,7 @@
                                         <td class="text-danger" id="fechVales">—</td></tr>
                                 </tbody>
                             </table>
+                            </div>
                             <div class="bg-success text-white p-3 mt-0 rounded-bottom">
                                 <div class="d-flex justify-content-between align-items-center">
                                     <strong class="fs-5">Salário Líquido</strong>

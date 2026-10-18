@@ -39,6 +39,7 @@ public class FolhaCalculoRuralService {
     private final Model.Dao.VinculoDAO vinculoDAO = new Model.Dao.VinculoDAO();
     private final Model.Dao.ProducaoCaixaDAO    producaoDAO = new Model.Dao.ProducaoCaixaDAO();
     private final Model.Dao.LancamentoEmpreitaDAO empreitaDAO = new Model.Dao.LancamentoEmpreitaDAO();
+    private final Model.Dao.DiarioCampoDAO      diarioDAO = new Model.Dao.DiarioCampoDAO();
 
     private static final BigDecimal C60 = BigDecimal.valueOf(60);
 
@@ -85,10 +86,19 @@ public class FolhaCalculoRuralService {
         for (Model.Model.LancamentoEmpreita le : empreitaDAO.listarPorMes(id, periodo)) {
             diasModoAlt.add(le.getDataEmpreita());
         }
+        // Colheita por caixa (regime PRODUCAO num diário) é o mesmo tipo de exceção pontual —
+        // qualquer CLT pode cair aqui num dia específico de colheita, sem mudar seu contrato.
+        diasModoAlt.addAll(diarioDAO.listarDiasRegimeProducao(id, periodo));
+
         BigDecimal valorProducao = producaoDAO.somarValor(id, periodo);
         BigDecimal valorEmpreita = empreitaDAO.somarPorMes(id, periodo);
         if (valorProducao == null) valorProducao = BigDecimal.ZERO;
         if (valorEmpreita == null) valorEmpreita = BigDecimal.ZERO;
+        BigDecimal valorColheita = diarioDAO.somarValorRegimeProducao(id, periodo);
+        if (valorColheita == null) valorColheita = BigDecimal.ZERO;
+        // Soma no mesmo balde de "valorProducao" (é dinheiro pago por volume produzido, mesma
+        // natureza) em vez de criar mais uma coluna só para este caso.
+        valorProducao = valorProducao.add(valorColheita);
 
         // Índices por dia
         Map<LocalDate, PontoEletronico> pontoPorDia = new HashMap<>();

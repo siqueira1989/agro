@@ -16,6 +16,13 @@ public class DiarioFuncionario {
     private BigDecimal valorContratado = BigDecimal.ZERO;  // empreita
     private BigDecimal custo = BigDecimal.ZERO;            // snapshot no finalizar
     private LocalDate dataExecucao;     // dia em que esta leva foi trabalhada (permite múltiplas execuções por diário)
+    // Regime de trabalho nesta atividade (independente do tipoFuncionario/contrato):
+    // null/REGIME_SISTEMA = cálculo padrão do contrato; PRODUCAO = pago só por caixa,
+    // anulando diária/hora/valor-contratado do dia para esta pessoa. Usado na Colheita.
+    private String regimeTrabalho;
+    private BigDecimal quantidadeCaixas;
+    private BigDecimal precoPorCaixa;
+    private BigDecimal valorRegime;     // snapshot: quantidadeCaixas * precoPorCaixa, calculado no servidor
 
     public int getId() { return id; }
     public void setId(int id) { this.id = id; }
@@ -39,4 +46,12 @@ public class DiarioFuncionario {
     public void setCusto(BigDecimal custo) { this.custo = custo; }
     public LocalDate getDataExecucao() { return dataExecucao; }
     public void setDataExecucao(LocalDate dataExecucao) { this.dataExecucao = dataExecucao; }
+    public String getRegimeTrabalho() { return regimeTrabalho; }
+    public void setRegimeTrabalho(String regimeTrabalho) { this.regimeTrabalho = regimeTrabalho; }
+    public BigDecimal getQuantidadeCaixas() { return quantidadeCaixas; }
+    public void setQuantidadeCaixas(BigDecimal quantidadeCaixas) { this.quantidadeCaixas = quantidadeCaixas; }
+    public BigDecimal getPrecoPorCaixa() { return precoPorCaixa; }
+    public void setPrecoPorCaixa(BigDecimal precoPorCaixa) { this.precoPorCaixa = precoPorCaixa; }
+    public BigDecimal getValorRegime() { return valorRegime; }
+    public void setValorRegime(BigDecimal valorRegime) { this.valorRegime = valorRegime; }
 }

@@ -356,3 +356,43 @@ table.dataTable tbody td {
 .login-header { background-color: #28a745; color: white; padding: 20px; border-radius: 4px 4px 0 0; text-align: center; }
 .btn-login { background-color: #28a745; border-color: #28a745; color: white; }
 .btn-login:hover { background-color: #218838; border-color: #1e7e34; color: white; }
+
+/* =====================================================================
+   Polimento mobile (não altera nada acima do breakpoint indicado)
+===================================================================== */
+
+/* Cabeçalhos de card/modal com título + botão(ões) não sobrepõem em telas estreitas */
+@media (max-width: 576px) {
+    .card-header.d-flex,
+    .modal-header.d-flex {
+        flex-wrap: wrap;
+        row-gap: .5rem;
+    }
+
+    /* Selects/inputs com largura fixa em px (filtros, campos "mês") viram fluidos */
+    select[style*="width"],
+    input[type="month"][style*="width"] {
+        max-width: 100%;
+    }
+
+    /* Dropdowns (ex.: alertas do Diário de Campo) não estouram a viewport */
+    .dropdown-menu {
+        max-width: calc(100vw - 2rem);
+    }
+
+    .content {
+        padding: 12px;
+    }
+}
+
+/* Alvos de toque maiores no menu colapsado (hambúrguer) */
+@media (max-width: 991.98px) {
+    .navbar-collapse .nav-link,
+    .navbar-collapse .dropdown-item {
+        padding-top: .65rem;
+        padding-bottom: .65rem;
+    }
+    .navbar-toggler {
+        padding: .5rem .65rem;
+    }
+}

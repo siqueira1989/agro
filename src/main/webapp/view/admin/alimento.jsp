@@ -15,17 +15,16 @@
         </header>
 
         <div class="container-fluid content mt-3">
-            <div class="bg-success text-white p-3 rounded mb-4">
+            <div class="bg-success text-white p-3 rounded mb-3 d-flex justify-content-between align-items-center">
                 <h2 class="m-0"> <i class="fa-solid fa-leaf me-1"></i>Alimento</h2>  
+                            <!-- Botão para abrir o modal -->
+            <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalFormulario">
+                <i class="fas fa-plus-circle me-1"></i> Novo registro
+            </button>
             </div>
           
             <div id="alerta" class="alert d-none" role="alert"></div>
-
-            <!-- Botão para abrir o modal -->
-            <button type="button" class="btn btn-primary mt-4 mb-3" data-bs-toggle="modal" data-bs-target="#modalFormulario">
-                <i class="fas fa-plus-circle me-1"></i> Novo registro
-            </button>
-            <!-- Tabela de alimentos -->
+             <!-- Tabela de alimentos -->
             <div class="table-responsive rounded shadow-custom m-2 p-2">
                 <table id="tabelaAlimento" class="table table-bordered table-striped">
                     <thead class="thead-green">

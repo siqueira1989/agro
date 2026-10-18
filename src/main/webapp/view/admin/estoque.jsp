@@ -61,7 +61,7 @@
                     <thead class="table-light">
                         <tr>
                             <th>Insumo</th><th>Categoria</th><th class="text-end">Qtd. Disponível</th>
-                            <th class="text-end">Preço Médio</th><th class="text-end">Mínimo</th>
+                            <th class="text-end">Preço Médio</th><th class="text-end">Valor Total</th><th class="text-end">Mínimo</th>
                             <th>Situação</th><th class="text-end">Ações</th>
                         </tr>
                     </thead>
@@ -110,15 +110,21 @@
             <div class="row g-2 mt-1">
                 <div class="col-md-6">
                     <label class="form-label">Estoque Mínimo</label>
-                    <input type="number" class="form-control" id="insMinimo" min="0" step="0.001" value="0">
+                    <input type="text" inputmode="decimal" class="form-control" id="insMinimo" placeholder="0,000" value="0">
                 </div>
                 <div class="col-md-6">
+                    <label class="form-label">Peso do saco/embalagem <span class="text-muted">(opcional)</span></label>
+                    <input type="text" inputmode="decimal" class="form-control" id="insPesoEmbalagem" placeholder="ex.: 50 (saco de 50kg)">
+                </div>
+            </div>
+            <div class="row g-2 mt-1">
+                <div class="col-md-12">
                     <label class="form-label">Fornecedor padrão (insumo)</label>
                     <select class="form-select" id="insFornecedor"><option value="">— nenhum —</option></select>
                     <small id="insFornecedorHint" class="text-warning d-none"><i class="fas fa-triangle-exclamation me-1"></i>Nenhum <strong>Parceiro do tipo Insumo</strong> cadastrado. <a href="${pageContext.request.contextPath}/view/admin/CadastroParceiro.jsp" class="alert-link">Cadastrar</a></small>
                 </div>
             </div>
-            <div class="mt-2 small text-muted">Quantidade e preço médio são geridos pelas movimentações (Entrada/Saída).</div>
+            <div class="mt-2 small text-muted">Quantidade e preço médio são geridos pelas movimentações (Entrada/Saída). Se o insumo tem peso de saco cadastrado, a tela de Entrada permite lançar em nº de sacos.</div>
         </div>
         <div class="modal-footer">
             <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -144,14 +150,27 @@
                 <label class="form-label">Fornecedor (tipo insumo) *</label>
                 <select class="form-select" id="entFornecedor"></select>
             </div>
+            <div id="entBlocoSacos" class="alert alert-light border py-2 mb-2 d-none">
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-6">
+                        <label class="form-label small mb-0">Nº de sacos <span class="text-muted">(saco de <span id="entPesoSaco">-</span>)</span></label>
+                        <input type="text" inputmode="decimal" class="form-control form-control-sm" id="entSacos" placeholder="ex.: 10">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small mb-0">Preço por saco (R$) <span class="text-muted">(opcional)</span></label>
+                        <input type="text" inputmode="decimal" class="form-control form-control-sm" id="entPrecoSaco" placeholder="ex.: 120,00">
+                    </div>
+                    <div class="col-12 small text-muted">Preenchem automaticamente Quantidade (nº sacos × peso do saco) e Preço unitário (preço por saco ÷ peso do saco).</div>
+                </div>
+            </div>
             <div class="row g-2">
                 <div class="col-md-6">
                     <label class="form-label">Quantidade *</label>
-                    <input type="number" class="form-control" id="entQtd" min="0.001" step="0.001">
+                    <input type="text" inputmode="decimal" class="form-control" id="entQtd" placeholder="0,000">
                 </div>
                 <div class="col-md-6">
                     <label class="form-label">Preço unitário (R$) *</label>
-                    <input type="number" class="form-control" id="entPreco" min="0" step="0.01">
+                    <input type="text" inputmode="decimal" class="form-control" id="entPreco" placeholder="0,00">
                 </div>
             </div>
             <div class="mb-2 mt-2">
@@ -188,7 +207,7 @@
             </div>
             <div class="mb-2">
                 <label class="form-label">Quantidade *</label>
-                <input type="number" class="form-control" id="saiQtd" min="0.001" step="0.001">
+                <input type="text" inputmode="decimal" class="form-control" id="saiQtd" placeholder="0,000">
             </div>
             <div class="mb-2">
                 <label class="form-label">Data</label>
@@ -208,7 +227,7 @@
 
 <!-- MODAL: Movimentações -->
 <div class="modal fade" id="modalMovimentos" tabindex="-1">
-    <div class="modal-dialog modal-lg"><div class="modal-content">
+    <div class="modal-dialog modal-lg modal-fullscreen-sm-down"><div class="modal-content">
         <div class="modal-header bg-dark text-white">
             <h5 class="modal-title"><i class="fas fa-clock-rotate-left me-2"></i>Movimentações — <span id="movInsumoNome"></span></h5>
             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>

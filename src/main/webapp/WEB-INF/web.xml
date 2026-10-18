@@ -81,6 +81,10 @@
         <servlet-class>Controller.ControllerDiarioCampo</servlet-class>
     </servlet>
     <servlet>
+        <servlet-name>ControllerColheita</servlet-name>
+        <servlet-class>Controller.ControllerColheita</servlet-class>
+    </servlet>
+    <servlet>
         <servlet-name>ControllerMaquina</servlet-name>
         <servlet-class>Controller.ControllerMaquina</servlet-class>
     </servlet>
@@ -159,6 +163,10 @@
     <servlet-mapping>
         <servlet-name>ControllerDiarioCampo</servlet-name>
         <url-pattern>/ControllerDiarioCampo</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>ControllerColheita</servlet-name>
+        <url-pattern>/ControllerColheita</url-pattern>
     </servlet-mapping>
     <servlet-mapping>
         <servlet-name>ControllerMaquina</servlet-name>
