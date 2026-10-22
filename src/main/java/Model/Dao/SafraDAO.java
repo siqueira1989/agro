@@ -229,6 +229,9 @@ public class SafraDAO {
                 r.put("areaDestinadaHa", t.getAreaDestinadaHa());
                 r.put("participacaoPct", part.multiply(new BigDecimal(100)).setScale(2, RoundingMode.HALF_UP));
                 r.put("custoRateado", custoRateado); r.put("custoReal", custoReal);
+                // Pendências (PLANEJADA/EM_ANDAMENTO): só informativas — não entram no custo.
+                Object[] pend = pendenciasTalhao(c, t.getIdQuadra(), s.getDataInicial(), s.getDataFinal());
+                r.put("qtdPendentes", pend[0]); r.put("valorPendente", pend[1]);
                 rateio.add(r);
             }
 
@@ -254,6 +257,17 @@ public class SafraDAO {
             ps.setInt(1, idQuadra); ps.setDate(2, Date.valueOf(ini)); ps.setDate(3, Date.valueOf(fim));
             ResultSet rs = ps.executeQuery();
             return rs.next() ? nz(rs.getBigDecimal(1)) : BigDecimal.ZERO;
+        }
+    }
+
+    /** Qtd e soma de custo_total das atividades PLANEJADA/EM_ANDAMENTO do talhão no período: {Integer, BigDecimal}. */
+    private Object[] pendenciasTalhao(Connection c, int idQuadra, LocalDate ini, LocalDate fim) throws SQLException {
+        String sql = "SELECT COUNT(*), COALESCE(SUM(custo_total),0) FROM diario_campo WHERE id_quadra=? AND data BETWEEN ? AND ? "
+                + "AND status IN ('PLANEJADA','EM_ANDAMENTO')";
+        try (PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, idQuadra); ps.setDate(2, Date.valueOf(ini)); ps.setDate(3, Date.valueOf(fim));
+            ResultSet rs = ps.executeQuery();
+            return rs.next() ? new Object[]{ rs.getInt(1), nz(rs.getBigDecimal(2)) } : new Object[]{ 0, BigDecimal.ZERO };
         }
     }
 

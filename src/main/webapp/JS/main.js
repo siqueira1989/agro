@@ -5481,8 +5481,13 @@ $(document).ready(function () {
         var alimentos = [], vistos = {};
         rsCacheRateio.forEach(function (x) { if (x.alimento && !vistos[x.alimento]) { vistos[x.alimento] = true; alimentos.push(x.alimento); } });
         var optsAlim = '<option value="">Todos</option>';
-        alimentos.sort().forEach(function (a) { optsAlim += '<option value="' + a + '">' + a + '</option>'; });
+        alimentos.sort().forEach(function (a) { optsAlim += '<option value="' + rsEsc(a) + '">' + rsEsc(a) + '</option>'; });
         $('#rsFiltroAlimento').html(optsAlim);
+        // Sem despesas fixas os totais das duas colunas coincidem — a frase sobre a diferença só aparece quando há fixas.
+        $('#rsRateioNota').text((Number(r.despesasFixas) > 0
+            ? 'O custo dividido inclui as Despesas Fixas da safra (' + sfMoney(r.despesasFixas) +
+              '), que não são lançadas por quadra; por isso os totais das colunas não coincidem. '
+            : '') + 'Só atividades concluídas entram no custo.');
         rsRenderRateio();
     });
     $('#rsFiltroAlimento').off('change').on('change', rsRenderRateio);
@@ -5495,16 +5500,42 @@ function rsRenderRateio() {
     var filtro = $('#rsFiltroAlimento').val();
     var lista = filtro ? rsCacheRateio.filter(function (x) { return x.alimento === filtro; }) : rsCacheRateio;
     var $b = $('#rsRateioBody').empty();
-    if (!lista.length) $b.append('<tr><td colspan="6" class="text-center text-muted py-2">Sem talhões.</td></tr>');
-    var totalRateado = 0, totalReal = 0;
+    if (!lista.length) $b.append('<tr><td colspan="7" class="text-center text-muted py-2">Sem talhões.</td></tr>');
+    var totalRateado = 0, totalReal = 0, totalDif = 0, totalPendQtd = 0, totalPendValor = 0;
     lista.forEach(function (x) {
-        totalRateado += Number(x.custoRateado) || 0; totalReal += Number(x.custoReal) || 0;
-        $b.append('<tr><td>' + x.talhao + '</td><td>' + (x.alimento || '—') + '</td><td class="text-end">' + Number(x.numeroPlantas).toLocaleString('pt-BR') +
-            '</td><td class="text-end">' + x.participacaoPct + '%</td><td class="text-end">' + sfMoney(x.custoRateado) +
-            '</td><td class="text-end">' + sfMoney(x.custoReal) + '</td></tr>');
+        var rateado = Number(x.custoRateado) || 0, real = Number(x.custoReal) || 0;
+        var qtdPend = Number(x.qtdPendentes) || 0, valPend = Number(x.valorPendente) || 0;
+        totalRateado += rateado; totalReal += real; totalPendQtd += qtdPend; totalPendValor += valPend;
+        var badge = qtdPend > 0
+            ? ' <span class="badge bg-warning text-dark" title="Atividades planejadas/em andamento: só entram no custo depois de finalizadas no Diário de Campo.">' +
+              qtdPend + ' em andamento (' + sfMoney(valPend) + ')</span>'
+            : '';
+        var semLanc = real === 0 && qtdPend === 0;
+        var celReal = semLanc ? '<span class="text-muted fst-italic small">Sem lançamentos</span>' : sfMoney(real) + badge;
+        var celDif = '';
+        if (!semLanc) {
+            var dif = real - rateado; totalDif += dif;
+            celDif = '<span class="' + rsClasseDif(dif) + '">' + sfMoney(dif) + '</span>';
+        }
+        $b.append('<tr><td>' + rsEsc(x.talhao) + '</td><td>' + rsEsc(x.alimento || '—') + '</td><td class="text-end">' + Number(x.numeroPlantas).toLocaleString('pt-BR') +
+            '</td><td class="text-end">' + rsEsc(x.participacaoPct) + '%</td><td class="text-end">' + sfMoney(rateado) +
+            '</td><td class="text-end">' + celReal + '</td><td class="text-end">' + celDif + '</td></tr>');
     });
     $('#rsFiltroRateadoTotal').text(sfMoney(totalRateado));
     $('#rsFiltroRealTotal').text(sfMoney(totalReal));
+    $('#rsFiltroDifTotal').html('<span class="' + rsClasseDif(totalDif) + '">' + sfMoney(totalDif) + '</span>')
+        .attr('title', 'Soma das diferenças dos talhões com lançamentos (exclui os "Sem lançamentos").');
+    $('#rsFiltroPendRow').toggleClass('d-none', totalPendQtd === 0);
+    $('#rsFiltroPendTotal').text('Pendente (fora do custo): ' + totalPendQtd + ' atividade(s) em andamento/planejada(s), ' + sfMoney(totalPendValor));
+}
+
+/** Verde quando gastou menos que a sua parte (negativo), vermelho quando mais (positivo). */
+function rsClasseDif(v) { return v < 0 ? 'text-success' : (v > 0 ? 'text-danger' : ''); }
+
+/** Escapa texto vindo do banco antes de montar HTML. */
+function rsEsc(v) {
+    return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 /**

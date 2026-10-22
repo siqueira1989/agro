@@ -70,9 +70,13 @@
       </div>
       <div class="card-body p-0"><div class="table-responsive">
         <table class="table table-sm table-striped mb-0">
-          <thead class="table-light"><tr><th>Talhão</th><th>Alimento</th><th class="text-end">Plantas</th><th class="text-end">Part.%</th><th class="text-end">Custo Rateado</th><th class="text-end">Custo Real</th></tr></thead>
+          <thead class="table-light"><tr><th>Talhão</th><th>Alimento</th><th class="text-end">Plantas</th><th class="text-end">Part.%</th><th class="text-end" title="Custo Total da safra (incluindo as Despesas Fixas) dividido entre os talhões pela proporção de plantas de cada um.">Custo dividido (por nº de plantas) <i class="fas fa-circle-info text-muted small"></i></th><th class="text-end" title="Soma do custo das atividades CONCLUÍDAS deste talhão no Diário de Campo, dentro do período da safra. Atividades planejadas ou em andamento não entram.">Custo lançado no Diário <i class="fas fa-circle-info text-muted small"></i></th><th class="text-end" title="Custo lançado − custo dividido. Verde: o talhão gastou menos que a sua parte; vermelho: gastou mais.">Diferença <i class="fas fa-circle-info text-muted small"></i></th></tr></thead>
           <tbody id="rsRateioBody"></tbody>
-          <tfoot><tr class="fw-bold"><td colspan="4">Total (filtro atual)</td><td class="text-end" id="rsFiltroRateadoTotal">R$ 0,00</td><td class="text-end" id="rsFiltroRealTotal">R$ 0,00</td></tr></tfoot>
+          <tfoot>
+            <tr class="fw-bold"><td colspan="4">Total (filtro atual)</td><td class="text-end" id="rsFiltroRateadoTotal">R$ 0,00</td><td class="text-end" id="rsFiltroRealTotal">R$ 0,00</td><td class="text-end" id="rsFiltroDifTotal">R$ 0,00</td></tr>
+            <tr id="rsFiltroPendRow" class="d-none"><td colspan="7" class="small text-end fw-normal" id="rsFiltroPendTotal"></td></tr>
+            <tr><td colspan="7" class="small text-muted fw-normal" id="rsRateioNota"></td></tr>
+          </tfoot>
         </table>
       </div></div>
     </div></div>
