@@ -1,5 +1,13 @@
 ---
 title: Agro Tech One — Diagrama de Classes do Domínio (Model/Model, 43 classes)
+config:
+  theme: base
+  themeVariables:
+    fontFamily: Inter, Helvetica, Arial, sans-serif
+    primaryColor: "#EFF6FF"
+    primaryBorderColor: "#2563EB"
+    primaryTextColor: "#0F172A"
+    lineColor: "#475569"
 ---
 classDiagram
   direction TB
@@ -293,3 +301,45 @@ classDiagram
   EstoqueMovimento "0..*" --> "1" Insumo
   EstoqueMovimento "0..*" --> "0..1" Parceiro
   LancamentoDespesasCustos "0..*" --> "1" DespesasCustos
+  style Pessoa fill:#F1F5F9,stroke:#475569,color:#0F172A
+  style PessoaFisica fill:#F1F5F9,stroke:#475569,color:#0F172A
+  style PessoaCnpj fill:#F1F5F9,stroke:#475569,color:#0F172A
+  style Parceiro fill:#F1F5F9,stroke:#475569,color:#0F172A
+  style Funcionario fill:#F1F5F9,stroke:#475569,color:#0F172A
+  style FuncionarioCLT fill:#F1F5F9,stroke:#475569,color:#0F172A
+  style FuncionarioDiarista fill:#F1F5F9,stroke:#475569,color:#0F172A
+  style FuncionarioEmpreita fill:#F1F5F9,stroke:#475569,color:#0F172A
+  style FuncionarioProducao fill:#F1F5F9,stroke:#475569,color:#0F172A
+  style Vinculo fill:#F1F5F9,stroke:#475569,color:#0F172A
+  style PontoEletronico fill:#F1F5F9,stroke:#475569,color:#0F172A
+  style FaltaFuncionario fill:#F1F5F9,stroke:#475569,color:#0F172A
+  style ValeFuncionario fill:#F1F5F9,stroke:#475569,color:#0F172A
+  style FechamentoFolha fill:#F1F5F9,stroke:#475569,color:#0F172A
+  style FolhaPagamento fill:#F1F5F9,stroke:#475569,color:#0F172A
+  style LancamentoEmpreita fill:#F1F5F9,stroke:#475569,color:#0F172A
+  style Produto fill:#EFF6FF,stroke:#2563EB,color:#0F172A
+  style Alimento fill:#EFF6FF,stroke:#2563EB,color:#0F172A
+  style Classificacao fill:#EFF6FF,stroke:#2563EB,color:#0F172A
+  style AlimentoClassificacao fill:#EFF6FF,stroke:#2563EB,color:#0F172A
+  style AreaProducao fill:#EFF6FF,stroke:#2563EB,color:#0F172A
+  style Quadra fill:#EFF6FF,stroke:#2563EB,color:#0F172A
+  style Safra fill:#EFF6FF,stroke:#2563EB,color:#0F172A
+  style SafraTalhao fill:#EFF6FF,stroke:#2563EB,color:#0F172A
+  style DiarioCampo fill:#EFF6FF,stroke:#2563EB,color:#0F172A
+  style DiarioFuncionario fill:#EFF6FF,stroke:#2563EB,color:#0F172A
+  style DiarioMaquina fill:#EFF6FF,stroke:#2563EB,color:#0F172A
+  style DiarioDespesa fill:#EFF6FF,stroke:#2563EB,color:#0F172A
+  style TipoAtividade fill:#EFF6FF,stroke:#2563EB,color:#0F172A
+  style ColheitaLote fill:#EFF6FF,stroke:#2563EB,color:#0F172A
+  style Insumo fill:#FEF3C7,stroke:#B45309,color:#0F172A
+  style DiarioInsumo fill:#FEF3C7,stroke:#B45309,color:#0F172A
+  style EstoqueMovimento fill:#ECFDF5,stroke:#047857,color:#0F172A
+  style Maquina fill:#ECFDF5,stroke:#047857,color:#0F172A
+  style DespesasCustos fill:#ECFDF5,stroke:#047857,color:#0F172A
+  style LancamentoDespesasCustos fill:#ECFDF5,stroke:#047857,color:#0F172A
+  style CategoriaInsumo fill:#F8FAFC,stroke:#94A3B8,color:#334155
+  style UnidadeMedida fill:#F8FAFC,stroke:#94A3B8,color:#334155
+  style TipoFuncionario fill:#F8FAFC,stroke:#94A3B8,color:#334155
+  style TipoAtividadeRural fill:#F8FAFC,stroke:#94A3B8,color:#334155
+  style TipoParceiro fill:#F8FAFC,stroke:#94A3B8,color:#334155
+  style TipoCaixa fill:#F8FAFC,stroke:#94A3B8,color:#334155
