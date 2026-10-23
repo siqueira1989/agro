@@ -1,0 +1,128 @@
+---
+title: Agro Tech One — Camadas (Controller → Service → DAO → Model/Banco)
+config:
+  layout: elk
+---
+flowchart LR
+  subgraph F["Filter"]
+    AuthFilter
+  end
+  subgraph C["Controller (Servlets)"]
+    LoginServlet
+    LogoutServlet
+    ControleColaborador
+    ControllerFuncionario
+    ControllerCLT
+    ControllerDiarista
+    ControllerEmpreita
+    ControllerProducao
+    ControllerPontoEletronico
+    ControllerPagamento
+    ControllerParceiro
+    ControllerAlimento
+    ClassificacaoServlet
+    ControllerAreaProducao
+    ControllerSafra
+    ControllerDiarioCampo
+    ControllerColheita
+    ControllerInsumo
+    ControllerEstoque
+    ControllerMaquina
+    DespesasCustosServlet
+    RelatorioExportServlet
+  end
+  subgraph S["Service (regras de cálculo)"]
+    FolhaCalculoRuralService
+    FolhaCalculoService
+    EncargosService
+    ParametrosFolhaService
+    CalculoPontoRural
+  end
+  subgraph D["DAO (JDBC)"]
+    PessoaDAO
+    FuncionarioDAO
+    FuncionarioCLTDAO
+    FuncionarioDiaristaDAO
+    VinculoDAO
+    PontoEletronicoDAO
+    FaltaFuncionarioDAO
+    ValeFuncionarioDAO
+    FechamentoFolhaDAO
+    FolhaPagamentoDAO
+    LancamentoEmpreitaDAO
+    ProducaoCaixaDAO
+    PrecoCaixaDAO
+    PagamentoDAO
+    ParceiroDAO
+    AlimentoDAO
+    ClassificacaoDAO
+    AlimentoClassificacaoDao
+    AreaProducaoDAO
+    QuadraDAO
+    SafraDAO
+    DiarioCampoDAO
+    TipoAtividadeDAO
+    ColheitaDAO
+    InsumoDAO
+    EstoqueMovimentoDAO
+    MaquinaDAO
+    DespesasCustosDAO
+  end
+  subgraph U["Util (infraestrutura)"]
+    PostgresConnection
+    ConnectionPool
+    TransacaoUtil
+    SchemaMigrator
+    LogUtil
+    HtmlUtil
+    SenhaUtil
+    HashUtil
+    ConfigUtil
+    DataUtil
+    EmailUtil
+    Bootstrap
+    MigracaoSenhas
+  end
+  DB[("PostgreSQL 17<br>Model/Model = beans")]
+  AuthFilter --> C
+  LoginServlet --> PessoaDAO
+  ControleColaborador --> FuncionarioDAO & FuncionarioCLTDAO & PontoEletronicoDAO & FolhaPagamentoDAO
+  ControllerFuncionario --> FuncionarioDAO & VinculoDAO
+  ControllerCLT --> FuncionarioCLTDAO & VinculoDAO & FaltaFuncionarioDAO & ValeFuncionarioDAO & FechamentoFolhaDAO & PontoEletronicoDAO
+  ControllerCLT --> FolhaCalculoRuralService
+  ControllerDiarista --> FuncionarioDiaristaDAO & VinculoDAO & PontoEletronicoDAO & ValeFuncionarioDAO
+  ControllerEmpreita --> LancamentoEmpreitaDAO & VinculoDAO & ValeFuncionarioDAO
+  ControllerProducao --> ProducaoCaixaDAO & PrecoCaixaDAO & VinculoDAO & ValeFuncionarioDAO
+  ControllerPontoEletronico --> PontoEletronicoDAO & FaltaFuncionarioDAO & ValeFuncionarioDAO
+  ControllerPontoEletronico --> FolhaCalculoService
+  ControllerPagamento --> PagamentoDAO
+  ControllerParceiro --> ParceiroDAO
+  ControllerAlimento --> AlimentoDAO & ClassificacaoDAO & AlimentoClassificacaoDao
+  ClassificacaoServlet --> ClassificacaoDAO
+  ControllerAreaProducao --> AreaProducaoDAO & QuadraDAO
+  ControllerSafra --> SafraDAO
+  ControllerDiarioCampo --> DiarioCampoDAO & SafraDAO & TipoAtividadeDAO
+  ControllerColheita --> ColheitaDAO
+  ControllerInsumo --> InsumoDAO & ParceiroDAO
+  ControllerEstoque --> EstoqueMovimentoDAO & ParceiroDAO
+  ControllerMaquina --> MaquinaDAO
+  DespesasCustosServlet --> DespesasCustosDAO
+  RelatorioExportServlet --> AreaProducaoDAO & FolhaPagamentoDAO & FuncionarioDAO
+  FolhaCalculoRuralService --> PontoEletronicoDAO & FaltaFuncionarioDAO & ValeFuncionarioDAO
+  FolhaCalculoService --> FechamentoFolhaDAO & PontoEletronicoDAO
+  FolhaCalculoRuralService & FolhaCalculoService --> EncargosService & ParametrosFolhaService
+  DiarioCampoDAO -.-> FolhaCalculoRuralService
+  D --> PostgresConnection
+  PostgresConnection --> ConnectionPool
+  ConnectionPool --> DB
+  SchemaMigrator --> DB
+  classDef ctl fill:#e1d5e7,stroke:#9673a6
+  classDef svc fill:#fff2cc,stroke:#d6b656
+  classDef dao fill:#dae8fc,stroke:#6c8ebf
+  classDef utl fill:#f5f5f5,stroke:#666666
+  classDef db fill:#d5e8d4,stroke:#82b366
+  class LoginServlet,LogoutServlet,ControleColaborador,ControllerFuncionario,ControllerCLT,ControllerDiarista,ControllerEmpreita,ControllerProducao,ControllerPontoEletronico,ControllerPagamento,ControllerParceiro,ControllerAlimento,ClassificacaoServlet,ControllerAreaProducao,ControllerSafra,ControllerDiarioCampo,ControllerColheita,ControllerInsumo,ControllerEstoque,ControllerMaquina,DespesasCustosServlet,RelatorioExportServlet,AuthFilter ctl
+  class FolhaCalculoRuralService,FolhaCalculoService,EncargosService,ParametrosFolhaService,CalculoPontoRural svc
+  class PessoaDAO,FuncionarioDAO,FuncionarioCLTDAO,FuncionarioDiaristaDAO,VinculoDAO,PontoEletronicoDAO,FaltaFuncionarioDAO,ValeFuncionarioDAO,FechamentoFolhaDAO,FolhaPagamentoDAO,LancamentoEmpreitaDAO,ProducaoCaixaDAO,PrecoCaixaDAO,PagamentoDAO,ParceiroDAO,AlimentoDAO,ClassificacaoDAO,AlimentoClassificacaoDao,AreaProducaoDAO,QuadraDAO,SafraDAO,DiarioCampoDAO,TipoAtividadeDAO,ColheitaDAO,InsumoDAO,EstoqueMovimentoDAO,MaquinaDAO,DespesasCustosDAO dao
+  class PostgresConnection,ConnectionPool,TransacaoUtil,SchemaMigrator,LogUtil,HtmlUtil,SenhaUtil,HashUtil,ConfigUtil,DataUtil,EmailUtil,Bootstrap,MigracaoSenhas utl
+  class DB db

@@ -1,0 +1,295 @@
+---
+title: Agro Tech One — Diagrama de Classes do Domínio (Model/Model, 43 classes)
+---
+classDiagram
+  direction TB
+  class Pessoa {
+    #int idPessoa
+    #String nomePessoa
+    #String usuarioPessoa
+    #String nivelPessoa
+    #String emailPessoa
+    #boolean situacaoPessoa
+  }
+  class PessoaFisica {
+    -String cpfPf
+  }
+  class PessoaCnpj {
+    #String cnpjPessoaCnpj
+    #String razaoSocialPessoaCnpj
+  }
+  class Parceiro {
+    -String siteparceiro
+    -String tipoParceiro
+  }
+  class Funcionario {
+    -String matricula
+    -TipoFuncionario tipoFuncionario
+    -LocalDate dataInicio
+    -String cargo
+  }
+  class FuncionarioCLT {
+    -int cargaHorariaDiaria
+    -StatusEmprego statusEmprego
+    -TipoAtividadeRural tipoAtividadeRural
+  }
+  class FuncionarioDiarista {
+    -BigDecimal valorPorDia
+  }
+  class FuncionarioEmpreita {
+    -BigDecimal valorFixoAcordado
+  }
+  class FuncionarioProducao {
+    -int quantidadeProduzidaNoPeriodo
+    -BigDecimal valorPorUnidade
+  }
+  class Vinculo {
+    -int idVinculo
+    -int idPessoa
+    -TipoFuncionario tipoFuncionario
+    -LocalDate dataAdmissao
+    -LocalDate dataDesligamento
+  }
+  class PontoEletronico {
+    -int idPonto
+    -int idFuncionario
+    -LocalDate dataRegistro
+    -int totalMinutos
+    -int extraMinutos
+    -String hashAutenticidade
+  }
+  class FaltaFuncionario {
+    -int idFalta
+    -LocalDate dataFalta
+    -boolean justificada
+  }
+  class ValeFuncionario {
+    -int idVale
+    -BigDecimal valor
+    -StatusVale statusVale
+  }
+  class FechamentoFolha {
+    -int idFechamento
+    -String periodo
+    -BigDecimal salarioBruto
+    -BigDecimal salarioLiquido
+  }
+  class FolhaPagamento {
+    -int idFolha
+    -String periodo
+    -BigDecimal valorCalculado
+  }
+  class LancamentoEmpreita {
+    -int idLancamento
+    -LocalDate dataEmpreita
+    -BigDecimal valor
+    -boolean pago
+  }
+  class Produto {
+    -int idproduto
+    -String nomeproduto
+    -double valorvendaproduto
+    -String tipoproduto
+  }
+  class Alimento {
+    -String variedadealimento
+  }
+  class Classificacao {
+    -int idclassificacao
+    -String classificacao
+  }
+  class AlimentoClassificacao {
+    -int idalimentoclassificao
+    -Alimento alimento
+    -Classificacao classificacao
+  }
+  class AreaProducao {
+    -int idAreaProducao
+    -String PropriedadeAreaProducao
+    -String SiglasAreaProducao
+    -int QuantidadeTotalPlantasAreaProducao
+  }
+  class Quadra {
+    -int idQuadra
+    -int idAreaProducao
+    -String nomeQuadra
+    -int numeroPlantas
+    -Integer idAlimento
+  }
+  class Safra {
+    -int idSafra
+    -String nome
+    -LocalDate dataInicial
+    -LocalDate dataFinal
+    -String status
+    -BigDecimal despesasFixas
+    -List~SafraTalhao~ talhoes
+  }
+  class SafraTalhao {
+    -int idQuadra
+    -int numeroPlantas
+    -BigDecimal areaDestinadaHa
+  }
+  class DiarioCampo {
+    -int idDiario
+    -String numeroDiario
+    -LocalDate data
+    -Integer idQuadra
+    -Integer idSafra
+    -String status
+    -BigDecimal custoTotal
+  }
+  class DiarioFuncionario {
+    -int idPessoa
+    -BigDecimal horasTrabalhadas
+    -String regimeTrabalho
+    -BigDecimal custo
+  }
+  class DiarioMaquina {
+    -Integer idMaquina
+    -BigDecimal horasTrabalhadas
+    -BigDecimal km
+    -BigDecimal custo
+  }
+  class DiarioInsumo {
+    -int idInsumo
+    -BigDecimal quantidade
+    -String formaAplicacao
+    -BigDecimal pesoSacoKg
+    -Integer plantasAplicadas
+    -BigDecimal quantidadePorPlantaKg
+    -boolean baixado
+  }
+  class DiarioDespesa {
+    -int idDespesaCusto
+    -String classificacao
+    -BigDecimal quantidade
+    -BigDecimal valor
+  }
+  class TipoAtividade {
+    -int idTipo
+    -String nome
+    -boolean ativo
+  }
+  class ColheitaLote {
+    -int idLote
+    -int idDiario
+    -LocalDate dataColheita
+    -BigDecimal quantidadeTotal
+    -String status
+  }
+  class Insumo {
+    -int idInsumo
+    -String nome
+    -String categoria
+    -String unidade
+    -BigDecimal quantidadeDisponivel
+    -BigDecimal precoMedio
+    -BigDecimal pesoEmbalagem
+  }
+  class EstoqueMovimento {
+    -int idMov
+    -int idInsumo
+    -String tipo
+    -BigDecimal quantidade
+    -BigDecimal saldoApos
+  }
+  class Maquina {
+    -int idMaquina
+    -String nome
+    -String tipo
+    -BigDecimal custoHora
+    -BigDecimal custoKm
+  }
+  class DespesasCustos {
+    -int iddespesascusto
+    -String despesascusto
+    -double valordespesascustos
+    -String classificacao
+  }
+  class LancamentoDespesasCustos {
+    -int IdlancaLancamentoDespesasCustos
+    -DespesasCustos despesasecustos
+    -Double valor
+  }
+  class CategoriaInsumo {
+    <<enumeration>>
+    DEFENSIVO
+    ADUBO
+  }
+  class UnidadeMedida {
+    <<enumeration>>
+    G
+    KG
+    T
+    ML
+    L
+    UN
+  }
+  class TipoFuncionario {
+    <<enumeration>>
+    CLT
+    DIARISTA
+    PRODUCAO
+    EMPREITA
+  }
+  class TipoAtividadeRural {
+    <<enumeration>>
+    LAVOURA
+    PECUARIA
+  }
+  class TipoParceiro {
+    <<enumeration>>
+    PARCEIRO
+    FORNECEDOR
+    INSUMO
+  }
+  class TipoCaixa {
+    <<enumeration>>
+    CONTENTOR
+  }
+  Pessoa <|-- PessoaFisica
+  Pessoa <|-- PessoaCnpj
+  PessoaCnpj <|-- Parceiro
+  PessoaFisica <|-- Funcionario
+  Funcionario <|-- FuncionarioCLT
+  Funcionario <|-- FuncionarioDiarista
+  Funcionario <|-- FuncionarioEmpreita
+  Funcionario <|-- FuncionarioProducao
+  Produto <|-- Alimento
+  Funcionario ..> TipoFuncionario
+  FuncionarioCLT ..> TipoAtividadeRural
+  FuncionarioProducao ..> TipoCaixa
+  Parceiro ..> TipoParceiro
+  Pessoa "1" --> "0..*" Vinculo : vínculos
+  Funcionario "1" --> "0..*" PontoEletronico
+  Funcionario "1" --> "0..*" FaltaFuncionario
+  Funcionario "1" --> "0..*" ValeFuncionario
+  Funcionario "1" --> "0..*" FechamentoFolha
+  Funcionario "1" --> "0..*" FolhaPagamento
+  FuncionarioEmpreita "1" --> "0..*" LancamentoEmpreita
+  AlimentoClassificacao "0..*" --> "1" Alimento
+  AlimentoClassificacao "0..*" --> "1" Classificacao
+  AreaProducao "1" *-- "1..*" Quadra : talhões
+  Quadra "0..*" --> "0..1" Alimento : cultura
+  Safra "0..*" --> "1" AreaProducao
+  Safra "1" *-- "1..*" SafraTalhao
+  SafraTalhao "0..*" --> "1" Quadra
+  DiarioCampo "0..*" --> "1" Quadra
+  DiarioCampo "0..*" --> "1" Safra
+  DiarioCampo "0..*" --> "1" TipoAtividade
+  DiarioCampo "1" *-- "0..*" DiarioFuncionario
+  DiarioCampo "1" *-- "0..*" DiarioMaquina
+  DiarioCampo "1" *-- "0..*" DiarioInsumo
+  DiarioCampo "1" *-- "0..*" DiarioDespesa
+  DiarioFuncionario "0..*" --> "1" Funcionario
+  DiarioMaquina "0..*" --> "0..1" Maquina
+  DiarioInsumo "0..*" --> "1" Insumo
+  DiarioDespesa "0..*" --> "1" DespesasCustos
+  ColheitaLote "0..*" --> "1" DiarioCampo : gerado por
+  Insumo "0..*" --> "0..1" Parceiro : fornecedor
+  Insumo ..> CategoriaInsumo
+  Insumo ..> UnidadeMedida
+  EstoqueMovimento "0..*" --> "1" Insumo
+  EstoqueMovimento "0..*" --> "0..1" Parceiro
+  LancamentoDespesasCustos "0..*" --> "1" DespesasCustos
