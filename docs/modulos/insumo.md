@@ -23,6 +23,8 @@
 - **Diário de Campo**: `diario_insumo` consome insumos (dose, unidade) — mudança em unidade/dose afeta o cálculo do diário.
 
 ## Pendências
-- [ ] V25 e V26 ainda não commitadas (ver `git status`).
+- [x] V25 e V26 commitadas (9f04351).
+- [ ] Entrada de estoque (módulo Estoque) ainda usa só o saco do cadastro como atalho; se o mesmo adubo chegar em sacos de pesos diferentes, avaliar um seletor de saco na Entrada.
 
 ## Histórico
+- 2026-10-22 — Adubo (grandeza Massa): o campo livre "Peso do saco" vira o seletor "A granel / Saco 5, 10, 25 ou 50 kg" (`#insSacoAdubo`). O valor é em kg e é convertido para a unidade do insumo ao salvar (saco de 50 kg num adubo em T → `peso_embalagem` 0,05). Adubo a granel usa a unidade Tonelada. Defensivo continua com o campo livre. Sem mudança de banco no `insumo`.

@@ -4276,8 +4276,10 @@ function dcInit(areaId) {
 
     // recálculo do custo estimado ao vivo
     var body = '#modalNovoDiario';
-    $(body).off('input.dc change.dc', '.dc-fpessoa,.dc-fhoras,.dc-fvalor,.dc-fcaixas,.dc-fprecocaixa,.dc-mmaq,.dc-muso,.dc-ipro,.dc-idosepu,.dc-idosetotal,.dc-isacos,.dc-iqtddireta')
-        .on('input.dc change.dc', '.dc-fpessoa,.dc-fhoras,.dc-fvalor,.dc-fcaixas,.dc-fprecocaixa,.dc-mmaq,.dc-muso,.dc-ipro,.dc-idosepu,.dc-idosetotal,.dc-isacos,.dc-iqtddireta', dcRecalcPreview);
+    $(body).off('input.dc change.dc', '.dc-fpessoa,.dc-fhoras,.dc-fvalor,.dc-fcaixas,.dc-fprecocaixa,.dc-mmaq,.dc-muso,.dc-ipro,.dc-idosepu,.dc-idosetotal,.dc-iforma,.dc-iqtdinf,.dc-iplantas')
+        .on('input.dc change.dc', '.dc-fpessoa,.dc-fhoras,.dc-fvalor,.dc-fcaixas,.dc-fprecocaixa,.dc-mmaq,.dc-muso,.dc-ipro,.dc-idosepu,.dc-idosetotal,.dc-iforma,.dc-iqtdinf,.dc-iplantas', dcRecalcPreview);
+    // Plantas digitadas pelo usuário deixam de seguir o talhão.
+    $(body).off('input.dcpl', '.dc-iplantas').on('input.dcpl', '.dc-iplantas', function () { $(this).attr('data-auto', '0'); });
     $('#dcFuncBody').off('change.dc', '.dc-fpessoa').on('change.dc', '.dc-fpessoa', function () {
         var opt = $(this).find(':selected');
         var $tr = $(this).closest('tr');
@@ -4368,6 +4370,7 @@ function dcAplicarCulturaDoTalhao() {
         $('#dcCultura').val('');
         $('#dcCulturaNome').val(q ? '(talhão sem cultura cadastrada)' : '');
     }
+    dcAtualizarPlantasAdubo();
     dcResolverSafra();
 }
 
@@ -4728,24 +4731,63 @@ function dcAddInsRowAdu(i) {
     }
     $('#dcInsAduBody').append('<tr>' +
         '<td><select class="form-select form-select-sm dc-ipro">' + dcInsumoOptsCategoria('ADUBO') + '</select></td>' +
-        '<td>' +
-            '<small class="text-muted dc-irotulo1 d-block" style="line-height:1.1">Sem saco cadastrado</small>' +
-            '<input type="text" inputmode="decimal" class="form-control dc-isacos d-none" value="" placeholder="ex.: 10" title="Nº de sacos aplicados — preenche a Quantidade Aplicada automaticamente (nº sacos × peso do saco cadastrado)">' +
-        '</td>' +
         '<td><div class="input-group input-group-sm">' +
-            '<input type="text" inputmode="decimal" class="form-control dc-iqtddireta" value="" placeholder="0,000" title="Quantidade aplicada direto, já na unidade do insumo (kg/tonelada)">' +
-            '<span class="input-group-text dc-iunid">—</span>' +
+            '<select class="form-select form-select-sm dc-iforma" style="max-width:9.5rem" title="Como o adubo foi aplicado: em sacos (escolha o peso do saco), em toneladas ou em kg">' +
+                '<option value="S5">Saco 5 kg</option><option value="S10">Saco 10 kg</option><option value="S25">Saco 25 kg</option><option value="S50">Saco 50 kg</option>' +
+                '<option value="T">Tonelada</option><option value="KG">Quilo (kg)</option></select>' +
+            '<input type="text" inputmode="decimal" class="form-control dc-iqtdinf" value="" placeholder="0" title="Quantidade aplicada na forma escolhida">' +
+            '<span class="input-group-text dc-iqtdlbl">sacos</span>' +
         '</div></td>' +
+        '<td><input type="text" inputmode="numeric" class="form-control form-control-sm dc-iplantas" value="" data-auto="1" title="Plantas do talhão que receberam o adubo (padrão: todas as plantas do talhão)"></td>' +
+        '<td><input type="text" class="form-control form-control-sm dc-iporplanta bg-light" readonly value="—" title="Dose por planta = total aplicado ÷ nº de plantas"></td>' +
         '<td><div class="input-group input-group-sm"><input type="text" class="form-control dc-iqtdtotal bg-light" readonly value="0" title="Quantidade total consumida, debitada do estoque"><span class="input-group-text dc-iunid2">—</span></div></td>' +
         '<td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger dc-rm"><i class="fas fa-trash"></i></button></td></tr>');
     var $tr = $('#dcInsAduBody tr:last');
-    aplicarMascaraDecimal($tr.find('.dc-isacos'), 3);
-    aplicarMascaraDecimal($tr.find('.dc-iqtddireta'), 3);
+    aplicarMascaraDecimal($tr.find('.dc-iqtdinf'), 3);
+    $tr.find('.dc-iplantas').val(dcPlantasDoTalhao() || '');
     if (i) {
         $tr.find('.dc-ipro').val(String(i.idInsumo));
-        if (i.quantidadeDireta != null) $tr.find('.dc-iqtddireta').val(exibirDecimalNatural(i.quantidadeDireta, 3));
+        var un = $tr.find('.dc-ipro :selected').data('unidade');
+        if (i.formaAplicacao) {
+            $tr.find('.dc-iforma').val(i.formaAplicacao === 'SACO' ? 'S' + Number(i.pesoSacoKg) : (i.formaAplicacao === 'TONELADA' ? 'T' : 'KG'));
+            $tr.find('.dc-iqtdinf').val(exibirDecimalNatural(i.qtdInformada, 3));
+            if (i.plantasAplicadas) $tr.find('.dc-iplantas').val(i.plantasAplicadas).attr('data-auto', '0');
+        } else if (i.quantidadeDireta != null) {
+            // Lançamento anterior à V27 (só a quantidade total): reabre como t ou kg.
+            var q = Number(i.quantidadeDireta);
+            $tr.find('.dc-iforma').val(un === 'T' ? 'T' : 'KG');
+            $tr.find('.dc-iqtdinf').val(exibirDecimalNatural(un === 'G' ? q / 1000 : q, 3));
+        }
+        $tr.attr('data-ins', String(i.idInsumo));
     }
     dcAtualizarLinhaInsumoAdu($tr);
+}
+
+/** Nº de plantas do talhão selecionado no Diário (0 se não houver). */
+function dcPlantasDoTalhao() {
+    var idq = parseInt($('#dcTalhao').val()) || 0;
+    var q = dcCacheTalhao.filter(function (x) { return x.idQuadra === idq; })[0];
+    return q ? (parseInt(q.numeroPlantas) || 0) : 0;
+}
+
+/** Ao trocar o talhão, atualiza as plantas das linhas de adubo que o usuário não editou. */
+function dcAtualizarPlantasAdubo() {
+    var p = dcPlantasDoTalhao();
+    $('#dcInsAduBody tr').each(function () {
+        var $p = $(this).find('.dc-iplantas');
+        if ($p.attr('data-auto') === '1') $p.val(p || '');
+        dcAtualizarLinhaInsumoAdu($(this));
+    });
+}
+
+var DC_PESOS_SACO = [5, 10, 25, 50];
+function dcEhMassa(un) { return un === 'G' || un === 'KG' || un === 'T'; }
+
+/** Lê a forma de aplicação da linha de adubo: {forma: SACO|TONELADA|KG, pesoSacoKg}. */
+function dcFormaAdubo($tr) {
+    var v = $tr.find('.dc-iforma').val() || 'KG';
+    if (v.charAt(0) === 'S') return { forma: 'SACO', pesoSacoKg: Number(v.slice(1)) };
+    return { forma: v === 'T' ? 'TONELADA' : 'KG', pesoSacoKg: null };
 }
 
 /** Mostra a unidade do insumo escolhido e recalcula a quantidade total consumida (linha Defensivo: dose do produto × total de calda aplicada). */
@@ -4759,21 +4801,46 @@ function dcAtualizarLinhaInsumoDef($tr) {
 }
 
 /**
- * Mostra a unidade do insumo escolhido e recalcula a quantidade total consumida (linha Adubo:
- * quantidade aplicada direto, com atalho opcional de nº de sacos × peso do saco cadastrado —
- * mesmo padrão já usado na Entrada de Insumo do Estoque).
+ * Linha Adubo: identifica pelo cadastro do insumo como ele chega (saco de 5/10/25/50 kg ou
+ * tonelada) e pré-seleciona a forma; calcula o total (sacos × peso, t × 1000 ou kg), converte para
+ * a unidade do insumo (debitada do estoque) e a dose por planta. Ex.: 10 sacos de 50 kg em 50
+ * plantas = 500 kg, 10 kg/planta; 5 t em 500 plantas = 10 kg/planta. O servidor refaz a conta
+ * (DiarioCampoDAO.inserirInsumo) — aqui é só a prévia.
  */
 function dcAtualizarLinhaInsumoAdu($tr) {
     var opt = $tr.find('.dc-ipro :selected');
-    var unidade = opt.data('unidade') || '—';
-    var pesoEmbalagem = parseFloat(opt.data('embalagem')) || 0;
-    $tr.find('.dc-iunid,.dc-iunid2').text(unidade);
-    $tr.find('.dc-isacos').toggleClass('d-none', pesoEmbalagem <= 0);
-    $tr.find('.dc-irotulo1').text(pesoEmbalagem > 0 ? 'Nº de sacos (saco de ' + exibirDecimalNatural(pesoEmbalagem, 3) + ' ' + unidade + ', opcional)' : 'Sem saco cadastrado');
-    var sacos = lerDecimalBR($tr.find('.dc-isacos').val());
-    if (pesoEmbalagem > 0 && sacos > 0) $tr.find('.dc-iqtddireta').val(exibirDecimalNatural(sacos * pesoEmbalagem, 3));
-    var qtd = lerDecimalBR($tr.find('.dc-iqtddireta').val());
-    $tr.find('.dc-iqtdtotal').val(exibirDecimalBR(qtd, 3));
+    var unidade = opt.data('unidade') || '';
+    var massa = dcEhMassa(unidade);
+    $tr.find('.dc-iunid2').text(unidade || '—');
+    // Insumo trocado: pré-seleciona a forma conforme o cadastro (saco padrão → saco; unidade T → tonelada).
+    if (opt.val() && $tr.attr('data-ins') !== String(opt.val())) {
+        $tr.attr('data-ins', String(opt.val()));
+        var embKg = Math.round(insUnidadeParaKg(parseFloat(opt.data('embalagem')) || 0, unidade) * 1000) / 1000;
+        $tr.find('.dc-iforma').val(DC_PESOS_SACO.indexOf(embKg) >= 0 ? 'S' + embKg : (unidade === 'T' ? 'T' : 'KG'));
+    }
+    // Adubo que não é de massa (ex.: foliar em litros): quantidade direto na unidade do insumo.
+    $tr.find('.dc-iforma').toggleClass('d-none', !massa);
+    $tr.find('.dc-iplantas').prop('disabled', !massa);
+    var qtd = lerDecimalBR($tr.find('.dc-iqtdinf').val());
+    var plantas = parseInt($tr.find('.dc-iplantas').val()) || 0;
+    if (!massa) {
+        $tr.find('.dc-iqtdlbl').text(unidade || '—');
+        $tr.find('.dc-iporplanta').val('—');
+        $tr.find('.dc-iqtdtotal').val(exibirDecimalBR(qtd, 3));
+        return;
+    }
+    var f = dcFormaAdubo($tr);
+    $tr.find('.dc-iqtdlbl').text(f.forma === 'SACO' ? 'sacos' : (f.forma === 'TONELADA' ? 't' : 'kg'));
+    var totalKg = f.forma === 'SACO' ? qtd * f.pesoSacoKg : (f.forma === 'TONELADA' ? qtd * 1000 : qtd);
+    $tr.find('.dc-iqtdtotal').val(exibirDecimalBR(insKgParaUnidade(totalKg, unidade), 3));
+    var txt = '—';
+    if (plantas > 0 && totalKg > 0) {
+        var kgPl = totalKg / plantas;
+        txt = f.forma === 'TONELADA'
+            ? exibirDecimalNatural(kgPl / 1000, 4) + ' t (' + exibirDecimalNatural(kgPl, 3) + ' kg)/planta'
+            : exibirDecimalNatural(kgPl, 3) + ' kg/planta';
+    }
+    $tr.find('.dc-iporplanta').val(txt);
 }
 
 /**
@@ -4974,14 +5041,24 @@ function dcSalvar() {
         if (!id || dosePu <= 0 || doseTotal <= 0) { insumoInvalido = true; return; }
         insumos.push({ idInsumo: parseInt(id), dosePorUnidade: dosePu, doseTotalAplicada: doseTotal });
     });
+    // Adubo de massa vai pela forma (sacos/t/kg) + plantas — o servidor calcula o total e a dose por
+    // planta; adubo que não é de massa continua com a quantidade direta na unidade do insumo.
     $('#dcInsAduBody tr').each(function () {
-        var id = $(this).find('.dc-ipro').val();
-        var qtdDireta = lerDecimalBR($(this).find('.dc-iqtddireta').val());
-        if (!id && qtdDireta === 0) return;
-        if (!id || qtdDireta <= 0) { insumoInvalido = true; return; }
-        insumos.push({ idInsumo: parseInt(id), quantidadeDireta: qtdDireta });
+        var $tr = $(this);
+        var id = $tr.find('.dc-ipro').val();
+        var qtd = lerDecimalBR($tr.find('.dc-iqtdinf').val());
+        if (!id && qtd === 0) return;
+        if (!id || qtd <= 0) { insumoInvalido = true; return; }
+        if (!dcEhMassa($tr.find('.dc-ipro :selected').data('unidade'))) {
+            insumos.push({ idInsumo: parseInt(id), quantidadeDireta: qtd });
+            return;
+        }
+        var plantas = parseInt($tr.find('.dc-iplantas').val()) || 0;
+        if (plantas <= 0) { insumoInvalido = true; return; }
+        var f = dcFormaAdubo($tr);
+        insumos.push({ idInsumo: parseInt(id), formaAplicacao: f.forma, pesoSacoKg: f.pesoSacoKg, qtdInformada: qtd, plantasAplicadas: plantas });
     });
-    if (insumoInvalido) { $('#alertDiario').removeClass('d-none').addClass('alert-danger').text('Cada insumo precisa de produto e quantidade aplicada: dose por litro/kg + dose total aplicada (defensivo), ou quantidade aplicada (adubo), todos maiores que zero.'); return; }
+    if (insumoInvalido) { $('#alertDiario').removeClass('d-none').addClass('alert-danger').text('Cada insumo precisa de produto e quantidade aplicada: dose por litro/kg + dose total aplicada (defensivo), ou quantidade e nº de plantas (adubo), todos maiores que zero.'); return; }
     var despesas = [], despesaInvalida = false;
     $('#dcDespBody tr').each(function () {
         var id = $(this).find('.dc-ditem').val();
@@ -5207,7 +5284,12 @@ function dcVerDetalhe(id) {
         }
         h += bloco('Funcionários', d.funcionarios, [['Nome', function (o) { return o.nomePessoa || o.idPessoa; }], ['Tipo', function (o) { return o.tipoFuncionario || ''; }], ['Execução', function (o) { return o.dataExecucao ? formatarData(o.dataExecucao) : ''; }], ['Regime', function (o) { return o.regimeTrabalho === 'PRODUCAO' ? 'Produção' : (o.regimeTrabalho === 'REGIME_SISTEMA' ? 'Sistema' : ''); }], ['Horas', function (o) { return o.horasTrabalhadas; }], ['Caixas', function (o) { return o.quantidadeCaixas != null ? o.quantidadeCaixas : '—'; }], ['Custo', function (o) { return dcMoney(o.custo); }]]);
         h += bloco('Máquinas', d.maquinas, [['Maquinário', function (o) { return o.nome || ''; }], ['Categoria', function (o) { return o.categoria || ''; }], ['Uso', function (o) { return (o.categoria === 'VEICULO' ? o.km + ' km' : o.horasTrabalhadas + ' h'); }], ['Custo', function (o) { return dcMoney(o.custo); }]]);
-        h += bloco('Insumos', d.insumos, [['Insumo', function (o) { return o.insumoNome || o.idInsumo; }], ['Dose (por L/kg)', function (o) { return o.dosePorUnidade != null ? o.dosePorUnidade : '—'; }], ['Dose Total Aplicada', function (o) { return o.doseTotalAplicada != null ? o.doseTotalAplicada : '—'; }], ['Qtd. Total Aplicada', function (o) { return o.quantidade + ' ' + (o.unidade || ''); }], ['Custo', function (o) { return dcMoney(o.custo); }], ['Baixado', function (o) { return o.baixado ? 'Sim' : 'Não'; }]]);
+        h += bloco('Insumos', d.insumos, [['Insumo', function (o) { return o.insumoNome || o.idInsumo; }], ['Dose (por L/kg)', function (o) { return o.dosePorUnidade != null ? o.dosePorUnidade : '—'; }], ['Dose Total Aplicada', function (o) { return o.doseTotalAplicada != null ? o.doseTotalAplicada : '—'; }], ['Aplicação (adubo)', function (o) {
+            if (!o.formaAplicacao) return '—';
+            var q = exibirDecimalNatural(o.qtdInformada, 3);
+            var forma = o.formaAplicacao === 'SACO' ? q + ' saco(s) de ' + Number(o.pesoSacoKg) + ' kg' : (o.formaAplicacao === 'TONELADA' ? q + ' t' : q + ' kg');
+            return forma + ' em ' + o.plantasAplicadas + ' plantas = ' + exibirDecimalNatural(o.quantidadePorPlantaKg, 3) + ' kg/planta';
+        }], ['Qtd. Total Aplicada', function (o) { return o.quantidade + ' ' + (o.unidade || ''); }], ['Custo', function (o) { return dcMoney(o.custo); }], ['Baixado', function (o) { return o.baixado ? 'Sim' : 'Não'; }]]);
         h += bloco('Despesas', d.despesas, [['Despesa', function (o) { return o.descricao || o.idDespesaCusto; }], ['Classif.', function (o) { return o.classificacao === 'VARIAVEL' ? 'Variável' : 'Fixo'; }], ['Execução', function (o) { return o.dataExecucao ? formatarData(o.dataExecucao) : ''; }], ['Qtd', function (o) { return o.quantidade; }], ['Valor unit.', function (o) { return dcMoney(o.valorUnitario); }], ['Subtotal', function (o) { return dcMoney(o.valor); }]]);
         $('#ddCorpo').html(h);
         var podeFinalizar = (d.status === 'PLANEJADA' || d.status === 'EM_ANDAMENTO');
@@ -6023,6 +6105,30 @@ function carregarResumoEstoque() {
     });
 }
 
+/** Adubo de massa usa o select de saco padrão (5/10/25/50 kg) no lugar do peso livre. */
+function insUsaSacoAdubo() { return $("#insCategoria").val() === "ADUBO" && $("#insGrandeza").val() === "MASSA"; }
+
+function insAtualizarCampoSaco() {
+    const adubo = insUsaSacoAdubo();
+    $("#insSacoAdubo,#insSacoAduboHint").toggleClass("d-none", !adubo);
+    $("#insPesoEmbalagem").toggleClass("d-none", adubo);
+}
+
+/** Seleciona o saco (em kg); um peso fora do padrão de cadastro antigo vira uma opção extra. */
+function insSetSacoAdubo(kg) {
+    const $s = $("#insSacoAdubo");
+    $s.find("option.ins-saco-legado").remove();
+    if (!kg) { $s.val(""); return; }
+    const v = String(Math.round(kg * 1000) / 1000);
+    if (!$s.find('option[value="' + v + '"]').length)
+        $s.append('<option class="ins-saco-legado" value="' + v + '">Saco de ' + exibirDecimalNatural(kg, 3) + ' kg (cadastro antigo)</option>');
+    $s.val(v);
+}
+
+/** Conversões de massa entre kg e a unidade do insumo (G/KG/T). */
+function insKgParaUnidade(kg, un) { return un === "T" ? kg / 1000 : (un === "G" ? kg * 1000 : kg); }
+function insUnidadeParaKg(v, un) { return un === "T" ? v * 1000 : (un === "G" ? v / 1000 : v); }
+
 /** Preenche o select de unidades conforme a grandeza. */
 function popularUnidades(grandeza, selecionada) {
     const $u = $("#insUnidade").empty();
@@ -6053,6 +6159,8 @@ function abrirModalNovoInsumo() {
     popularUnidades("MASSA");
     $("#insMinimo").val("0");
     $("#insPesoEmbalagem").val("");
+    insSetSacoAdubo(null);
+    insAtualizarCampoSaco();
     carregarFornecedoresInsumo("insFornecedor", true, dcAtualizarHintFornecedor);
     $("#modalInsumo").modal("show");
 }
@@ -6073,6 +6181,8 @@ function abrirModalEditarInsumo(id) {
         popularUnidades(i.grandeza, i.unidade);
         $("#insMinimo").val(exibirDecimalNatural(i.estoqueMinimo, 3));
         $("#insPesoEmbalagem").val(i.pesoEmbalagem != null ? exibirDecimalNatural(i.pesoEmbalagem, 3) : "");
+        insSetSacoAdubo(i.pesoEmbalagem != null ? insUnidadeParaKg(Number(i.pesoEmbalagem), i.unidade) : null);
+        insAtualizarCampoSaco();
         // seta o fornecedor só APÓS carregar as opções (evita corrida)
         carregarFornecedoresInsumo("insFornecedor", true, function (lista) {
             dcAtualizarHintFornecedor(lista);
@@ -6092,7 +6202,9 @@ function salvarInsumo() {
         grandeza: $("#insGrandeza").val(),
         unidade: $("#insUnidade").val(),
         estoqueMinimo: lerDecimalBR($("#insMinimo").val()),
-        pesoEmbalagem: lerDecimalBR($("#insPesoEmbalagem").val()),
+        pesoEmbalagem: insUsaSacoAdubo()
+            ? ($("#insSacoAdubo").val() ? insKgParaUnidade(Number($("#insSacoAdubo").val()), $("#insUnidade").val()) : null)
+            : lerDecimalBR($("#insPesoEmbalagem").val()),
         idFornecedor: $("#insFornecedor").val() ? parseInt($("#insFornecedor").val()) : 0,
         situacao: true
     };
@@ -6296,7 +6408,8 @@ $(document).ready(function () {
     aplicarMascaraDecimal($('#saiQtd'), 3);
 
     $("#filtroCategoria").on("change", CarregarInsumos);
-    $("#insGrandeza").on("change", function () { popularUnidades($(this).val()); });
+    $("#insGrandeza").on("change", function () { popularUnidades($(this).val()); insAtualizarCampoSaco(); });
+    $("#insCategoria,#insUnidade").on("change", insAtualizarCampoSaco);
     $("#btnNovoInsumo").on("click", abrirModalNovoInsumo);
     $("#btnSalvarInsumo").on("click", salvarInsumo);
     $("#btnEntrada").on("click", abrirEntrada);

@@ -269,6 +269,19 @@ public class DiarioCampoDAO {
      */
     private void inserirInsumo(Connection c, int idDiario, DiarioInsumo i) throws SQLException {
         String unidade = unidadeInsumo(c, i.getIdInsumo());
+        // ADUBO por forma de aplicação (V27): o total vem de forma × qtd informada, nunca do cliente.
+        BigDecimal porPlantaKg = null;
+        String forma = i.getFormaAplicacao();
+        if (forma != null && !forma.isBlank()) {
+            BigDecimal totalKg = totalKgAdubo(forma, i.getQtdInformada(), i.getPesoSacoKg());
+            BigDecimal naUnidade = kgParaUnidade(totalKg, unidade);
+            if (naUnidade == null) throw new SQLException("Insumo " + i.getIdInsumo() + " não é de massa (unidade " + unidade + "): não aceita sacos/toneladas.");
+            i.setQuantidadeDireta(naUnidade);
+            if (i.getPlantasAplicadas() != null && i.getPlantasAplicadas() > 0)
+                porPlantaKg = totalKg.divide(new BigDecimal(i.getPlantasAplicadas()), 4, RoundingMode.HALF_UP);
+        } else {
+            forma = null;
+        }
         boolean porQuantidadeDireta = i.getQuantidadeDireta() != null && i.getQuantidadeDireta().signum() > 0;
         BigDecimal dosePorUnidade = porQuantidadeDireta ? null : nz(i.getDosePorUnidade());
         BigDecimal doseTotalAplicada = porQuantidadeDireta ? null : nz(i.getDoseTotalAplicada());
@@ -276,15 +289,44 @@ public class DiarioCampoDAO {
                 ? i.getQuantidadeDireta().setScale(3, RoundingMode.HALF_UP)
                 : dosePorUnidade.multiply(doseTotalAplicada).setScale(3, RoundingMode.HALF_UP);
         String sql = "INSERT INTO diario_insumo (iddiario, id_insumo, quantidade, unidade, "
-                + "dose_por_unidade, dose_total_aplicada, quantidade_direta, custo_unitario, custo, baixado) "
-                + "VALUES (?,?,?,?,?,?,?,0,0,false)";
+                + "dose_por_unidade, dose_total_aplicada, quantidade_direta, custo_unitario, custo, baixado, "
+                + "forma_aplicacao, peso_saco_kg, qtd_informada, plantas_aplicadas, quantidade_por_planta_kg) "
+                + "VALUES (?,?,?,?,?,?,?,0,0,false,?,?,?,?,?)";
         try (PreparedStatement st = c.prepareStatement(sql)) {
             st.setInt(1, idDiario); st.setInt(2, i.getIdInsumo()); st.setBigDecimal(3, quantidade);
             st.setString(4, unidade);
             setBigDecimalOrNull(st, 5, dosePorUnidade); setBigDecimalOrNull(st, 6, doseTotalAplicada);
             setBigDecimalOrNull(st, 7, porQuantidadeDireta ? quantidade : null);
+            st.setString(8, forma);
+            setBigDecimalOrNull(st, 9, "SACO".equals(forma) ? i.getPesoSacoKg() : null);
+            setBigDecimalOrNull(st, 10, forma != null ? i.getQtdInformada() : null);
+            if (forma != null && i.getPlantasAplicadas() != null && i.getPlantasAplicadas() > 0) st.setInt(11, i.getPlantasAplicadas());
+            else st.setNull(11, java.sql.Types.INTEGER);
+            setBigDecimalOrNull(st, 12, porPlantaKg);
             st.executeUpdate();
         }
+    }
+
+    /** Pesos de saco aceitos para adubo (kg). */
+    public static final java.util.Set<Integer> PESOS_SACO_KG = java.util.Set.of(5, 10, 25, 50);
+
+    /** Total em kg de uma linha de adubo: SACO = nº sacos × peso do saco; TONELADA = t × 1000; KG = kg. */
+    public static BigDecimal totalKgAdubo(String forma, BigDecimal qtd, BigDecimal pesoSacoKg) {
+        BigDecimal q = nz(qtd);
+        switch (forma) {
+            case "SACO":     return q.multiply(nz(pesoSacoKg));
+            case "TONELADA": return q.multiply(new BigDecimal(1000));
+            case "KG":       return q;
+            default: throw new IllegalArgumentException("Forma de aplicação inválida: " + forma);
+        }
+    }
+
+    /** Converte kg para a unidade de massa do insumo (G/KG/T); null se a unidade não for de massa. */
+    public static BigDecimal kgParaUnidade(BigDecimal kg, String unidade) {
+        if ("KG".equalsIgnoreCase(unidade)) return kg.setScale(3, RoundingMode.HALF_UP);
+        if ("T".equalsIgnoreCase(unidade))  return kg.divide(new BigDecimal(1000), 3, RoundingMode.HALF_UP);
+        if ("G".equalsIgnoreCase(unidade))  return kg.multiply(new BigDecimal(1000)).setScale(3, RoundingMode.HALF_UP);
+        return null;
     }
 
     /**
@@ -1257,6 +1299,11 @@ public class DiarioCampoDAO {
                 i.setDosePorUnidade(rs.getBigDecimal("dose_por_unidade"));
                 i.setDoseTotalAplicada(rs.getBigDecimal("dose_total_aplicada"));
                 i.setQuantidadeDireta(rs.getBigDecimal("quantidade_direta"));
+                i.setFormaAplicacao(rs.getString("forma_aplicacao"));
+                i.setPesoSacoKg(rs.getBigDecimal("peso_saco_kg"));
+                i.setQtdInformada(rs.getBigDecimal("qtd_informada"));
+                i.setPlantasAplicadas((Integer) rs.getObject("plantas_aplicadas"));
+                i.setQuantidadePorPlantaKg(rs.getBigDecimal("quantidade_por_planta_kg"));
                 i.setCustoUnitario(rs.getBigDecimal("custo_unitario")); i.setCusto(rs.getBigDecimal("custo"));
                 i.setBaixado(rs.getBoolean("baixado")); l.add(i);
             }

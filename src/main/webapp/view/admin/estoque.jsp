@@ -115,6 +115,15 @@
                 <div class="col-md-6">
                     <label class="form-label">Peso do saco/embalagem <span class="text-muted">(opcional)</span></label>
                     <input type="text" inputmode="decimal" class="form-control" id="insPesoEmbalagem" placeholder="ex.: 50 (saco de 50kg)">
+                    <!-- Adubo (massa): sacos de peso padrão; o valor é em kg e convertido para a unidade do insumo ao salvar -->
+                    <select class="form-select d-none" id="insSacoAdubo" title="Como o adubo chega: a granel (use a unidade Tonelada) ou em sacos de peso padrão">
+                        <option value="">A granel / sem saco padrão</option>
+                        <option value="5">Saco de 5 kg</option>
+                        <option value="10">Saco de 10 kg</option>
+                        <option value="25">Saco de 25 kg</option>
+                        <option value="50">Saco de 50 kg</option>
+                    </select>
+                    <small id="insSacoAduboHint" class="text-muted d-none">Adubo a granel: escolha a unidade <strong>Tonelada</strong>. Em sacos: escolha o tipo de saco.</small>
                 </div>
             </div>
             <div class="row g-2 mt-1">

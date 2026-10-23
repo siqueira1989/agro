@@ -173,6 +173,25 @@ public class ControllerDiarioCampo extends HttpServlet {
             if (i.getIdInsumo() == 0) {
                 writeJson(resp, 400, false, "Cada insumo precisa de um produto selecionado."); return;
             }
+            String forma = i.getFormaAplicacao();
+            if (forma != null && !forma.isBlank()) {
+                // Adubo por forma (V27): sacos de peso padrão, toneladas ou kg + nº de plantas.
+                if (!java.util.Set.of("SACO", "TONELADA", "KG").contains(forma)) {
+                    writeJson(resp, 400, false, "Forma de aplicação do adubo inválida."); return;
+                }
+                if ("SACO".equals(forma) && (i.getPesoSacoKg() == null
+                        || i.getPesoSacoKg().stripTrailingZeros().scale() > 0
+                        || !DiarioCampoDAO.PESOS_SACO_KG.contains(i.getPesoSacoKg().intValue()))) {
+                    writeJson(resp, 400, false, "Escolha o tipo de saco do adubo: 5, 10, 25 ou 50 kg."); return;
+                }
+                if (i.getQtdInformada() == null || i.getQtdInformada().signum() <= 0) {
+                    writeJson(resp, 400, false, "Informe a quantidade de adubo aplicada (nº de sacos, toneladas ou kg) maior que zero."); return;
+                }
+                if (i.getPlantasAplicadas() == null || i.getPlantasAplicadas() <= 0) {
+                    writeJson(resp, 400, false, "Informe o nº de plantas que receberam o adubo (maior que zero)."); return;
+                }
+                continue;
+            }
             boolean temQuantidadeDireta = i.getQuantidadeDireta() != null && i.getQuantidadeDireta().signum() > 0;
             boolean temDose = i.getDosePorUnidade() != null && i.getDosePorUnidade().signum() > 0
                     && i.getDoseTotalAplicada() != null && i.getDoseTotalAplicada().signum() > 0;

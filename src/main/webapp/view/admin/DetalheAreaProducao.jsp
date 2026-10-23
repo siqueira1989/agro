@@ -201,9 +201,9 @@
         <h6 class="fw-bold text-secondary mb-0"><i class="fas fa-seedling me-1"></i>Insumos — Adubo</h6>
         <button class="btn btn-outline-success btn-sm" type="button" id="btnAddInsAdu"><i class="fas fa-flask me-1"></i>Insumo</button>
       </div>
-      <small id="dcInsAduAjuda" class="text-muted d-block mb-1">Informe a quantidade aplicada direto (ou o nº de sacos, quando o insumo tiver peso de saco cadastrado) — a quantidade total consumida (debitada do estoque) é calculada automaticamente.</small>
+      <small id="dcInsAduAjuda" class="text-muted d-block mb-1">Escolha como o adubo foi aplicado (saco de 5/10/25/50 kg, tonelada ou kg — já vem do cadastro do insumo), a quantidade e o nº de plantas que receberam (padrão: todas do talhão). Ex.: 10 sacos de 50 kg em 50 plantas = 10 kg/planta; 5 t em 500 plantas = 10 kg/planta. O total é debitado do estoque.</small>
       <div id="dcInsAduTableWrap" class="table-responsive"><table class="table table-sm align-middle mb-0">
-        <thead class="table-light"><tr><th style="width:26%">Insumo</th><th style="width:22%">Nº de Sacos</th><th style="width:20%">Quantidade Aplicada</th><th style="width:20%">Qtd. Total Aplicada</th><th></th></tr></thead>
+        <thead class="table-light"><tr><th style="width:22%">Insumo</th><th style="width:28%">Forma / Quantidade</th><th style="width:10%">Plantas</th><th style="width:17%">Dose por planta</th><th style="width:17%">Qtd. Total Aplicada</th><th></th></tr></thead>
         <tbody id="dcInsAduBody"></tbody></table></div>
 
       <!-- Despesas (escondido na edição quando não há lançamento anterior — evita duplicar com "Despesas desta execução" acima) -->
