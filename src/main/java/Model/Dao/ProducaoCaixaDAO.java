@@ -1,5 +1,6 @@
 package Model.Dao;
 
+import Model.Model.TipoCaixa;
 import Model.Model.Vinculo;
 import Util.PostgresConnection;
 
@@ -120,7 +121,7 @@ public class ProducaoCaixaDAO {
           "SELECT d.iddiario, d.numero_diario, d.status, d.id_area, COALESCE(df.data_execucao, d.data) AS data_execucao, "
         + "       t.nome AS atividade, q.nome_quadra, "
         + "       COALESCE(a.propriedadeareaproducao, a.siglasareaproducao) AS area, "
-        + "       df.quantidade_caixas, df.preco_por_caixa, df.valor_regime %s "
+        + "       df.quantidade_caixas, df.preco_por_caixa, df.valor_regime "
         + "FROM diario_funcionario df "
         + "JOIN diario_campo d ON d.iddiario = df.iddiario "
         + "LEFT JOIN diario_tipo_atividade t ON t.idtipo = d.id_tipo_atividade "
@@ -129,11 +130,75 @@ public class ProducaoCaixaDAO {
         + "WHERE df.idpessoa=? AND df.regime_trabalho='PRODUCAO' "
         + "AND d.status IN ('EM_ANDAMENTO','CONCLUIDA') ";
 
-    /** Tipo(s) de embalagem do Processamento vêm da tabela da Colheita (V30), se ela já existir. */
-    private static final String SQL_TIPO_EMBALAGEM =
-          ", (SELECT string_agg(DISTINCT e.tipo_caixa, ', ') FROM colheita_processamento cp "
-        + "   JOIN colheita_processamento_embalagem e ON e.idprocessamento = cp.idprocessamento "
-        + "   WHERE cp.iddiario = d.iddiario AND e.idpessoa = df.idpessoa) AS tipo_embalagem ";
+    /**
+     * Embalagens do Processamento por embalador (tabela da Colheita, V30). A linha do
+     * diario_funcionario não guarda o tipo, então a embalagem de cada linha é achada em
+     * {@link #embalagemDaLinha} pelo diário + preço/caixa (+ caixas).
+     */
+    private static final String SQL_EMBALAGENS =
+          "SELECT cp.iddiario, e.tipo_caixa, e.quantidade_caixas, e.preco_caixa, dc.despesascusto AS nome "
+        + "FROM colheita_processamento cp "
+        + "JOIN colheita_processamento_embalagem e ON e.idprocessamento = cp.idprocessamento "
+        + "LEFT JOIN despesascusto dc ON dc.iddespesascusto = e.iddespesascusto "
+        + "WHERE e.idpessoa=? AND cp.iddiario IS NOT NULL";
+
+    /** Embalagens da pessoa por diário: {iddiario → [ {tipo, caixas, preco, nome} ]}. */
+    private Map<Integer, List<Object[]>> embalagensPorDiario(Connection c, int idpessoa) throws SQLException {
+        Map<Integer, List<Object[]>> out = new java.util.HashMap<>();
+        if (!temTabelaEmbalagem(c)) return out;
+        try (PreparedStatement ps = c.prepareStatement(SQL_EMBALAGENS)) {
+            ps.setInt(1, idpessoa);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    out.computeIfAbsent(rs.getInt("iddiario"), k -> new ArrayList<>()).add(new Object[]{
+                        rs.getString("tipo_caixa"), rs.getBigDecimal("quantidade_caixas"),
+                        rs.getBigDecimal("preco_caixa"), rs.getString("nome")});
+                }
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Embalagem de UMA linha do diário: tenta preço + caixas, depois só preço, depois o diário
+     * inteiro; aceita o resultado só se der um único tipo. Ambíguo ou sem dado → null ("—").
+     * Devolve {tipo, nome do cadastro em Despesas}.
+     */
+    private String[] embalagemDaLinha(List<Object[]> embs, BigDecimal caixas, BigDecimal preco) {
+        if (embs == null || embs.isEmpty()) return null;
+        for (int nivel = 0; nivel < 3; nivel++) {
+            java.util.Set<String> tipos = new java.util.LinkedHashSet<>();
+            String nome = null;
+            for (Object[] e : embs) {
+                boolean precoOk = preco != null && e[2] != null && preco.compareTo((BigDecimal) e[2]) == 0;
+                boolean caixasOk = caixas != null && e[1] != null && caixas.compareTo((BigDecimal) e[1]) == 0;
+                if ((nivel == 0 && !(precoOk && caixasOk)) || (nivel == 1 && !precoOk)) continue;
+                tipos.add((String) e[0]);
+                if (nome == null) nome = (String) e[3];
+            }
+            if (tipos.size() == 1) return new String[]{ tipos.iterator().next(), nome };
+            if (tipos.size() > 1) return null;   // ambíguo: não chuta
+        }
+        return null;
+    }
+
+    /** Rótulo legível: Colheita → enum (Caixa Contentor); embalagem → nome em Despesas, enum ou o código formatado. */
+    private static String rotuloTipoCaixa(String tipo, String nomeCadastro) {
+        if (tipo == null) return null;
+        if (nomeCadastro != null && !nomeCadastro.isBlank()) return nomeCadastro.trim();
+        if (Model.Model.TipoCaixa.isValido(tipo)) return Model.Model.TipoCaixa.valueOf(tipo).getRotulo();
+        StringBuilder sb = new StringBuilder("Caixa");
+        for (String p : tipo.toLowerCase().split("_")) {
+            if (p.isEmpty()) continue;
+            String w = switch (p) {
+                case "papelao" -> "Papelão";
+                case "plastico" -> "Plástico";
+                default -> p.matches("\\d.*") ? p : Character.toUpperCase(p.charAt(0)) + p.substring(1);
+            };
+            sb.append(' ').append(w);
+        }
+        return sb.toString();
+    }
 
     private boolean temTabelaEmbalagem(Connection c) throws SQLException {
         try (Statement st = c.createStatement();
@@ -149,8 +214,8 @@ public class ProducaoCaixaDAO {
     public List<Map<String, Object>> listarDoDiario(int idpessoa, String periodo) throws SQLException {
         List<Map<String, Object>> lista = new ArrayList<>();
         try (Connection c = new PostgresConnection().getConnection()) {
-            boolean emb = temTabelaEmbalagem(c);
-            String sql = String.format(SQL_DIARIO_BASE, emb ? SQL_TIPO_EMBALAGEM : ", NULL AS tipo_embalagem ")
+            Map<Integer, List<Object[]>> embs = embalagensPorDiario(c, idpessoa);
+            String sql = SQL_DIARIO_BASE
                     + "AND TO_CHAR(COALESCE(df.data_execucao, d.data),'YYYY-MM')=? ORDER BY 5, d.numero_diario";
             try (PreparedStatement ps = c.prepareStatement(sql)) {
                 ps.setInt(1, idpessoa);
@@ -159,10 +224,15 @@ public class ProducaoCaixaDAO {
                     while (rs.next()) {
                         Map<String, Object> m = new LinkedHashMap<>();
                         String atividade = rs.getString("atividade");
-                        String tipo = rs.getString("tipo_embalagem");
-                        if (tipo == null && atividade != null && atividade.toLowerCase().contains("colh")) tipo = "CONTENTOR";
                         BigDecimal caixas = rs.getBigDecimal("quantidade_caixas");
                         BigDecimal preco  = rs.getBigDecimal("preco_por_caixa");
+                        String tipo = null, rotulo = null;
+                        if (atividade != null && atividade.toLowerCase().contains("colh")) {
+                            tipo = TipoCaixa.CONTENTOR.name(); rotulo = TipoCaixa.CONTENTOR.getRotulo();
+                        } else {
+                            String[] emb = embalagemDaLinha(embs.get(rs.getInt("iddiario")), caixas, preco);
+                            if (emb != null) { tipo = emb[0]; rotulo = rotuloTipoCaixa(emb[0], emb[1]); }
+                        }
                         BigDecimal valor  = rs.getBigDecimal("valor_regime");
                         if (valor == null && caixas != null && preco != null) valor = caixas.multiply(preco);
                         Date dt = rs.getDate("data_execucao");
@@ -177,6 +247,7 @@ public class ProducaoCaixaDAO {
                         m.put("area", rs.getString("area"));
                         m.put("talhao", rs.getString("nome_quadra"));
                         m.put("tipoCaixa", tipo);
+                        m.put("tipoCaixaRotulo", rotulo);
                         m.put("caixas", caixas != null ? caixas : BigDecimal.ZERO);
                         m.put("precoPorCaixa", preco != null ? preco : BigDecimal.ZERO);
                         m.put("valor", valor != null ? valor : BigDecimal.ZERO);

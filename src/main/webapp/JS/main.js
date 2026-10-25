@@ -3142,7 +3142,8 @@ function renderTabelaCaixasDiario(lancs) {
     }
     lancs.forEach(function (l) {
         var areaTalhao = [l.area, l.talhao].filter(Boolean).map(escProducao).join(' / ') || '—';
-        var tipo = l.tipoCaixa ? escProducao(l.tipoCaixa.split(', ').map(rotuloCaixa).join(', ')) : '—';
+        // Uma embalagem por linha (rótulo vem do servidor); sem como identificar com segurança → "—".
+        var tipo = l.tipoCaixaRotulo ? escProducao(l.tipoCaixaRotulo) : '—';
         var num = escProducao(l.numeroDiario || l.idDiario);
         var link = l.idArea
             ? '<a href="' + AGRO_CTX + '/view/admin/DetalheAreaProducao.jsp?id=' + parseInt(l.idArea, 10)

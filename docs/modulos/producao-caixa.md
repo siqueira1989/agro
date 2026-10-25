@@ -37,8 +37,14 @@ safra, mas não paga ninguém. O perfil soma:
   para a pessoa respondem `{ok:false, confirmar:true, msg}`; o front pede confirmação e reenvia com
   `confirmardiario:true`. **Avisa em vez de bloquear**: no mesmo dia a pessoa pode ter caixas legítimas fora do
   diário (outro tipo de caixa, outro lote ou ajuste); o lançamento manual não substitui nem altera o diário.
+- **Tipo de caixa por linha:** `diario_funcionario` não guarda a embalagem. Colheita → sempre CONTENTOR ("Caixa
+  Contentor"). Processamento → `ProducaoCaixaDAO.embalagemDaLinha` procura em `colheita_processamento_embalagem` do
+  mesmo diário e pessoa: 1º preço/caixa + nº de caixas iguais, 2º só preço, 3º o diário inteiro; aceita só se der
+  **um único tipo** — ambíguo ou sem registro mostra "—" (nunca junta tipos). Rótulo: nome do cadastro em Despesas
+  (`despesascusto.despesascusto`), senão o rótulo do enum `TipoCaixa`, senão o código formatado ("PAPELAO_7KG" →
+  "Caixa Papelão 7kg").
 - Resposta do GET `acao=perfil` ganhou: `lancamentosDiario[]` ({idDiario, numeroDiario, status, contaNoTotal,
-  idArea, data, atividade, area, talhao, tipoCaixa, caixas, precoPorCaixa, valor}), `caixasDiario`, `valorManual`,
+  idArea, data, atividade, area, talhao, tipoCaixa, tipoCaixaRotulo, caixas, precoPorCaixa, valor}), `caixasDiario`, `valorManual`,
   `valorDiario`. `valorProducao`/`valorLiquido` agora incluem o Diário.
 
 ## Dependências
@@ -69,3 +75,9 @@ safra, mas não paga ninguém. O perfil soma:
   as 2 linhas (a 2ª "fora do total"), total R$ 120; caixa manual em 24/10 pediu confirmação (cancelar não gravou,
   confirmar gravou); com preço R$ 3,50 → "Manual R$ 17,50 + Diário R$ 120,00 = R$ 137,50" no Fechamento e no modal,
   `pgValor` 137,50. Dados de teste (pessoa 67, diários 91/92, `producao_caixa` e `preco_caixa` dela) apagados.
+- 2026-10-25 — Correção (teste integrado do Gerente): a coluna "Tipo de Caixa" juntava todos os tipos do diário em
+  cada linha ("Caixa Papelão 10kg, PAPELAO_7KG"). Agora cada linha mostra só a sua embalagem (regra acima) com rótulo
+  legível. Verificado com embalador de teste (id 69): diário A com 40 cx × R$ 2,30 (PAPELAO_10) e 20 cx × R$ 1,80
+  (PAPELAO_7KG) → "Caixa Papelão 10kg" e "Caixa Papelão 7kg" em linhas separadas; diário B com 2 linhas iguais
+  (10 cx × R$ 2,00) e tipos diferentes → "—" nas duas. Dados de teste (pessoa 69, diários TESTE-PP-A/B, lote e
+  processamentos) apagados.
