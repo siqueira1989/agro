@@ -80,7 +80,7 @@ Erros: HTTP 400 `{"ok":false,"msg":"<regra>","target":...}` (ex.: `idAlimento e 
 
 ## Pendências
 - [ ] Modal de **atualização** não permite trocar categoria/alimento/área/tipo (só descrição, unidade, valor, tipo, classificação). Para mudar a chave: excluir e recadastrar.
-- [ ] Dados de teste na base local: ids 6 (contentor, alimento 1/área 2, R$ 3,50), 7 (PLASTICO_20), 9 (PAPELAO_10), 10 (MADEIRA_12) — podem ser apagados ou mantidos para as ondas 2/3.
+- [x] Dados de teste (ids 6, 7, 9, 10 e 16) apagados em 2026-10-25 pelo Gerente Geral, a pedido do usuário. Não há preço de caixa/embalagem cadastrado: o primeiro lançamento real de Colheita ou Processamento vai registrar.
 
 ## Histórico
 - 2026-09-07 — corrigido update sempre bloqueado; adicionada classificação Fixo/Variável (V23).
