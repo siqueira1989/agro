@@ -12,14 +12,6 @@
   <div class="bg-success text-white p-3 rounded mb-4 d-flex justify-content-between align-items-center">
     <h2 class="m-0"><i class="fas fa-map-marked-alt me-2"></i>Áreas de Produção</h2>
     <div>
-      <a href="${pageContext.request.contextPath}/RelatorioExportServlet?tipo=excel&modulo=areaproducao"
-         class="btn btn-light btn-sm me-1">
-        <i class="fas fa-file-excel me-1 text-success"></i>Excel
-      </a>
-      <a href="${pageContext.request.contextPath}/RelatorioExportServlet?tipo=pdf&modulo=areaproducao"
-         class="btn btn-light btn-sm me-2">
-        <i class="fas fa-file-pdf me-1 text-danger"></i>PDF
-      </a>
       <a href="${pageContext.request.contextPath}/view/admin/CadastroAreaProducao.jsp" class="btn btn-light btn-sm">
         <i class="fas fa-plus me-1"></i>Nova Área
       </a>

@@ -1,9 +1,7 @@
 package Controller;
 
-import Model.Dao.AreaProducaoDAO;
 import Model.Dao.FolhaPagamentoDAO;
 import Model.Dao.FuncionarioDAO;
-import Model.Model.AreaProducao;
 import Model.Model.FolhaPagamento;
 import Model.Model.Funcionario;
 import net.sf.jasperreports.engine.*;
@@ -35,13 +33,11 @@ public class RelatorioExportServlet extends HttpServlet {
 
     private FolhaPagamentoDAO folhaDAO;
     private FuncionarioDAO funcionarioDAO;
-    private AreaProducaoDAO areaDAO;
 
     @Override
     public void init() {
         folhaDAO = new FolhaPagamentoDAO();
         funcionarioDAO = new FuncionarioDAO();
-        areaDAO = new AreaProducaoDAO();
     }
 
     @Override
@@ -71,12 +67,6 @@ public class RelatorioExportServlet extends HttpServlet {
                     List<Funcionario> funcionarios = funcionarioDAO.listAllFuncionario();
                     if ("excel".equalsIgnoreCase(tipo)) exportarFuncionariosExcel(resp, funcionarios);
                     else exportarFuncionariosPdf(resp, funcionarios);
-                    break;
-
-                case "areaproducao":
-                    List<AreaProducao> areas = areaDAO.listAll();
-                    if ("excel".equalsIgnoreCase(tipo)) exportarAreasExcel(resp, areas);
-                    else exportarAreasPdf(resp, areas);
                     break;
 
                 default:
@@ -221,69 +211,6 @@ public class RelatorioExportServlet extends HttpServlet {
                     new String[]{"Nome", "CPF", "Matrícula", "Cargo", "Tipo"},
                     new int[]{180, 100, 80, 100, 80},
                     lista, Funcionario.class
-            );
-            JasperExportManager.exportReportToPdfStream(print, os);
-        } catch (JRException e) {
-            // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
-            String cod = Util.LogUtil.erro(RelatorioExportServlet.class, "Falha tratada em RelatorioExportServlet.", e);
-            throw new IOException("Erro ao gerar PDF: " + cod, e);
-        }
-    }
-
-    // ===================== ÁREAS DE PRODUÇÃO =====================
-
-    private void exportarAreasExcel(HttpServletResponse resp, List<AreaProducao> lista) throws IOException {
-        resp.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-        resp.setHeader("Content-Disposition", "attachment; filename=\"areas_producao.xlsx\"");
-
-        try (XSSFWorkbook wb = new XSSFWorkbook(); OutputStream os = resp.getOutputStream()) {
-            Sheet sheet = wb.createSheet("Áreas de Produção");
-            CellStyle headerStyle = criarEstiloCabecalho(wb);
-
-            Row titulo = sheet.createRow(0);
-            Cell cellTitulo = titulo.createCell(0);
-            cellTitulo.setCellValue("ÁREAS DE PRODUÇÃO");
-            cellTitulo.setCellStyle(headerStyle);
-            sheet.addMergedRegion(new CellRangeAddress(0, 0, 0, 4));
-
-            Row cab = sheet.createRow(1);
-            String[] cols = {"Propriedade", "Proprietário", "Sigla", "Qtd. Plantas", "CEP"};
-            for (int i = 0; i < cols.length; i++) {
-                Cell c = cab.createCell(i);
-                c.setCellValue(cols[i]);
-                c.setCellStyle(headerStyle);
-            }
-
-            int rowNum = 2;
-            for (AreaProducao a : lista) {
-                Row row = sheet.createRow(rowNum++);
-                row.createCell(0).setCellValue(a.getPropriedadeAreaProducao());
-                row.createCell(1).setCellValue(a.getProprietarioAreaProducao());
-                row.createCell(2).setCellValue(a.getSiglasAreaProducao());
-                row.createCell(3).setCellValue(a.getQuantidadeTotalPlantasAreaProducao());
-                row.createCell(4).setCellValue(a.getCep() != null ? a.getCep() : "");
-            }
-
-            sheet.createRow(rowNum + 1).createCell(0)
-                    .setCellValue("Gerado em: " + LocalDateTime.now().format(FORMATTER));
-
-            for (int i = 0; i < 5; i++) sheet.autoSizeColumn(i);
-            wb.write(os);
-        }
-    }
-
-    private void exportarAreasPdf(HttpServletResponse resp, List<AreaProducao> lista) throws IOException {
-        resp.setContentType("application/pdf");
-        resp.setHeader("Content-Disposition", "attachment; filename=\"areas_producao.pdf\"");
-
-        try (OutputStream os = resp.getOutputStream()) {
-            JasperPrint print = gerarJasperPrint(
-                    "ÁREAS DE PRODUÇÃO",
-                    new String[]{"propriedadeAreaProducao", "proprietarioAreaProducao",
-                            "siglasAreaProducao", "quantidadeTotalPlantasAreaProducao", "cep"},
-                    new String[]{"Propriedade", "Proprietário", "Sigla", "Qtd. Plantas", "CEP"},
-                    new int[]{180, 140, 60, 80, 100},
-                    lista, AreaProducao.class
             );
             JasperExportManager.exportReportToPdfStream(print, os);
         } catch (JRException e) {

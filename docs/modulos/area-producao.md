@@ -23,6 +23,7 @@
 - **Colheita** e **Relatórios** (export Excel/PDF da área em `RelatorioExportServlet`, que é do núcleo).
 
 ## Pendências
-- [ ] —
+- [ ] A mudança em `RelatorioExportServlet.java` (remoção do `case "areaproducao"`) só entra no próximo build Maven; até lá o servlet compilado no Tomcat ainda aceita a URL antiga.
 
 ## Histórico
+- 2026-10-25 — Removida a exportação Excel/PDF da página: botões em `areaproducao.jsp` (antigas linhas 15–21); `main.js` não tinha handler dessa exportação; em `RelatorioExportServlet.java` (autorizado pelo Gerente) removidos `case "areaproducao"`, `exportarAreasExcel/Pdf`, campo/`init` do `AreaProducaoDAO` e imports. Folha e funcionário intactos. JSP copiado para `target`; build pendente.
