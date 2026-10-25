@@ -16,3 +16,6 @@ Use esta ficha para mudanças que atravessam módulos: login, layout, menu, rela
 ## Regras
 - Mudanças aqui afetam todos os módulos: listar o impacto antes de editar.
 - Ao criar módulo novo: registrar o servlet no `web.xml`, adicionar link no `menu.jsp` e criar a ficha em `docs/modulos/`.
+
+## Histórico
+- 2026-10-25 — `menu.jsp`: removidos os itens "Área de Produção (Excel)" e "Área de Produção (PDF)" do menu Relatório (o `case "areaproducao"` do `RelatorioExportServlet` foi removido no mesmo dia pela conversa da Área de Produção; os links passaram a dar HTTP 400). Feito pelo Gerente Geral no teste integrado.

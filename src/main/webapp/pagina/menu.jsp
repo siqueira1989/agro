@@ -100,13 +100,6 @@
                     <a class="dropdown-item" href="<%=request.getContextPath()%>/RelatorioExportServlet?tipo=pdf&modulo=funcionario">
                         <i class="fas fa-file-pdf me-1 text-danger"></i>Funcionario (PDF)
                     </a>
-                    <div class="dropdown-divider"></div>
-                    <a class="dropdown-item" href="<%=request.getContextPath()%>/RelatorioExportServlet?tipo=excel&modulo=areaproducao">
-                        <i class="fas fa-file-excel me-1 text-success"></i>Área de Produção (Excel)
-                    </a>
-                    <a class="dropdown-item" href="<%=request.getContextPath()%>/RelatorioExportServlet?tipo=pdf&modulo=areaproducao">
-                        <i class="fas fa-file-pdf me-1 text-danger"></i>Área de Produção (PDF)
-                    </a>
                 </div>
             </li>
 
