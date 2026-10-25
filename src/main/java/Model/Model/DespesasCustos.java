@@ -16,6 +16,45 @@ public class DespesasCustos {
  private String tipodespesascustos;
  private String classificacao;
 
+ /* V28 — preço de caixa/embalagem por alimento e área (categoria ≠ GERAL). */
+ private String categoria = CATEGORIA_GERAL;
+ private Integer idAlimento;
+ private Integer idAreaProducao;
+ private String tipoCaixa;
+ /* Somente leitura (JOIN), para exibição: */
+ private String nomeAlimento;
+ private String nomeArea;
+ private String siglaArea;
+
+    public static final String CATEGORIA_GERAL = "GERAL";
+    public static final String CATEGORIA_CAIXA_COLHEITA = "CAIXA_COLHEITA";
+    public static final String CATEGORIA_EMBALAGEM = "EMBALAGEM";
+
+    public static boolean isCategoriaValida(String c) {
+        return CATEGORIA_GERAL.equals(c) || CATEGORIA_CAIXA_COLHEITA.equals(c) || CATEGORIA_EMBALAGEM.equals(c);
+    }
+
+    public String getCategoria() { return categoria; }
+    public void setCategoria(String categoria) { this.categoria = categoria; }
+
+    public Integer getIdAlimento() { return idAlimento; }
+    public void setIdAlimento(Integer idAlimento) { this.idAlimento = idAlimento; }
+
+    public Integer getIdAreaProducao() { return idAreaProducao; }
+    public void setIdAreaProducao(Integer idAreaProducao) { this.idAreaProducao = idAreaProducao; }
+
+    public String getTipoCaixa() { return tipoCaixa; }
+    public void setTipoCaixa(String tipoCaixa) { this.tipoCaixa = tipoCaixa; }
+
+    public String getNomeAlimento() { return nomeAlimento; }
+    public void setNomeAlimento(String nomeAlimento) { this.nomeAlimento = nomeAlimento; }
+
+    public String getNomeArea() { return nomeArea; }
+    public void setNomeArea(String nomeArea) { this.nomeArea = nomeArea; }
+
+    public String getSiglaArea() { return siglaArea; }
+    public void setSiglaArea(String siglaArea) { this.siglaArea = siglaArea; }
+
     public int getIddespesascusto() {
         return iddespesascusto;
     }

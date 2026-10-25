@@ -7,10 +7,13 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Types;
+import java.text.Normalizer;
 import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 /**
  * Persistência de Despesas e Custos.
@@ -38,8 +41,20 @@ import java.util.Locale;
 public class DespesasCustosDAO {
 
     private static final String COLUNAS =
-        "iddespesascusto, despesascusto, unidadedespesascustos, "
-      + "valordespesascustos, tipodespesascustos, classificacao";
+        "d.iddespesascusto, d.despesascusto, d.unidadedespesascustos, "
+      + "d.valordespesascustos, d.tipodespesascustos, d.classificacao, "
+      + "d.categoria, d.id_alimento, d.id_area_producao, d.tipo_caixa, "
+      + "a.nomeproduto AS nome_alimento, ap.propriedadeareaproducao AS nome_area, "
+      + "ap.siglasareaproducao AS sigla_area";
+
+    /** FROM com os JOINs de exibição (nome do alimento e da área). */
+    private static final String FROM =
+        " FROM despesascusto d"
+      + " LEFT JOIN alimento a ON a.idproduto = d.id_alimento"
+      + " LEFT JOIN areaproducao ap ON ap.idareaproducao = d.id_area_producao";
+
+    /** Código de caixa/embalagem: maiúsculas, dígitos e '_' (ex.: CONTENTOR, PLASTICO_20). */
+    private static final Pattern TIPO_CAIXA = Pattern.compile("^[A-Z0-9_]{1,30}$");
 
     /** Já existe uma despesa com esta descrição? */
     public boolean existeDespesaCusto(String despesascustos) throws SQLException {
@@ -57,22 +72,30 @@ public class DespesasCustosDAO {
 
     public void create(DespesasCustos despesaCusto) throws SQLException {
         String sql = "INSERT INTO despesascusto (despesascusto, unidadedespesascustos, "
-                   + "valordespesascustos, tipodespesascustos, classificacao) VALUES (?, ?, ?, ?, ?)";
+                   + "valordespesascustos, tipodespesascustos, classificacao, "
+                   + "categoria, id_alimento, id_area_producao, tipo_caixa) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         try (Connection conexao = new PostgresConnection().getConnection();
              PreparedStatement stmt = conexao.prepareStatement(sql)) {
 
+            String categoria = despesaCusto.getCategoria() == null
+                    ? DespesasCustos.CATEGORIA_GERAL : despesaCusto.getCategoria();
+            boolean geral = DespesasCustos.CATEGORIA_GERAL.equals(categoria);
             stmt.setString(1, despesaCusto.getDespesascusto());
             stmt.setString(2, despesaCusto.getUnidadedespesascustos());
             stmt.setBigDecimal(3, valor(despesaCusto));
             stmt.setString(4, despesaCusto.getTipodespesascustos());
             stmt.setString(5, despesaCusto.getClassificacao());
+            stmt.setString(6, categoria);
+            stmt.setObject(7, geral ? null : despesaCusto.getIdAlimento(), Types.INTEGER);
+            stmt.setObject(8, geral ? null : despesaCusto.getIdAreaProducao(), Types.INTEGER);
+            stmt.setString(9, geral ? null : normalizarTipoCaixa(despesaCusto.getTipoCaixa()));
             stmt.executeUpdate();
         }
     }
 
     public DespesasCustos read(int id) throws SQLException {
-        String sql = "SELECT " + COLUNAS + " FROM despesascusto WHERE iddespesascusto = ?";
+        String sql = "SELECT " + COLUNAS + FROM + " WHERE d.iddespesascusto = ?";
 
         try (Connection conexao = new PostgresConnection().getConnection();
              PreparedStatement stmt = conexao.prepareStatement(sql)) {
@@ -113,7 +136,7 @@ public class DespesasCustosDAO {
     }
 
     public List<DespesasCustos> listAll() throws SQLException {
-        String sql = "SELECT " + COLUNAS + " FROM despesascusto ORDER BY despesascusto";
+        String sql = "SELECT " + COLUNAS + FROM + " ORDER BY d.despesascusto";
         List<DespesasCustos> lista = new ArrayList<>();
 
         try (Connection conexao = new PostgresConnection().getConnection();
@@ -174,6 +197,163 @@ public class DespesasCustosDAO {
         }
     }
 
+    /* ============================================================
+       V28 — Preço de caixa (colheita) e de embalagem (processamento),
+       por alimento e área. Contrato usado pelo Diário de Campo e pela
+       Colheita e Estoque: buscar → se null, pedir o valor ao usuário →
+       registrar (upsert). As versões com Connection não abrem, não
+       comitam e não fecham a conexão: rodam na transação do chamador.
+       Regras inválidas (categoria, código, valor, alimento/área
+       inexistentes) sobem como IllegalArgumentException com mensagem
+       pronta para o usuário.
+       ============================================================ */
+
+    /** Preço cadastrado para (categoria, alimento, área, tipo de caixa), ou {@code null}. */
+    public DespesasCustos buscarPrecoCaixa(String categoria, int idAlimento, int idArea, String tipoCaixa) throws SQLException {
+        try (Connection c = new PostgresConnection().getConnection()) {
+            return buscarPrecoCaixa(c, categoria, idAlimento, idArea, tipoCaixa);
+        }
+    }
+
+    public DespesasCustos buscarPrecoCaixa(Connection c, String categoria, int idAlimento, int idArea, String tipoCaixa) throws SQLException {
+        String cat = validarCategoriaCaixa(categoria);
+        String tipo = tipoCaixaPadrao(cat, tipoCaixa);
+        String sql = "SELECT " + COLUNAS + FROM
+                   + " WHERE d.categoria = ? AND d.id_alimento = ? AND d.id_area_producao = ? AND d.tipo_caixa = ?";
+        try (PreparedStatement stmt = c.prepareStatement(sql)) {
+            stmt.setString(1, cat);
+            stmt.setInt(2, idAlimento);
+            stmt.setInt(3, idArea);
+            stmt.setString(4, tipo);
+            try (ResultSet rs = stmt.executeQuery()) {
+                return rs.next() ? mapear(rs) : null;
+            }
+        }
+    }
+
+    /**
+     * Insere o preço ou, se já existir para a mesma chave, atualiza o valor.
+     * {@code descricao} vazia gera uma automática (ex.: "Caixa Contentor - CAQUI RAMA FORTE - SS")
+     * e, num registro já existente, preserva a descrição atual.
+     * Grava unidade "un", classificação VARIAVEL. Devolve o {@code iddespesascusto}.
+     */
+    public int registrarPrecoCaixa(String categoria, int idAlimento, int idArea, String tipoCaixa,
+                                   String descricao, BigDecimal valor) throws SQLException {
+        try (Connection c = new PostgresConnection().getConnection()) {
+            return registrarPrecoCaixa(c, categoria, idAlimento, idArea, tipoCaixa, descricao, valor);
+        }
+    }
+
+    public int registrarPrecoCaixa(Connection c, String categoria, int idAlimento, int idArea, String tipoCaixa,
+                                   String descricao, BigDecimal valor) throws SQLException {
+        String cat = validarCategoriaCaixa(categoria);
+        String tipo = tipoCaixaPadrao(cat, tipoCaixa);
+        if (valor == null || valor.signum() <= 0 || valor.compareTo(new BigDecimal("99999999.99")) > 0) {
+            throw new IllegalArgumentException("Informe um valor maior que zero para a caixa/embalagem.");
+        }
+        String nomeAlimento = nome(c, "SELECT nomeproduto FROM alimento WHERE idproduto = ?", idAlimento);
+        if (nomeAlimento == null) throw new IllegalArgumentException("Alimento não encontrado.");
+        String siglaArea = nome(c, "SELECT siglasareaproducao FROM areaproducao WHERE idareaproducao = ?", idArea);
+        if (siglaArea == null) throw new IllegalArgumentException("Área de produção não encontrada.");
+
+        boolean descricaoInformada = descricao != null && !descricao.trim().isEmpty();
+        String desc = descricaoInformada ? descricao.trim()
+                    : rotuloTipoCaixa(tipo) + " - " + nomeAlimento.trim() + " - " + siglaArea.trim();
+        if (desc.length() > 50) desc = desc.substring(0, 50);
+
+        String sql = "INSERT INTO despesascusto (despesascusto, unidadedespesascustos, valordespesascustos, "
+                   + "tipodespesascustos, classificacao, categoria, id_alimento, id_area_producao, tipo_caixa) "
+                   + "VALUES (?, 'un', ?, ?, 'VARIAVEL', ?, ?, ?, ?) "
+                   + "ON CONFLICT (categoria, id_alimento, id_area_producao, tipo_caixa) WHERE categoria <> 'GERAL' "
+                   + "DO UPDATE SET valordespesascustos = EXCLUDED.valordespesascustos, "
+                   + "despesascusto = CASE WHEN ? THEN EXCLUDED.despesascusto ELSE despesascusto.despesascusto END "
+                   + "RETURNING iddespesascusto";
+        try (PreparedStatement stmt = c.prepareStatement(sql)) {
+            stmt.setString(1, desc);
+            stmt.setBigDecimal(2, valor.setScale(2, java.math.RoundingMode.HALF_UP));
+            stmt.setString(3, DespesasCustos.CATEGORIA_CAIXA_COLHEITA.equals(cat) ? "Caixa colheita" : "Embalagem");
+            stmt.setString(4, cat);
+            stmt.setInt(5, idAlimento);
+            stmt.setInt(6, idArea);
+            stmt.setString(7, tipo);
+            stmt.setBoolean(8, descricaoInformada);
+            try (ResultSet rs = stmt.executeQuery()) {
+                rs.next();
+                return rs.getInt(1);
+            }
+        }
+    }
+
+    /** Embalagens (categoria EMBALAGEM) cadastradas para o alimento/área, por código. */
+    public List<DespesasCustos> listarEmbalagens(int idAlimento, int idArea) throws SQLException {
+        try (Connection c = new PostgresConnection().getConnection()) {
+            return listarEmbalagens(c, idAlimento, idArea);
+        }
+    }
+
+    public List<DespesasCustos> listarEmbalagens(Connection c, int idAlimento, int idArea) throws SQLException {
+        String sql = "SELECT " + COLUNAS + FROM
+                   + " WHERE d.categoria = 'EMBALAGEM' AND d.id_alimento = ? AND d.id_area_producao = ?"
+                   + " ORDER BY d.tipo_caixa";
+        List<DespesasCustos> lista = new ArrayList<>();
+        try (PreparedStatement stmt = c.prepareStatement(sql)) {
+            stmt.setInt(1, idAlimento);
+            stmt.setInt(2, idArea);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) lista.add(mapear(rs));
+            }
+        }
+        return lista;
+    }
+
+    /**
+     * Normaliza o código digitado: sem acentos, maiúsculas, espaços/hífens viram '_'
+     * ("Plástico 20" → "PLASTICO_20"). {@code null}/vazio → {@code null}.
+     * Código fora de {@code [A-Z0-9_]{1,30}} → IllegalArgumentException.
+     */
+    public static String normalizarTipoCaixa(String tipoCaixa) {
+        if (tipoCaixa == null || tipoCaixa.trim().isEmpty()) return null;
+        String t = Normalizer.normalize(tipoCaixa.trim(), Normalizer.Form.NFD)
+                             .replaceAll("\\p{M}", "")
+                             .toUpperCase(Locale.ROOT)
+                             .replaceAll("[\\s\\-]+", "_");
+        if (!TIPO_CAIXA.matcher(t).matches()) {
+            throw new IllegalArgumentException("Tipo de caixa inválido: use letras, números e '_' (até 30), ex.: PLASTICO_20.");
+        }
+        return t;
+    }
+
+    private static String validarCategoriaCaixa(String categoria) {
+        String cat = categoria == null ? "" : categoria.trim().toUpperCase(Locale.ROOT);
+        if (!DespesasCustos.CATEGORIA_CAIXA_COLHEITA.equals(cat) && !DespesasCustos.CATEGORIA_EMBALAGEM.equals(cat)) {
+            throw new IllegalArgumentException("Categoria deve ser CAIXA_COLHEITA ou EMBALAGEM.");
+        }
+        return cat;
+    }
+
+    /** CAIXA_COLHEITA sem código assume CONTENTOR; EMBALAGEM exige o código. */
+    private static String tipoCaixaPadrao(String categoria, String tipoCaixa) {
+        String t = normalizarTipoCaixa(tipoCaixa);
+        if (t == null && DespesasCustos.CATEGORIA_CAIXA_COLHEITA.equals(categoria)) return Model.Model.TipoCaixa.CONTENTOR.name();
+        if (t == null) throw new IllegalArgumentException("Informe o tipo de embalagem.");
+        return t;
+    }
+
+    /** Rótulo do enum TipoCaixa quando o código é conhecido; senão o próprio código legível. */
+    private static String rotuloTipoCaixa(String tipo) {
+        if (Model.Model.TipoCaixa.isValido(tipo)) return Model.Model.TipoCaixa.valueOf(tipo).getRotulo();
+        return "Embalagem " + tipo.replace('_', ' ');
+    }
+
+    private static String nome(Connection c, String sql, int id) throws SQLException {
+        try (PreparedStatement stmt = c.prepareStatement(sql)) {
+            stmt.setInt(1, id);
+            try (ResultSet rs = stmt.executeQuery()) {
+                return rs.next() ? rs.getString(1) : null;
+            }
+        }
+    }
+
     @SuppressWarnings("deprecation")
     public static String converterParaMoedaBrasileira(Double valor) {
         NumberFormat formatoBrasileiro = NumberFormat.getNumberInstance(new Locale("pt", "BR"));  // Locale.of() so existe a partir do Java 19
@@ -191,6 +371,13 @@ public class DespesasCustosDAO {
         d.setValordespesascustos(v != null ? v.doubleValue() : 0d);
         d.setTipodespesascustos(rs.getString("tipodespesascustos"));
         d.setClassificacao(rs.getString("classificacao"));
+        d.setCategoria(rs.getString("categoria"));
+        d.setIdAlimento((Integer) rs.getObject("id_alimento"));
+        d.setIdAreaProducao((Integer) rs.getObject("id_area_producao"));
+        d.setTipoCaixa(rs.getString("tipo_caixa"));
+        d.setNomeAlimento(rs.getString("nome_alimento"));
+        d.setNomeArea(rs.getString("nome_area"));
+        d.setSiglaArea(rs.getString("sigla_area"));
         return d;
     }
 

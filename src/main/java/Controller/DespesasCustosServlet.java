@@ -31,10 +31,17 @@ public class DespesasCustosServlet extends HttpServlet {
        Helpers: resposta JSON padronizada e parse de moeda BRL
        ============================================================ */
     private void writeJson(HttpServletResponse resp, int status, boolean ok, String msg, String target) throws IOException {
+        writeJson(resp, status, ok, msg, target, null);
+    }
+
+    /** Mesmo padrão {ok,msg,target} com campos extras (ex.: encontrado, registro, embalagens). */
+    private void writeJson(HttpServletResponse resp, int status, boolean ok, String msg, String target,
+                           Map<String, Object> extras) throws IOException {
         resp.setContentType("application/json");
         resp.setCharacterEncoding(StandardCharsets.UTF_8.name());
 
         Map<String, Object> payload = new HashMap<>();
+        if (extras != null) payload.putAll(extras);
         payload.put("ok", ok);
         payload.put("msg", msg);
         if (target != null) payload.put("target", target);
@@ -59,6 +66,9 @@ public class DespesasCustosServlet extends HttpServlet {
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         response.setContentType("application/json");
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+        if (request.getParameter("precoCaixa") != null) { handleBuscarPrecoCaixa(request, response); return; }
+        if (request.getParameter("embalagens") != null) { handleListarEmbalagens(request, response); return; }
+        if (request.getParameter("tiposCaixa") != null) { handleTiposCaixa(response); return; }
         try {
             List<DespesasCustos> despesasCustosList = despesasCustosDAO.listAll();
             try (PrintWriter out = response.getWriter()) {
@@ -86,6 +96,8 @@ public class DespesasCustosServlet extends HttpServlet {
             handleUpdate(request, response);
         } else if ("delete".equalsIgnoreCase(acao)) {
             handleDelete(request, response);
+        } else if ("registrarPrecoCaixa".equalsIgnoreCase(acao)) {
+            handleRegistrarPrecoCaixa(request, response);
         } else {
             writeJson(response, HttpServletResponse.SC_BAD_REQUEST, false, "Ação inválida.", "page");
         }

@@ -163,7 +163,7 @@ public class ControllerDiarioCampo extends HttpServlet {
                 writeJson(resp, 400, false, "Horas trabalhadas não podem ser negativas."); return;
             }
         }
-        if (!validarRegimeColheita(d.getIdTipoAtividade(), d.getFuncionarios(), resp)) return;
+        if (!validarRegimeCaixa(d.getIdTipoAtividade(), d.getFuncionarios(), resp)) return;
         // Nova regra: quantidade não é digitada — é calculada no servidor (DiarioCampoDAO.inserirInsumo),
         // de uma de duas formas mutuamente exclusivas: dosePorUnidade × doseTotalAplicada (DEFENSIVO,
         // aplicação por calda) OU quantidadeDireta (ADUBO, aplicação direta — ex.: nº de sacos × peso do
@@ -280,7 +280,7 @@ public class ControllerDiarioCampo extends HttpServlet {
         }
         DiarioCampo atual = dao.buscarPorId(id);
         if (atual == null) { writeJson(resp, 400, false, "Diário não encontrado."); return; }
-        if (!validarRegimeColheita(atual.getIdTipoAtividade(), funcionarios, resp)) return;
+        if (!validarRegimeCaixa(atual.getIdTipoAtividade(), funcionarios, resp)) return;
         dao.adicionarExecucao(id, dataExec, funcionarios, despesas);
         writeJson(resp, 200, true, "Execução registrada com sucesso! Custo total recalculado.");
     }
@@ -358,13 +358,47 @@ public class ControllerDiarioCampo extends HttpServlet {
      * que o cliente mandou): o formulário reaproveita a mesma linha entre trocas de tipo de
      * atividade no navegador, e uma linha deixada preenchida antes de o usuário mudar o tipo não
      * pode vazar quantidade_caixas/valor_regime para fora da Colheita.
+     *
+     * Processamento (V29) usa o mesmo regime: CLT/Diarista/Empreita pelas horas (REGIME_SISTEMA,
+     * caixas opcional) e Embalador por caixa (PRODUCAO, caixas + preço obrigatórios).
+     *
+     * Funcionário de Produção só existe pago por caixa: na Colheita só o cargo Colhedor, no
+     * Processamento só o Embalador, sempre em PRODUCAO; nas demais atividades não entra (não tem
+     * hora/diária para calcular). Tipo/cargo vêm do banco (DiarioCampoDAO.cargosProducao), nunca
+     * do cliente.
      * Escreve o erro na resposta e devolve false quando a validação falha.
      */
-    private boolean validarRegimeColheita(int idTipoAtividade, List<DiarioFuncionario> funcionarios,
+    private boolean validarRegimeCaixa(int idTipoAtividade, List<DiarioFuncionario> funcionarios,
             HttpServletResponse resp) throws Exception {
         String nomeTipo = tipoDAO.buscarNome(idTipoAtividade);
-        boolean ehColheita = nomeTipo != null && nomeTipo.toLowerCase().contains("colh");
-        if (!ehColheita) {
+        String nome = nomeTipo != null ? nomeTipo.toLowerCase() : "";
+        boolean ehColheita = nome.contains("colh");
+        boolean ehProcessamento = nome.contains("processa");
+        List<Integer> ids = new ArrayList<>();
+        for (DiarioFuncionario f : funcionarios) ids.add(f.getIdPessoa());
+        Map<Integer, String> cargos = dao.cargosProducao(ids);
+        for (DiarioFuncionario f : funcionarios) {
+            if (!cargos.containsKey(f.getIdPessoa())) continue;
+            String cargo = cargos.get(f.getIdPessoa());
+            f.setTipoFuncionario("PRODUCAO");
+            if (ehColheita && "Embalador".equalsIgnoreCase(cargo)) {
+                writeJson(resp, 400, false, "Funcionário de Produção com cargo Embalador não pode ser lançado na Colheita.");
+                return false;
+            }
+            if (ehProcessamento && "Colhedor".equalsIgnoreCase(cargo)) {
+                writeJson(resp, 400, false, "Funcionário de Produção com cargo Colhedor não pode ser lançado no Processamento.");
+                return false;
+            }
+            if (!ehColheita && !ehProcessamento) {
+                writeJson(resp, 400, false, "Funcionário de Produção (pago por caixa) só pode ser lançado na Colheita ou no Processamento.");
+                return false;
+            }
+            if (!"PRODUCAO".equals(f.getRegimeTrabalho())) {
+                writeJson(resp, 400, false, "Funcionário de Produção deve ser lançado no regime Produção (por caixa).");
+                return false;
+            }
+        }
+        if (!ehColheita && !ehProcessamento) {
             for (DiarioFuncionario f : funcionarios) {
                 f.setRegimeTrabalho(null); f.setQuantidadeCaixas(null); f.setPrecoPorCaixa(null);
             }
@@ -373,14 +407,18 @@ public class ControllerDiarioCampo extends HttpServlet {
         for (DiarioFuncionario f : funcionarios) {
             String regime = f.getRegimeTrabalho();
             if (regime == null || regime.isBlank()) {
-                writeJson(resp, 400, false, "Indique o regime de trabalho de cada funcionário na colheita (sistema ou produção por caixa).");
+                writeJson(resp, 400, false, "Indique o regime de trabalho de cada funcionário (sistema ou produção por caixa).");
                 return false;
             }
             if (!"REGIME_SISTEMA".equals(regime) && !"PRODUCAO".equals(regime)) {
                 writeJson(resp, 400, false, "Regime de trabalho inválido: " + regime + "."); return false;
             }
-            if (f.getQuantidadeCaixas() == null || f.getQuantidadeCaixas().signum() <= 0) {
-                writeJson(resp, 400, false, "Informe a quantidade de caixas colhidas (maior que zero) para cada funcionário.");
+            // Processamento: caixas só é obrigatório para quem é pago por caixa.
+            boolean caixasObrigatorio = ehColheita || "PRODUCAO".equals(regime);
+            if (caixasObrigatorio && (f.getQuantidadeCaixas() == null || f.getQuantidadeCaixas().signum() <= 0)) {
+                writeJson(resp, 400, false, ehColheita
+                        ? "Informe a quantidade de caixas colhidas (maior que zero) para cada funcionário."
+                        : "Informe a quantidade de caixas (maior que zero) para quem é pago por caixa.");
                 return false;
             }
             if ("PRODUCAO".equals(regime)) {

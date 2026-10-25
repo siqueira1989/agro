@@ -1003,16 +1003,22 @@ public class DiarioCampoDAO {
                 ? "LEFT JOIN vinculo_empregaticio v ON v.idpessoa=f.idpessoa "
                   + "AND v.data_admissao <= ? AND (v.data_desligamento IS NULL OR v.data_desligamento >= ?) "
                 : "LEFT JOIN vinculo_empregaticio v ON v.idpessoa=f.idpessoa AND v.data_desligamento IS NULL ";
+        // Funcionário de Produção (Colhedor/Embalador) vem como tipo PRODUCAO + cargo: é pago só por
+        // caixa (custo_ref = valorporunidade, sugerido como preço/caixa). Quem pode ser lançado em
+        // cada atividade (Colhedor na Colheita, Embalador no Processamento) é decidido no front e
+        // validado no Controller (validarRegimeCaixa) — aqui a lista é a mesma para todas.
         String sql = "SELECT f.idpessoa, pe.nomepessoa, "
                 + "CASE WHEN c.idpessoa IS NOT NULL THEN 'CLT' WHEN di.idpessoa IS NOT NULL THEN 'DIARISTA' "
-                + "     WHEN e.idpessoa IS NOT NULL THEN 'EMPREITA' ELSE 'OUTRO' END AS tipo, "
+                + "     WHEN e.idpessoa IS NOT NULL THEN 'EMPREITA' WHEN fp.idpessoa IS NOT NULL THEN 'PRODUCAO' ELSE 'OUTRO' END AS tipo, "
+                + "CASE WHEN fp.idpessoa IS NOT NULL THEN COALESCE(NULLIF(btrim(v.cargo),''), f.cargofuncionario) END AS cargo_producao, "
                 // P1-11: era "* 22.0" fixo. O divisor passa a ser o numero real de
                 // dias uteis do mes de referencia, calculado em Java e passado como
                 // parametro — mesma fonte usada por custoHoraCLT.
                 + "CASE WHEN c.idpessoa IS NOT NULL THEN round(COALESCE(v.salario_mensal, c.salariomensal, 0) / "
                 + "        (GREATEST(COALESCE(v.carga_horaria_diaria, c.cargahorariadiaria, 8),1) * CAST(? AS numeric)), 2) "
                 + "     WHEN di.idpessoa IS NOT NULL THEN COALESCE(di.valorpordia, 0) "
-                + "     WHEN e.idpessoa IS NOT NULL THEN COALESCE(e.valorfixoacordado, 0) ELSE 0 END AS custo_ref, "
+                + "     WHEN e.idpessoa IS NOT NULL THEN COALESCE(e.valorfixoacordado, 0) "
+                + "     WHEN fp.idpessoa IS NOT NULL THEN COALESCE(fp.valorporunidade, 0) ELSE 0 END AS custo_ref, "
                 // Valor da hora extra do CLT (usada quando horas > 8 na atividade): o
                 // valor cadastrado manualmente, se houver, senão 1,5x a hora normal —
                 // mesma regra de Controller.ControllerCLT#valorHoraExtraEfetivo.
@@ -1026,6 +1032,7 @@ public class DiarioCampoDAO {
                 + "LEFT JOIN funcionarioclt c ON c.idpessoa=f.idpessoa "
                 + "LEFT JOIN funcionariodiarista di ON di.idpessoa=f.idpessoa "
                 + "LEFT JOIN funcionarioempreita e ON e.idpessoa=f.idpessoa "
+                + "LEFT JOIN funcionarioproducao fp ON fp.idpessoa=f.idpessoa "
                 + joinVinc
                 // CLT depende do vínculo ativo na data (salário/carga horária vêm dele); diarista/empreita
                 // não dependem de vínculo — só precisam estar ativos (situacaopessoa), senão sumiam da
@@ -1049,6 +1056,7 @@ public class DiarioCampoDAO {
                     m.put("idPessoa", rs.getInt("idpessoa")); m.put("nome", rs.getString("nomepessoa"));
                     m.put("tipo", rs.getString("tipo")); m.put("custoRef", rs.getBigDecimal("custo_ref"));
                     m.put("custoRefExtra", rs.getBigDecimal("custo_ref_extra"));
+                    m.put("cargo", rs.getString("cargo_producao"));
                     out.add(m);
                 }
             }
@@ -1076,13 +1084,36 @@ public class DiarioCampoDAO {
         return out;
     }
 
+    /**
+     * Cargo (Colhedor/Embalador) dos funcionários de Produção entre {@code idsPessoa} — quem não é
+     * de Produção não aparece no mapa. Usado pelo Controller para validar quem pode ser lançado na
+     * Colheita (sem Embalador) e no Processamento (sem Colhedor). Cargo do vínculo ativo, senão o
+     * do cadastro do funcionário.
+     */
+    public Map<Integer, String> cargosProducao(java.util.Collection<Integer> idsPessoa) throws SQLException {
+        Map<Integer, String> out = new java.util.HashMap<>();
+        if (idsPessoa == null || idsPessoa.isEmpty()) return out;
+        String sql = "SELECT fp.idpessoa, COALESCE((SELECT NULLIF(btrim(v.cargo),'') FROM vinculo_empregaticio v "
+                + "  WHERE v.idpessoa=fp.idpessoa AND v.data_desligamento IS NULL ORDER BY v.id_vinculo DESC LIMIT 1), "
+                + "  fp.cargofuncionario, '') FROM funcionarioproducao fp WHERE fp.idpessoa = ANY (?)";
+        try (Connection c = new PostgresConnection().getConnection();
+             PreparedStatement st = c.prepareStatement(sql)) {
+            st.setArray(1, c.createArrayOf("integer", idsPessoa.toArray()));
+            try (ResultSet rs = st.executeQuery()) {
+                while (rs.next()) out.put(rs.getInt(1), rs.getString(2));
+            }
+        }
+        return out;
+    }
+
     /* ===================== helpers de custo ===================== */
 
     private String resolverTipo(Connection c, int idpessoa) throws SQLException {
         String sql = "SELECT CASE WHEN c.idpessoa IS NOT NULL THEN 'CLT' WHEN di.idpessoa IS NOT NULL THEN 'DIARISTA' "
-                + "WHEN e.idpessoa IS NOT NULL THEN 'EMPREITA' ELSE 'OUTRO' END FROM funcionario f "
+                + "WHEN e.idpessoa IS NOT NULL THEN 'EMPREITA' WHEN fp.idpessoa IS NOT NULL THEN 'PRODUCAO' ELSE 'OUTRO' END FROM funcionario f "
                 + "LEFT JOIN funcionarioclt c ON c.idpessoa=f.idpessoa LEFT JOIN funcionariodiarista di ON di.idpessoa=f.idpessoa "
-                + "LEFT JOIN funcionarioempreita e ON e.idpessoa=f.idpessoa WHERE f.idpessoa=?";
+                + "LEFT JOIN funcionarioempreita e ON e.idpessoa=f.idpessoa LEFT JOIN funcionarioproducao fp ON fp.idpessoa=f.idpessoa "
+                + "WHERE f.idpessoa=?";
         try (PreparedStatement st = c.prepareStatement(sql)) {
             st.setInt(1, idpessoa); ResultSet rs = st.executeQuery();
             return rs.next() ? rs.getString(1) : "OUTRO";
