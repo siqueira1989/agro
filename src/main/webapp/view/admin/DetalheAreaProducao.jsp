@@ -145,6 +145,7 @@
       <div class="mt-2"><span class="badge bg-light text-dark border"><i class="fas fa-seedling me-1 text-success"></i>Safra vinculada: <strong id="dcSafraNome">—</strong></span></div>
 
       <!-- Funcionários (escondido na edição quando não há lançamento anterior — evita duplicar com "Registrar Nova Execução" abaixo) -->
+      <div id="dcAvisoPrecoCaixa" class="small text-warning-emphasis mt-2 d-none"></div>
       <div id="dcFuncHeader" class="d-flex justify-content-between align-items-center mt-3 mb-1">
         <h6 class="fw-bold text-secondary mb-0"><i class="fas fa-users me-1"></i>Funcionários</h6>
         <button class="btn btn-outline-primary btn-sm" type="button" id="btnAddFunc"><i class="fas fa-user-plus me-1"></i>Funcionário</button>

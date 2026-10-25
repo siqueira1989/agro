@@ -4237,6 +4237,7 @@ var dcOptTalhao = '', dcOptTipo = '', dcOptFunc = '', dcOptDesp = '';
 var dcSafraResolvida = false, dcTemSafra = false;
 var dcFuncPromise = null, dcTalhaoPromise = null, dcDespPromise = null, dcSafraPromise = null, dcTiposPromise = null;
 var dcVeioDaColheita = false;   // aberto pela página Colheita (?abrirColheita=1)
+var dcPrecoCaixaRef = 0, dcPrecoCaixaChave = '';   // preço da caixa (Despesas/Custos) do alimento+área atuais
 
 function dcMoney(v) { return 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 /** Escapa texto vindo do banco antes de montar HTML (seção Diário). */
@@ -4792,13 +4793,54 @@ function dcAplicarRegimeProducao($tr, prefix, atividadeCaixa, funcEditavel) {
     var $reg = $tr.find('.' + prefix + '-fregime');
     if (atividadeCaixa && $tr.find('.' + prefix + '-ftipo').val() === 'PRODUCAO') {
         $reg.val('PRODUCAO').prop('disabled', true);
-        var $preco = $tr.find('.' + prefix + '-fprecocaixa');
-        var ref = Number($tr.find('.' + prefix + '-fpessoa :selected').attr('data-ref')) || 0;
-        if (funcEditavel && !$preco.val() && ref > 0) $preco.val(ref);
     } else {
         $reg.prop('disabled', !funcEditavel);
     }
+    if (funcEditavel && atividadeCaixa && $reg.val() === 'PRODUCAO') dcSugerirPrecoCaixa($tr, prefix);
     return $reg.val();
+}
+
+/**
+ * Preço/caixa sugerido numa linha em regime Produção: na Colheita, o preço da caixa cadastrado em
+ * Despesas/Custos para o alimento do talhão + área (dcPrecoCaixaRef) tem prioridade; senão, para
+ * funcionário de Produção, o preço do cadastro dele (data-ref). Só preenche campo vazio ou que foi
+ * preenchido automaticamente (data-auto="1") — o que o usuário digitou fica.
+ */
+function dcSugerirPrecoCaixa($tr, prefix) {
+    var $p = $tr.find('.' + prefix + '-fprecocaixa');
+    if ($p.val() && $p.attr('data-auto') !== '1') return;
+    var v = 0;
+    if (dcEhColheita() && dcPrecoCaixaRef > 0) v = dcPrecoCaixaRef;
+    else if ($tr.find('.' + prefix + '-ftipo').val() === 'PRODUCAO') v = Number($tr.find('.' + prefix + '-fpessoa :selected').attr('data-ref')) || 0;
+    if (v > 0) $p.val(v).attr('data-auto', '1');
+}
+
+/**
+ * Colheita: busca em Despesas/Custos (V28) o preço da caixa CAIXA_COLHEITA/CONTENTOR do alimento do
+ * talhão + área. Achou: preenche o Preço/cx das linhas em Produção. Não achou: aviso discreto — ao
+ * salvar, o servidor registra o preço da primeira linha (DiarioCampoDAO.registrarPrecoCaixaSeAusente).
+ * Chamada ao trocar tipo/talhão e ao abrir um diário existente.
+ */
+function dcBuscarPrecoCaixa() {
+    var idAlimento = parseInt($('#dcCultura').val()) || 0;
+    var chave = idAlimento + '/' + dcAreaId;
+    dcPrecoCaixaRef = 0; dcPrecoCaixaChave = chave;
+    $('#dcAvisoPrecoCaixa').addClass('d-none').text('');
+    if (!dcEhColheita() || !idAlimento || !dcAreaId) return;
+    $.getJSON(AGRO_CTX + '/DespesasCustosServlet', { precoCaixa: 1, categoria: 'CAIXA_COLHEITA', idAlimento: idAlimento, idArea: dcAreaId, tipoCaixa: 'CONTENTOR' }, function (r) {
+        if (dcPrecoCaixaChave !== chave) return;   // talhão/tipo trocou enquanto buscava
+        if (r && r.encontrado && r.registro) {
+            dcPrecoCaixaRef = Number(r.registro.valordespesascustos) || 0;
+        } else {
+            $('#dcAvisoPrecoCaixa').removeClass('d-none').html('<i class="fas fa-circle-info me-1"></i>Preço da caixa não cadastrado para <strong>' +
+                dcHtml($('#dcCulturaNome').val()) + '</strong> — <strong>' + dcHtml($('#detProp').text()) +
+                '</strong>; o valor informado será registrado em Despesas/Custos.');
+        }
+        $('#dcFuncBody tr').each(function () { dcAtualizarCampoHoras($(this), dcFuncEditavel); });
+        $('#exFuncBody tr').each(function () { dcAtualizarCampoHorasExec($(this)); });
+        dcRecalcPreview();
+        dcExecRecalcPreview();
+    });
 }
 
 /** Mesma lógica de dcAtualizarCampoHoras, para as linhas do bloco "Registrar Nova Execução" (prefixo ex-). */

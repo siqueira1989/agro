@@ -38,12 +38,13 @@ public class DiarioCampoDAO {
                 for (DiarioMaquina m : d.getMaquinas()) inserirMaquina(c, id, m);
                 for (DiarioInsumo i : d.getInsumos()) inserirInsumo(c, id, i);
                 for (DiarioDespesa dsp : d.getDespesas()) inserirDespesa(c, id, dsp, dataExec);
+                registrarPrecoCaixaSeAusente(c, id, d.getFuncionarios());
                 // PLANEJADA é apenas agendamento (previsão): não calcula custo. EM_ANDAMENTO/CONCLUIDA calculam.
                 if (calculaCusto(d.getStatus())) recalcularCustos(c, id); else zerarCustos(c, id);
                 c.commit();
                 d.setIdDiario(id); d.setNumeroDiario(numero);
                 return id;
-            } catch (SQLException e) { c.rollback(); throw e; }
+            } catch (SQLException | RuntimeException e) { c.rollback(); throw e; }
             finally { c.setAutoCommit(true); }
         }
     }
@@ -114,11 +115,43 @@ public class DiarioCampoDAO {
                 if (!"EM_ANDAMENTO".equals(status)) throw new SQLException("Só é possível registrar execução em diários EM_ANDAMENTO.");
                 for (DiarioFuncionario f : funcionarios) inserirFuncionario(c, idDiario, f, dataExecucao);
                 for (DiarioDespesa d : despesas) inserirDespesa(c, idDiario, d, dataExecucao);
+                registrarPrecoCaixaSeAusente(c, idDiario, funcionarios);
                 recalcularCustos(c, idDiario);
                 c.commit();
-            } catch (SQLException e) { c.rollback(); throw e; }
+            } catch (SQLException | RuntimeException e) { c.rollback(); throw e; }
             finally { c.setAutoCommit(true); }
         }
+    }
+
+    /**
+     * Colheita (onda 2): o preço da caixa de colheita (CAIXA_COLHEITA/CONTENTOR) é por alimento +
+     * área e fica em Despesas/Custos (V28). Se ainda não há preço para a cultura/área do diário,
+     * registra o preço/caixa informado na PRIMEIRA linha em regime PRODUCAO — linhas com preços
+     * diferentes não mudam o cadastro. Preço já cadastrado nunca é sobrescrito daqui (quem altera
+     * é a tela de Despesas). Roda na transação do salvar: falhou o registro, falha o diário.
+     */
+    private void registrarPrecoCaixaSeAusente(Connection c, int idDiario, List<DiarioFuncionario> funcionarios)
+            throws SQLException {
+        BigDecimal preco = null;
+        for (DiarioFuncionario f : funcionarios) {
+            if ("PRODUCAO".equals(f.getRegimeTrabalho()) && f.getPrecoPorCaixa() != null && f.getPrecoPorCaixa().signum() > 0) {
+                preco = f.getPrecoPorCaixa(); break;
+            }
+        }
+        if (preco == null) return;
+        String nomeTipo; Integer idCultura, idArea;
+        try (PreparedStatement st = c.prepareStatement("SELECT t.nome, d.id_cultura, d.id_area FROM diario_campo d "
+                + "JOIN diario_tipo_atividade t ON t.idtipo=d.id_tipo_atividade WHERE d.iddiario=?")) {
+            st.setInt(1, idDiario);
+            try (ResultSet rs = st.executeQuery()) {
+                if (!rs.next()) return;
+                nomeTipo = rs.getString(1); idCultura = (Integer) rs.getObject(2); idArea = (Integer) rs.getObject(3);
+            }
+        }
+        if (nomeTipo == null || !nomeTipo.toLowerCase().contains("colh") || idCultura == null || idArea == null) return;
+        DespesasCustosDAO despDAO = new DespesasCustosDAO();
+        if (despDAO.buscarPrecoCaixa(c, "CAIXA_COLHEITA", idCultura, idArea, "CONTENTOR") != null) return;
+        despDAO.registrarPrecoCaixa(c, "CAIXA_COLHEITA", idCultura, idArea, "CONTENTOR", null, preco);
     }
 
     /** Só calcula custos para atividades em Execução ou Concluídas; Planejada é previsão (custo 0). */
