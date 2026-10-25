@@ -14,6 +14,7 @@ public class ColheitaLote {
     private Integer idQuadra;      private String quadraNome;
     private Integer idCultura;     private String culturaNome;
     private String siglaArea;      // sigla da Área de Produção dona do talhão (AreaProducao.SiglasAreaProducao)
+    private Integer idArea;        private String areaNome;   // Área de Produção do talhão (modal Processar)
     private LocalDate dataColheita;
     private BigDecimal quantidadeTotal = BigDecimal.ZERO;
     private BigDecimal quantidadeProcessada = BigDecimal.ZERO;
@@ -37,6 +38,10 @@ public class ColheitaLote {
     public void setCulturaNome(String culturaNome) { this.culturaNome = culturaNome; }
     public String getSiglaArea() { return siglaArea; }
     public void setSiglaArea(String siglaArea) { this.siglaArea = siglaArea; }
+    public Integer getIdArea() { return idArea; }
+    public void setIdArea(Integer idArea) { this.idArea = idArea; }
+    public String getAreaNome() { return areaNome; }
+    public void setAreaNome(String areaNome) { this.areaNome = areaNome; }
     public LocalDate getDataColheita() { return dataColheita; }
     public void setDataColheita(LocalDate dataColheita) { this.dataColheita = dataColheita; }
     public BigDecimal getQuantidadeTotal() { return quantidadeTotal; }

@@ -41,7 +41,6 @@ Tipo de atividade "Processamento" (V29). Atividades com regime por caixa = Colhe
 
 ## Pendências
 - [ ] Relatórios/Safra não mostram ainda a dose por planta (`quantidade_por_planta_kg`); se quiserem, levar ao módulo do relatório.
-- [ ] Onda 2: buscar o preço da caixa em Despesas (API da V28) ao lançar a Colheita e preencher o Preço/cx.
 - [ ] Levar a Produção/Folha: funcionário de Produção lançado no Diário em regime PRODUCAO tem custo (valor_regime) no
   diário; conferir se o pagamento dele também sai por `lancamento_producao` (risco de pagar duas vezes a mesma caixa).
 - [ ] Não há funcionário de Produção cadastrado no banco hoje: o filtro Colhedor/Embalador foi testado só na tela
@@ -60,3 +59,13 @@ Tipo de atividade "Processamento" (V29). Atividades com regime por caixa = Colhe
   Colheita, Embalador só no Processamento, sempre em regime Produção (travado) com o preço/caixa do cadastro
   sugerido; fora dessas atividades não aparece. Servidor valida (`DiarioCampoDAO.cargosProducao`). (5) V29: tipo
   "Processamento" — CLT/diarista/empreita por horas, embalador por caixa; não gera lote.
+- 2026-10-25 — Onda 2, preço da caixa vindo de Despesas/Custos (contrato V28): na Colheita, ao escolher o tipo,
+  trocar o talhão (cultura) ou abrir um diário existente, `dcBuscarPrecoCaixa` faz
+  `GET /DespesasCustosServlet?precoCaixa=1&categoria=CAIXA_COLHEITA&idAlimento=<cultura do talhão>&idArea=<área>&tipoCaixa=CONTENTOR`.
+  Encontrou: o Preço/cx das linhas em Produção (cadastro e nova execução) vem com esse valor, que tem prioridade
+  sobre o preço do cadastro do funcionário de Produção; o usuário pode editar (editou = não é mais sobrescrito,
+  `data-auto="0"`). Não encontrou: aviso discreto `#dcAvisoPrecoCaixa` e, ao salvar (`create` e `addexecucao`),
+  `DiarioCampoDAO.registrarPrecoCaixaSeAusente` registra, na mesma transação, o preço da **primeira** linha em regime
+  Produção via `DespesasCustosDAO.registrarPrecoCaixa(c, …)`; linhas com outros preços não mudam o cadastro, e
+  preço já cadastrado nunca é sobrescrito pelo Diário. `inserirCompleto`/`adicionarExecucao` passaram a dar rollback
+  também em `RuntimeException` (o registro pode lançar `IllegalArgumentException`). Processamento: nada (onda 3).
