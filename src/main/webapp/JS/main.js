@@ -4460,7 +4460,9 @@ function dcInit(areaId) {
     $('#dcData').off('change.dc').on('change.dc', function () { dcResolverSafra(); dcRecarregarFuncsPorData(); });
     // Tipo de atividade -> mostra só a seção de Insumos correspondente (Adubação=Adubo,
     // Pulverização=Defensivo, demais=as duas) e mostra/esconde a coluna Regime (só existe na Colheita)
-    $('#dcTipo').off('change.dc').on('change.dc', function () { dcAtualizarVisibilidadeInsumos(); dcAtualizarVisibilidadeColheita(); });
+    $('#dcTipo').off('change.dc').on('change.dc', function () { dcAtualizarVisibilidadeInsumos(); dcAtualizarVisibilidadeColheita(); dcBuscarPrecoCaixa(); });
+    // Preço/caixa digitado pelo usuário deixa de seguir a sugestão (Despesas/Custos ou cadastro).
+    $('#modalNovoDiario').off('input.dcpc', '.dc-fprecocaixa,.ex-fprecocaixa').on('input.dcpc', '.dc-fprecocaixa,.ex-fprecocaixa', function () { $(this).attr('data-auto', '0'); });
 
     // recálculo do custo estimado ao vivo
     var body = '#modalNovoDiario';
@@ -4560,6 +4562,7 @@ function dcAplicarCulturaDoTalhao() {
     }
     dcAtualizarPlantasAdubo();
     dcResolverSafra();
+    dcBuscarPrecoCaixa();   // preço da caixa é por alimento do talhão + área
 }
 
 /** Resolve e exibe a safra do talhão na data (trava/vínculo — validado no backend). */
@@ -4813,6 +4816,7 @@ function dcSugerirPrecoCaixa($tr, prefix) {
     if (dcEhColheita() && dcPrecoCaixaRef > 0) v = dcPrecoCaixaRef;
     else if ($tr.find('.' + prefix + '-ftipo').val() === 'PRODUCAO') v = Number($tr.find('.' + prefix + '-fpessoa :selected').attr('data-ref')) || 0;
     if (v > 0) $p.val(v).attr('data-auto', '1');
+    else if ($p.attr('data-auto') === '1') $p.val('').removeAttr('data-auto');   // sugestão de outro talhão/tipo
 }
 
 /**
@@ -5418,6 +5422,7 @@ function dcEditar(id) {
         dcRecalcPreview();
         dcResolverSafra();
         if (d.status === 'EM_ANDAMENTO') dcAbrirExecucaoForm();
+        dcBuscarPrecoCaixa();   // execução em mais dias de uma Colheita usa o mesmo preço
         $('#modalNovoDiario').modal('show');
     });
 }
