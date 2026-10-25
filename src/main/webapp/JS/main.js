@@ -5595,7 +5595,10 @@ function rsRenderRateio() {
         var semLanc = real === 0 && qtdPend === 0;
         var celReal = semLanc ? '<span class="text-muted fst-italic small">Sem lançamentos</span>' : sfMoney(real) + badge;
         var celDif = '';
-        if (!semLanc) {
+        if (real === 0 && qtdPend > 0) {
+            // Nada concluído ainda, só atividades em andamento: a diferença não diz nada (não é economia).
+            celDif = '<span class="text-muted" title="Ainda não há atividade concluída: a diferença só faz sentido depois de finalizar as atividades no Diário.">—</span>';
+        } else if (!semLanc) {
             var dif = real - rateado; totalDif += dif;
             celDif = '<span class="' + rsClasseDif(dif) + '">' + sfMoney(dif) + '</span>';
         }
@@ -5606,7 +5609,7 @@ function rsRenderRateio() {
     $('#rsFiltroRateadoTotal').text(sfMoney(totalRateado));
     $('#rsFiltroRealTotal').text(sfMoney(totalReal));
     $('#rsFiltroDifTotal').html('<span class="' + rsClasseDif(totalDif) + '">' + sfMoney(totalDif) + '</span>')
-        .attr('title', 'Soma das diferenças dos talhões com lançamentos (exclui os "Sem lançamentos").');
+        .attr('title', 'Soma das diferenças dos talhões com custo lançado (exclui "Sem lançamentos" e os que só têm atividades em andamento).');
     $('#rsFiltroPendRow').toggleClass('d-none', totalPendQtd === 0);
     $('#rsFiltroPendTotal').text('Pendente (fora do custo): ' + totalPendQtd + ' atividade(s) em andamento/planejada(s), ' + sfMoney(totalPendValor));
 }
