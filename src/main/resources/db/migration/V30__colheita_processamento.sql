@@ -26,7 +26,9 @@ CREATE INDEX idx_colheita_proc_lote ON colheita_processamento (idlote);
 CREATE TABLE colheita_processamento_embalagem (
     id                   SERIAL PRIMARY KEY,
     idprocessamento      INTEGER NOT NULL REFERENCES colheita_processamento(idprocessamento) ON DELETE CASCADE,
-    idpessoa             INTEGER NOT NULL REFERENCES pessoa(idpessoa),
+    -- Sem FK: os funcionários ficam nas tabelas filhas (herança de pessoa → funcionario →
+    -- funcionarioproducao/clt/...), e FK para a tabela-mãe não enxerga as linhas das filhas.
+    idpessoa             INTEGER NOT NULL,
     iddespesascusto      INTEGER REFERENCES despesascusto(iddespesascusto) ON DELETE SET NULL,
     tipo_caixa           VARCHAR(30) NOT NULL,
     quantidade_caixas    NUMERIC(12,2) NOT NULL,

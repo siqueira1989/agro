@@ -98,9 +98,9 @@
               <table class="table table-sm align-middle mb-0">
                 <thead class="table-light small"><tr>
                   <th style="min-width:180px">Funcionário</th><th>Tipo</th><th>Regime</th>
-                  <th style="min-width:200px">Embalagem</th><th style="width:110px" class="text-end">Preço</th>
-                  <th style="width:90px" class="text-end">Caixas</th><th style="width:90px" class="text-end">Horas</th>
-                  <th style="width:110px" class="text-end">Valor</th><th style="width:40px"></th>
+                  <th style="min-width:190px">Embalagem</th><th style="min-width:100px" class="text-end">Preço</th>
+                  <th style="min-width:85px" class="text-end">Caixas</th><th style="min-width:80px" class="text-end">Horas</th>
+                  <th style="min-width:100px" class="text-end">Valor</th><th style="width:32px"></th>
                 </tr></thead>
                 <tbody id="cpFuncBody"></tbody>
               </table>

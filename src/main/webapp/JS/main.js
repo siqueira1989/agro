@@ -6920,7 +6920,7 @@ function cpNovaLinha(modo) {
                                        : '<span class="small text-muted cp-ref"></span>') + '</td>' +
         '<td>' + (emb ? '<input type="number" class="form-control form-control-sm text-end cp-caixas" min="0" step="1" placeholder="0">' : '<span class="text-muted d-block text-center">—</span>') + '</td>' +
         '<td>' + (emb ? '<span class="text-muted d-block text-center">—</span>' : '<input type="number" class="form-control form-control-sm text-end cp-horas" min="0" step="0.5" placeholder="0">') + '</td>' +
-        '<td class="text-end fw-semibold cp-valor">R$ 0,00</td>' +
+        '<td class="text-end fw-semibold text-nowrap cp-valor">R$ 0,00</td>' +
         '<td class="text-end"><button type="button" class="btn btn-sm btn-link text-danger p-0 cp-remover" title="Remover"><i class="fas fa-xmark"></i></button></td>' +
         '</tr>');
     $('#cpFuncBody').append($tr);
