@@ -531,6 +531,93 @@ function abrirModalExclusaoDespesasCustos(id, despesa) {
     $('#modalExclusao').modal('show');
 }
 
+/** Linhas da última carga da tabela, por iddespesascusto (os botões passam só o id). */
+let _dcCache = {};
+
+/** Escapa texto vindo do banco antes de montar HTML. Usado em: despesascustos.jsp */
+function dcEsc(v) {
+    return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+/** Rótulo da categoria (V28). Usado em: despesascustos.jsp */
+function dcRotuloCategoria(cat) {
+    return cat === 'CAIXA_COLHEITA' ? 'Caixa de colheita' : (cat === 'EMBALAGEM' ? 'Embalagem' : 'Geral');
+}
+
+/** Editar a partir do cache da tabela. Usado em: despesascustos.jsp */
+function abrirModalAtualizacaoDespesasCustosPorId(id) {
+    const r = _dcCache[id];
+    if (!r) return;
+    abrirModalAtualizacaoDespesasCustos(r.iddespesascusto, r.despesascusto, r.unidadedespesascustos,
+        r.valordespesascustos, r.tipodespesascustos, r.classificacao);
+}
+
+/** Excluir a partir do cache da tabela. Usado em: despesascustos.jsp */
+function abrirModalExclusaoDespesasCustosPorId(id) {
+    const r = _dcCache[id];
+    if (!r) return;
+    abrirModalExclusaoDespesasCustos(r.iddespesascusto, r.despesascusto);
+}
+
+/**
+ * Preenche os selects de Alimento, Área e Tipo de caixa do modal de cadastro (uma vez por página).
+ * Tipos: sugestões do enum TipoCaixa (GET ?tiposCaixa=1) + "Outro (digitar)".
+ * Usado em: despesascustos.jsp
+ */
+function carregarSelectsCaixaDespesasCustos() {
+    if ($('#dcAlimento').data('carregado')) return;
+    $('#dcAlimento').data('carregado', true);
+
+    $.getJSON(AGRO_CTX + '/ControllerAlimento', function (lista) {
+        const $s = $('#dcAlimento');
+        (Array.isArray(lista) ? lista : []).forEach(function (a) {
+            $s.append($('<option>').val(a.idproduto).text(a.nomeproduto));
+        });
+    });
+    $.getJSON(AGRO_CTX + '/ControllerAreaProducao', function (lista) {
+        const $s = $('#dcArea');
+        (Array.isArray(lista) ? lista : []).forEach(function (a) {
+            $s.append($('<option>').val(a.idAreaProducao)
+                .text(a.PropriedadeAreaProducao + (a.SiglasAreaProducao ? ' (' + a.SiglasAreaProducao + ')' : '')));
+        });
+    });
+    $.getJSON(AGRO_CTX + '/DespesasCustosServlet', {tiposCaixa: 1}, function (resp) {
+        const $s = $('#dcTipoCaixa');
+        ((resp && resp.tipos) || []).forEach(function (t) {
+            $s.append($('<option>').val(t.codigo).text(t.rotulo + ' (' + t.codigo + ')').attr('data-cargo', t.cargo));
+        });
+        $s.append($('<option>').val('__OUTRO__').text('Outro (digitar)...'));
+        alternarCamposCaixaDespesasCustos();
+    });
+}
+
+/**
+ * Mostra/oculta Alimento/Área/Tipo conforme a Categoria. Caixa de colheita fixa CONTENTOR;
+ * Embalagem esconde o CONTENTOR. Caixas/embalagens sugerem unidade "un" e classificação Variável.
+ * Usado em: despesascustos.jsp
+ */
+function alternarCamposCaixaDespesasCustos() {
+    const cat = $('#dcCategoria').val() || 'GERAL';
+    const caixa = cat !== 'GERAL';
+    $('#dcCamposCaixa').toggleClass('d-none', !caixa);
+    if (!caixa) return;
+
+    const $tipo = $('#dcTipoCaixa');
+    $tipo.find('option[value="CONTENTOR"]').prop('hidden', cat === 'EMBALAGEM');
+    if (cat === 'CAIXA_COLHEITA') {
+        $tipo.val('CONTENTOR').prop('disabled', true);
+    } else {
+        $tipo.prop('disabled', false);
+        if ($tipo.val() === 'CONTENTOR') $tipo.val('');
+    }
+    $('#dcTipoCaixaOutro').toggleClass('d-none', $tipo.val() !== '__OUTRO__');
+
+    if (!$('#unidade').val()) $('#unidade').val('un');
+    if (!$('#tipo').val()) $('#tipo').val(cat === 'CAIXA_COLHEITA' ? 'Caixa colheita' : 'Embalagem');
+    $('#classificacao').val('VARIAVEL');
+}
+
 /** Atualiza os cards de KPI (total/fixas/variáveis). Usado em: despesascustos.jsp */
 function atualizarKpisDespesasCustos(lista) {
     if (!$('#kpiDcTotal').length) return;
@@ -559,6 +646,9 @@ function CarregarDadosDespesasCustos() {
             "url": AGRO_CTX + "/DespesasCustosServlet", // URL da servlet para buscar os dados
             "method": "GET",
             "dataSrc": function (json) {
+                if (!Array.isArray(json)) return [];
+                _dcCache = {};
+                json.forEach(function (d) { _dcCache[d.iddespesascusto] = d; });
                 atualizarKpisDespesasCustos(json);
                 return json;
             }
@@ -585,16 +675,27 @@ function CarregarDadosDespesasCustos() {
                 }
             },
             {
-                "data": null,
+                "data": "categoria",
                 "render": function (data, type, row) {
-                    return '<button class="btn-acao btn-acao-editar" title="Editar" onclick="abrirModalAtualizacaoDespesasCustos('
-                            + row.iddespesascusto + ', \''
-                            + row.despesascusto + '\', \''
-                            + row.unidadedespesascustos + '\', \''
-                            + row.valordespesascustos + '\', \''
-                            + row.tipodespesascustos + '\', \''
-                            + row.classificacao + '\')"><i class="fas fa-pen-to-square"></i></button> '
-                            + '<button class="btn-acao btn-acao-excluir" title="Excluir" onclick="abrirModalExclusaoDespesasCustos(' + row.iddespesascusto + ', \'' + row.despesascusto + '\')"><i class="fas fa-trash-can"></i></button>';
+                    const cat = data || 'GERAL';
+                    if (type !== 'display') {
+                        return cat + ' ' + (row.nomeAlimento || '') + ' ' + (row.nomeArea || '') + ' ' + (row.tipoCaixa || '');
+                    }
+                    if (cat === 'GERAL') return '<span class="badge bg-light text-dark border">Geral</span>';
+                    const cor = cat === 'CAIXA_COLHEITA' ? 'bg-success' : 'bg-info text-dark';
+                    return '<span class="badge ' + cor + '">' + dcEsc(dcRotuloCategoria(cat)) + '</span>'
+                         + '<div class="small text-muted mt-1">' + dcEsc(row.nomeAlimento || '?') + ' — '
+                         + dcEsc(row.nomeArea || '?') + ' — ' + dcEsc(row.tipoCaixa || '?') + '</div>';
+                }
+            },
+            {
+                "data": null,
+                "orderable": false,
+                "render": function (data, type, row) {
+                    // Só o id vai para o onclick; os textos saem do cache (evita quebra/injeção com aspas vindas do banco).
+                    const id = parseInt(row.iddespesascusto, 10);
+                    return '<button class="btn-acao btn-acao-editar" title="Editar" onclick="abrirModalAtualizacaoDespesasCustosPorId(' + id + ')"><i class="fas fa-pen-to-square"></i></button> '
+                         + '<button class="btn-acao btn-acao-excluir" title="Excluir" onclick="abrirModalExclusaoDespesasCustosPorId(' + id + ')"><i class="fas fa-trash-can"></i></button>';
                 }
             }
         ],
@@ -662,18 +763,18 @@ function atualizarDespesasCustos(id, despesa, unidade, valor, tipo, classificaca
 }
 
 /** Envia POST para criar nova despesa/custo via DespesasCustosServlet. Usado em: despesascustos.jsp */
-function salvarDespesasCustos(despesa, unidade, valor, tipo, classificacao) {
+function salvarDespesasCustos(despesa, unidade, valor, tipo, classificacao, caixa) {
     $.ajax({
         url: AGRO_CTX + '/DespesasCustosServlet',
         method: 'POST',
-        data: {
+        data: $.extend({
             acao: 'create',
             despesascusto: despesa,
             unidadedespesacusto: unidade,
             valordespesacusto: valor,
             tipodespesacusto: tipo,
             classificacao: classificacao
-        },
+        }, caixa || {}),  // caixa: {categoria, idAlimento, idArea, tipoCaixa} (V28)
         success: function (resp) {
             // resp: { ok:true, msg:"..." }
             mostrarAlerta(resp.msg || 'Despesa cadastrada com sucesso!', 'success', '#alerta');
@@ -2065,8 +2166,29 @@ $(document).ready(function () {
             mostrarAlerta('Formato inválido de valor.', 'warning', '#alertModalCadastro', 4000);
             return;
         }
-        salvarDespesasCustos(despesa, unidade, valor, tipo, classificacao);
+        // V28: caixa de colheita / embalagem por alimento e área
+        let categoria = $('#dcCategoria').val() || 'GERAL';
+        let caixa = {categoria: categoria};
+        if (categoria !== 'GERAL') {
+            let tipoCaixa = $('#dcTipoCaixa').val();
+            if (tipoCaixa === '__OUTRO__') tipoCaixa = $('#dcTipoCaixaOutro').val().trim();
+            if (!$('#dcAlimento').val() || !$('#dcArea').val()) {
+                mostrarAlerta('Selecione o alimento e a área de produção.', 'danger', '#alertModalCadastro');
+                return;
+            }
+            if (!tipoCaixa) {
+                mostrarAlerta('Informe o tipo de caixa/embalagem.', 'danger', '#alertModalCadastro');
+                return;
+            }
+            caixa.idAlimento = $('#dcAlimento').val();
+            caixa.idArea = $('#dcArea').val();
+            caixa.tipoCaixa = tipoCaixa;
+        }
+        salvarDespesasCustos(despesa, unidade, valor, tipo, classificacao, caixa);
     });
+
+    carregarSelectsCaixaDespesasCustos();
+    $('#dcCategoria, #dcTipoCaixa').on('change', alternarCamposCaixaDespesasCustos);
 
     $('#formAtualizacao').on('submit', function (e) {
         e.preventDefault();
@@ -2090,6 +2212,7 @@ $(document).ready(function () {
     $('#modalCadastro').on('show.bs.modal hidden.bs.modal', function () {
         $('#formCadastro')[0].reset();
         $('#alertModalCadastro').removeClass().addClass('alert d-none').empty();
+        alternarCamposCaixaDespesasCustos();
     });
 });
 
@@ -4095,7 +4218,10 @@ $(document).ready(function () {
     // Vindo do Módulo Colheita ("Cadastrar Colheita" escolhe a área e redireciona pra cá) — abre o
     // "Novo Diário" já com Colheita pré-selecionada (é o mesmo cadastro, só evita o clique extra).
     if (apGetParam('abrirColheita') === '1') {
-        $.when(dcFuncPromise, dcTalhaoPromise, dcDespPromise).always(function () {
+        dcVeioDaColheita = true;   // ao salvar, volta para a página Colheita (dcSalvar)
+        // Espera também safra e tipos: sem isso, se /ControllerSafra ainda não voltou, dcTemSafra
+        // fica false e aparecia o pré-requisito "obrigatório ter uma Safra" mesmo com safra válida.
+        $.when(dcFuncPromise, dcTalhaoPromise, dcDespPromise, dcSafraPromise, dcTiposPromise).always(function () {
             dcAbrirNovoInterno();
             var tipoColheita = dcCacheTipos.filter(function (t) { return t.nome.toLowerCase().indexOf('colh') > -1; })[0];
             if (tipoColheita) $('#dcTipo').val(String(tipoColheita.idTipo)).trigger('change');
@@ -4109,9 +4235,15 @@ $(document).ready(function () {
 var dcAreaId = null, dcCacheFunc = [], dcCacheIns = [], dcCacheMaq = [], dcCacheTalhao = [], dcCacheTipos = [], dcCacheDesp = [], dcCulturaMap = {};
 var dcOptTalhao = '', dcOptTipo = '', dcOptFunc = '', dcOptDesp = '';
 var dcSafraResolvida = false, dcTemSafra = false;
-var dcFuncPromise = null, dcTalhaoPromise = null, dcDespPromise = null;
+var dcFuncPromise = null, dcTalhaoPromise = null, dcDespPromise = null, dcSafraPromise = null, dcTiposPromise = null;
+var dcVeioDaColheita = false;   // aberto pela página Colheita (?abrirColheita=1)
 
 function dcMoney(v) { return 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+/** Escapa texto vindo do banco antes de montar HTML (seção Diário). */
+function dcHtml(v) {
+    return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
 function dcBadgeStatus(s) {
     var map = { PLANEJADA: 'bg-secondary', EM_ANDAMENTO: 'bg-info text-dark', CONCLUIDA: 'bg-success', CANCELADA: 'bg-danger' };
     var rot = { PLANEJADA: 'Planejado', EM_ANDAMENTO: 'Execução', CONCLUIDA: 'Concluído', CANCELADA: 'Cancelado' };
@@ -4167,8 +4299,7 @@ function dcRecarregarFuncsPorData() {
     var data = $('#dcData').val();
     var url = AGRO_CTX + '/ControllerDiarioCampo?funcionarios=1' + (data ? '&data=' + data : '');
     $.getJSON(url, function (fs) {
-        dcCacheFunc = fs; dcOptFunc = '<option value="">Selecione</option>';
-        fs.forEach(function (f) { dcOptFunc += '<option value="' + f.idPessoa + '" data-tipo="' + f.tipo + '" data-ref="' + (f.custoRef || 0) + '" data-refextra="' + (f.custoRefExtra || 0) + '">' + f.nome + ' (' + f.tipo + ')</option>'; });
+        dcCacheFunc = fs; dcOptFunc = dcMontarOptFunc(fs);
         // Reaplica nas linhas existentes. Preserva a pessoa já escolhida mesmo que ela não esteja
         // na lista filtrada da data (ex.: edição), acrescentando a opção original de volta.
         $('#dcFuncBody tr').each(function () {
@@ -4180,6 +4311,7 @@ function dcRecarregarFuncsPorData() {
                 $sel.val(v);
             }
         });
+        dcFiltrarFuncsAtividade();
         dcAtualizarResponsavel();
         dcRecalcPreview();
     });
@@ -4202,15 +4334,71 @@ function dcEhColheita() {
     return nome.indexOf('colh') > -1;
 }
 
+/** O tipo de atividade selecionado é "Processamento" (V29 — embalagem da colheita)? */
+function dcEhProcessamento() {
+    var idt = parseInt($('#dcTipo').val()) || 0;
+    var t = dcCacheTipos.filter(function (x) { return x.idTipo === idt; })[0];
+    return (t ? t.nome : '').toLowerCase().indexOf('processa') > -1;
+}
+
+/** Atividades com regime por caixa (Sistema x Produção): Colheita e Processamento. */
+function dcEhAtividadeCaixa() { return dcEhColheita() || dcEhProcessamento(); }
+
 /**
- * Mostra/esconde a coluna "Regime" (Sistema x Produção por caixa) nas tabelas de Funcionários
+ * Funcionário de Produção só é pago por caixa: na Colheita entra todo mundo menos o Embalador; no
+ * Processamento, todo mundo menos o Colhedor; nas demais atividades, nenhum de Produção. Demais
+ * tipos (CLT/Diarista/Empreita) sempre. Mesma regra do servidor (ControllerDiarioCampo#validarRegimeCaixa).
+ */
+function dcFuncApto(tipo, cargo) {
+    if (tipo !== 'PRODUCAO') return true;
+    var c = String(cargo || '').toLowerCase();
+    if (dcEhColheita()) return c !== 'embalador';
+    if (dcEhProcessamento()) return c !== 'colhedor';
+    return false;
+}
+
+/** Monta as options do select de funcionários (data-tipo/ref/refextra/cargo). */
+function dcMontarOptFunc(fs) {
+    var opt = '<option value="">Selecione</option>';
+    fs.forEach(function (f) {
+        var rot = f.tipo === 'PRODUCAO' ? 'Produção' + (f.cargo ? ' – ' + f.cargo : '') : f.tipo;
+        opt += '<option value="' + f.idPessoa + '" data-tipo="' + f.tipo + '" data-ref="' + (f.custoRef || 0) + '" data-refextra="' + (f.custoRefExtra || 0) +
+            '" data-cargo="' + dcHtml(f.cargo || '') + '">' + dcHtml(f.nome) + ' (' + dcHtml(rot) + ')</option>';
+    });
+    return opt;
+}
+
+/**
+ * Esconde, nos selects editáveis de funcionário, quem não pode ser lançado na atividade atual
+ * (dcFuncApto) e limpa a linha que tinha escolhido alguém que deixou de ser apto.
+ */
+function dcFiltrarFuncsAtividade() {
+    $('#dcFuncBody .dc-fpessoa:not([disabled]), #exFuncBody .ex-fpessoa').each(function () {
+        var $sel = $(this);
+        $sel.find('option[value!=""]').each(function () {
+            var apto = dcFuncApto($(this).attr('data-tipo'), $(this).attr('data-cargo'));
+            $(this).prop('hidden', !apto).prop('disabled', !apto);
+        });
+        // .val() devolve null quando a opção selecionada está desabilitada — checa pela própria opção.
+        var $opt = $sel.find('option:selected');
+        if ($opt.attr('value') && $opt.prop('disabled')) {
+            $sel.val('');
+            $sel.closest('tr').find('.dc-ftipo,.ex-ftipo').val('');
+        }
+    });
+}
+
+/**
+ * Mostra/esconde as colunas de regime (Regime | Preço | Caixas) nas tabelas de Funcionários
  * (principal e "Registrar Nova Execução") conforme o tipo de atividade selecionado — regime só
- * faz sentido na Colheita. Recalcula a prévia de custo em seguida, pois trocar de/para Colheita
- * muda como cada linha existente deve ser exibida (horas x caixas).
+ * faz sentido na Colheita e no Processamento. Recalcula a prévia de custo em seguida, pois trocar
+ * de tipo muda como cada linha existente deve ser exibida (horas x caixas).
  */
 function dcAtualizarVisibilidadeColheita() {
-    var colheita = dcEhColheita();
+    var colheita = dcEhAtividadeCaixa();
     $('.dc-col-regime').toggleClass('d-none', !colheita);
+    $('.dc-col-padrao').toggleClass('d-none', colheita);
+    dcFiltrarFuncsAtividade();
     if (!colheita) {
         // Fora da Colheita o regime não existe: reseta para Sistema para não deixar uma linha
         // "presa" em Produção (caixa) de quando o tipo de atividade era Colheita há pouco — o
@@ -4238,8 +4426,7 @@ function dcInit(areaId) {
     });
     dcCarregarTipos();
     dcFuncPromise = $.getJSON(AGRO_CTX + '/ControllerDiarioCampo?funcionarios=1', function (fs) {
-        dcCacheFunc = fs; dcOptFunc = '<option value="">Selecione</option>';
-        fs.forEach(function (f) { dcOptFunc += '<option value="' + f.idPessoa + '" data-tipo="' + f.tipo + '" data-ref="' + (f.custoRef || 0) + '" data-refextra="' + (f.custoRefExtra || 0) + '">' + f.nome + ' (' + f.tipo + ')</option>'; });
+        dcCacheFunc = fs; dcOptFunc = dcMontarOptFunc(fs);
         $('#dcResponsavel').html(dcOptFunc);
     });
     dcDespPromise = $.getJSON(AGRO_CTX + '/ControllerDiarioCampo?despesascatalogo=1', function (ds) {
@@ -4249,7 +4436,7 @@ function dcInit(areaId) {
     $.getJSON(AGRO_CTX + '/ControllerInsumo', function (is) { dcCacheIns = is.filter(function (i) { return i.situacao; }); });
     $.getJSON(AGRO_CTX + '/ControllerMaquina?ativas=true', function (ms) { dcCacheMaq = ms; });
     // Existe ao menos uma safra? (pré-requisito para lançar atividades)
-    $.getJSON(AGRO_CTX + '/ControllerSafra', function (ls) { dcTemSafra = Array.isArray(ls) && ls.length > 0; });
+    dcSafraPromise = $.getJSON(AGRO_CTX + '/ControllerSafra', function (ls) { dcTemSafra = Array.isArray(ls) && ls.length > 0; });
 
     dcCarregarLista();
     autoRefreshTabela('diario', dcCarregarLista, 15000);
@@ -4352,7 +4539,7 @@ function dcInit(areaId) {
 }
 
 function dcCarregarTipos() {
-    $.getJSON(AGRO_CTX + '/ControllerDiarioCampo?tiposatividade=1', function (ts) {
+    dcTiposPromise = $.getJSON(AGRO_CTX + '/ControllerDiarioCampo?tiposatividade=1', function (ts) {
         dcCacheTipos = ts; dcOptTipo = '';
         ts.forEach(function (t) { dcOptTipo += '<option value="' + t.idTipo + '">' + t.nome + '</option>'; });
         $('#dcTipo').html(dcOptTipo);
@@ -4471,7 +4658,7 @@ function dcAbrirNovo() {
     // Aguarda os carregamentos iniciais (funcionários/talhões/despesas) antes de checar pré-requisitos,
     // evitando falso alerta de "sem funcionário" quando o usuário clica antes do fetch terminar.
     var $btn = $('#btnNovoDiario').prop('disabled', true);
-    $.when(dcFuncPromise, dcTalhaoPromise, dcDespPromise).always(function () {
+    $.when(dcFuncPromise, dcTalhaoPromise, dcDespPromise, dcSafraPromise, dcTiposPromise).always(function () {
         $btn.prop('disabled', false);
         dcAbrirNovoInterno();
     });
@@ -4572,11 +4759,11 @@ var dcDespEditavel = true;   // false quando editando um diário já existente (
  */
 function dcAtualizarCampoHoras($tr, funcEditavel) {
     var tipo = $tr.find('.dc-ftipo').val();
-    var regime = $tr.find('.dc-fregime').val();
-    var colheita = dcEhColheita();
+    var colheita = dcEhAtividadeCaixa();
     var $horas = $tr.find('.dc-fhoras');
     var $caixas = $tr.find('.dc-fcaixas');
     var $preco = $tr.find('.dc-fprecocaixa');
+    var regime = dcAplicarRegimeProducao($tr, 'dc', colheita, funcEditavel);
 
     if (!colheita) {
         $caixas.addClass('d-none'); $preco.addClass('d-none'); $horas.removeClass('d-none');
@@ -4596,11 +4783,29 @@ function dcAtualizarCampoHoras($tr, funcEditavel) {
     }
 }
 
+/**
+ * Funcionário de Produção (Colhedor/Embalador) só é pago por caixa: trava o Regime em Produção e
+ * sugere o Preço/caixa do cadastro (valorporunidade) se ainda estiver vazio. Demais tipos: regime
+ * livre. Devolve o regime efetivo da linha. prefix = 'dc' (cadastro) ou 'ex' (nova execução).
+ */
+function dcAplicarRegimeProducao($tr, prefix, atividadeCaixa, funcEditavel) {
+    var $reg = $tr.find('.' + prefix + '-fregime');
+    if (atividadeCaixa && $tr.find('.' + prefix + '-ftipo').val() === 'PRODUCAO') {
+        $reg.val('PRODUCAO').prop('disabled', true);
+        var $preco = $tr.find('.' + prefix + '-fprecocaixa');
+        var ref = Number($tr.find('.' + prefix + '-fpessoa :selected').attr('data-ref')) || 0;
+        if (funcEditavel && !$preco.val() && ref > 0) $preco.val(ref);
+    } else {
+        $reg.prop('disabled', !funcEditavel);
+    }
+    return $reg.val();
+}
+
 /** Mesma lógica de dcAtualizarCampoHoras, para as linhas do bloco "Registrar Nova Execução" (prefixo ex-). */
 function dcAtualizarCampoHorasExec($tr) {
     var tipo = $tr.find('.ex-ftipo').val();
-    var regime = $tr.find('.ex-fregime').val();
-    var colheita = dcEhColheita();
+    var colheita = dcEhAtividadeCaixa();
+    var regime = dcAplicarRegimeProducao($tr, 'ex', colheita, true);
     var $horas = $tr.find('.ex-fhoras');
     var $caixas = $tr.find('.ex-fcaixas');
     var $preco = $tr.find('.ex-fprecocaixa');
@@ -4633,11 +4838,11 @@ function dcAddFuncRow(f) {
         '<td><input class="form-control form-control-sm dc-ftipo" readonly placeholder="—" style="width:90px"></td>' +
         '<td class="dc-col-regime d-none"><select class="form-select form-select-sm dc-fregime" ' + dis + '>' +
             '<option value="REGIME_SISTEMA">Sistema</option><option value="PRODUCAO">Produção (caixa)</option></select></td>' +
-        '<td>' +
-            '<input type="text" class="form-control form-control-sm dc-fhoras" placeholder="2h30 / 45min / 1,5" title="Aceita horas e minutos: 2h30, 45min, 2:30 ou 1,5" value="" ' + dis + '>' +
-            '<input type="number" class="form-control form-control-sm dc-fcaixas mt-1 d-none" placeholder="Caixas colhidas" min="0.01" step="0.01" ' + dis + '>' +
-            '<input type="number" class="form-control form-control-sm dc-fprecocaixa mt-1 d-none" placeholder="Preço/caixa" min="0.01" step="0.01" ' + dis + '>' +
-        '</td>' +
+        // Colheita/Processamento: Regime | Preço | Caixas | Horas | Valor (colunas .dc-col-regime);
+        // demais atividades: só Horas | Valor.
+        '<td class="dc-col-regime d-none"><input type="number" class="form-control form-control-sm dc-fprecocaixa d-none" placeholder="Preço/cx" title="Preço por caixa (regime Produção)" min="0.01" step="0.01" ' + dis + '></td>' +
+        '<td class="dc-col-regime d-none"><input type="number" class="form-control form-control-sm dc-fcaixas d-none" placeholder="Caixas" min="0.01" step="0.01" ' + dis + '></td>' +
+        '<td><input type="text" class="form-control form-control-sm dc-fhoras" placeholder="2h30 / 45min / 1,5" title="Aceita horas e minutos: 2h30, 45min, 2:30 ou 1,5" value="" ' + dis + '></td>' +
         '<td><input type="number" class="form-control form-control-sm dc-fvalor bg-light" readonly title="Calculado automaticamente conforme o tipo de funcionário" value="0"></td>' +
         '<td class="text-center">' + btnCell + '</td></tr>');
     if (f) {
@@ -4992,16 +5197,19 @@ function dcRecalcPreview() {
 
 function dcSalvar() {
     var ehColheita = dcEhColheita();
+    var ehCaixa = dcEhAtividadeCaixa();   // Colheita ou Processamento
     var funcionarios = [], caixasInvalidas = false, precoInvalido = false;
     $('#dcFuncBody tr').each(function () {
         var id = $(this).find('.dc-fpessoa').val(); if (!id) return;
-        var regime = ehColheita ? ($(this).find('.dc-fregime').val() || null) : null;
+        var regime = ehCaixa ? ($(this).find('.dc-fregime').val() || null) : null;
         var caixas = null, precoCx = null;
-        if (ehColheita) {
-            // Caixas colhidas vale pros dois regimes (é volume físico, não forma de pagamento);
-            // preço/caixa só importa em PRODUCAO, que é quem tem o pagamento calculado por ele.
+        if (ehCaixa) {
+            // Caixas colhidas vale pros dois regimes na Colheita (é volume físico, não forma de
+            // pagamento); no Processamento só é obrigatório para quem é pago por caixa.
+            // Preço/caixa só importa em PRODUCAO, que é quem tem o pagamento calculado por ele.
             caixas = parseFloat($(this).find('.dc-fcaixas').val()) || 0;
-            if (caixas <= 0) caixasInvalidas = true;
+            if (caixas <= 0 && (ehColheita || regime === 'PRODUCAO')) caixasInvalidas = true;
+            if (caixas <= 0) caixas = null;
             if (regime === 'PRODUCAO') {
                 precoCx = parseFloat($(this).find('.dc-fprecocaixa').val()) || 0;
                 if (precoCx <= 0) precoInvalido = true;
@@ -5014,7 +5222,7 @@ function dcSalvar() {
     });
     if (caixasInvalidas) {
         $('#alertDiario').removeClass('d-none').addClass('alert-danger')
-            .text('Informe a quantidade de caixas colhidas (maior que zero) para cada funcionário.');
+            .text(ehColheita ? 'Informe a quantidade de caixas colhidas (maior que zero) para cada funcionário.' : 'Informe a quantidade de caixas (maior que zero) para quem é pago por caixa.');
         return;
     }
     if (precoInvalido) {
@@ -5096,6 +5304,11 @@ function dcSalvar() {
         data: JSON.stringify(payload),
         success: function (res) {
             if (res.ok) {
+                // Cadastro aberto pela página Colheita ("Cadastrar Colheita"): volta para ela.
+                if (dcVeioDaColheita && !editId) {
+                    window.location.href = AGRO_CTX + '/view/admin/colheitaestoque.jsp';
+                    return;
+                }
                 mostrarAlerta(res.msg + (res.numeroDiario ? ' (' + res.numeroDiario + ')' : ''), 'success', '#alertPerfil');
                 dcCarregarLista();
                 // Atividade recém-passada para Execução: mantém o modal aberto e mostra o bloco de
@@ -5182,11 +5395,9 @@ function dcAddExecFuncRow() {
         '<td><input class="form-control form-control-sm ex-ftipo" readonly placeholder="—" style="width:90px"></td>' +
         '<td class="dc-col-regime d-none"><select class="form-select form-select-sm ex-fregime">' +
             '<option value="REGIME_SISTEMA">Sistema</option><option value="PRODUCAO">Produção (caixa)</option></select></td>' +
-        '<td>' +
-            '<input type="text" class="form-control form-control-sm ex-fhoras" placeholder="2h30 / 45min / 1,5" value="">' +
-            '<input type="number" class="form-control form-control-sm ex-fcaixas mt-1 d-none" placeholder="Caixas colhidas" min="0.01" step="0.01">' +
-            '<input type="number" class="form-control form-control-sm ex-fprecocaixa mt-1 d-none" placeholder="Preço/caixa" min="0.01" step="0.01">' +
-        '</td>' +
+        '<td class="dc-col-regime d-none"><input type="number" class="form-control form-control-sm ex-fprecocaixa d-none" placeholder="Preço/cx" title="Preço por caixa (regime Produção)" min="0.01" step="0.01"></td>' +
+        '<td class="dc-col-regime d-none"><input type="number" class="form-control form-control-sm ex-fcaixas d-none" placeholder="Caixas" min="0.01" step="0.01"></td>' +
+        '<td><input type="text" class="form-control form-control-sm ex-fhoras" placeholder="2h30 / 45min / 1,5" value=""></td>' +
         '<td><input type="number" class="form-control form-control-sm ex-fvalor bg-light" readonly value="0"></td>' +
         '<td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger ex-rm"><i class="fas fa-trash"></i></button></td></tr>');
     dcAtualizarVisibilidadeColheita();
@@ -5214,14 +5425,16 @@ function dcSalvarExecucao() {
     var dataExec = $('#exData').val();
     if (!iddiario || !dataExec) { $('#alertDiario').removeClass('d-none').addClass('alert-danger').text('Data da execução é obrigatória.'); return; }
     var ehColheita = dcEhColheita();
+    var ehCaixa = dcEhAtividadeCaixa();   // Colheita ou Processamento
     var funcionarios = [], caixasInvalidas = false, precoInvalido = false;
     $('#exFuncBody tr').each(function () {
         var id = $(this).find('.ex-fpessoa').val(); if (!id) return;
-        var regime = ehColheita ? ($(this).find('.ex-fregime').val() || null) : null;
+        var regime = ehCaixa ? ($(this).find('.ex-fregime').val() || null) : null;
         var caixas = null, precoCx = null;
-        if (ehColheita) {
+        if (ehCaixa) {
             caixas = parseFloat($(this).find('.ex-fcaixas').val()) || 0;
-            if (caixas <= 0) caixasInvalidas = true;
+            if (caixas <= 0 && (ehColheita || regime === 'PRODUCAO')) caixasInvalidas = true;
+            if (caixas <= 0) caixas = null;
             if (regime === 'PRODUCAO') {
                 precoCx = parseFloat($(this).find('.ex-fprecocaixa').val()) || 0;
                 if (precoCx <= 0) precoInvalido = true;
@@ -5234,7 +5447,7 @@ function dcSalvarExecucao() {
     });
     if (caixasInvalidas) {
         $('#alertDiario').removeClass('d-none').addClass('alert-danger')
-            .text('Informe a quantidade de caixas colhidas (maior que zero) para cada funcionário.');
+            .text(ehColheita ? 'Informe a quantidade de caixas colhidas (maior que zero) para cada funcionário.' : 'Informe a quantidade de caixas (maior que zero) para quem é pago por caixa.');
         return;
     }
     if (precoInvalido) {

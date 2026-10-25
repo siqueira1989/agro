@@ -64,6 +64,7 @@
           <th>Valor</th>
           <th>Tipo</th>
           <th>Classificação</th>
+          <th>Categoria</th>
           <th>Ações</th>
         </tr>
       </thead>
@@ -86,6 +87,38 @@
         <div id="alertModalCadastro" class="alert d-none" role="alert"></div>
         
         <form id="formCadastro">
+          <div class="mb-3">
+            <label for="dcCategoria"><i class="fas fa-box me-1 text-muted"></i>Categoria:</label>
+            <select id="dcCategoria" name="categoria" class="form-select">
+              <option value="GERAL">Geral</option>
+              <option value="CAIXA_COLHEITA">Caixa de colheita</option>
+              <option value="EMBALAGEM">Embalagem</option>
+            </select>
+            <small class="text-muted">Caixa de colheita / Embalagem: preço por alimento e área, usado no Diário de Campo e na Colheita.</small>
+          </div>
+          <div id="dcCamposCaixa" class="d-none">
+            <div class="row">
+              <div class="col-6 mb-3">
+                <label for="dcAlimento"><i class="fas fa-apple-whole me-1 text-muted"></i>Alimento:</label>
+                <select id="dcAlimento" name="idAlimento" class="form-select">
+                  <option value="">Selecione...</option>
+                </select>
+              </div>
+              <div class="col-6 mb-3">
+                <label for="dcArea"><i class="fas fa-map-location-dot me-1 text-muted"></i>Área de Produção:</label>
+                <select id="dcArea" name="idArea" class="form-select">
+                  <option value="">Selecione...</option>
+                </select>
+              </div>
+            </div>
+            <div class="mb-3">
+              <label for="dcTipoCaixa"><i class="fas fa-boxes-stacked me-1 text-muted"></i>Tipo de caixa:</label>
+              <select id="dcTipoCaixa" class="form-select">
+                <option value="">Selecione...</option>
+              </select>
+              <input type="text" id="dcTipoCaixaOutro" class="form-control mt-2 d-none" maxlength="30" placeholder="Ex.: PLASTICO_20">
+            </div>
+          </div>
           <div class="mb-3">
             <label for="despesascustos"><i class="fas fa-tag me-1 text-muted"></i>Despesa/Custo:</label>
             <input type="text" id="despesascustos" name="despesascustos" class="form-control" maxlength="50" placeholder="Ex.: Aluguel">

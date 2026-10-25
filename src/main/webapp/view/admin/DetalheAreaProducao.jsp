@@ -150,7 +150,7 @@
         <button class="btn btn-outline-primary btn-sm" type="button" id="btnAddFunc"><i class="fas fa-user-plus me-1"></i>Funcionário</button>
       </div>
       <div id="dcFuncTableWrap" class="table-responsive"><table class="table table-sm align-middle mb-2">
-        <thead class="table-light"><tr><th style="width:26%">Funcionário</th><th>Tipo</th><th class="dc-col-regime d-none" style="width:14%">Regime</th><th style="width:16%">Horas / Caixas</th><th style="width:16%">Valor (auto)</th><th></th></tr></thead>
+        <thead class="table-light"><tr><th style="width:24%">Funcionário</th><th>Tipo</th><th class="dc-col-regime d-none" style="width:14%">Regime</th><th class="dc-col-regime d-none" style="width:11%">Preço</th><th class="dc-col-regime d-none" style="width:10%">Caixas</th><th style="width:13%">Horas</th><th style="width:13%"><span class="dc-col-regime d-none">Valor</span><span class="dc-col-padrao">Valor (auto)</span></th><th></th></tr></thead>
         <tbody id="dcFuncBody"></tbody></table></div>
       <div id="dcFuncSoNaExecucao" class="alert alert-info py-2 small d-none">
         <i class="fas fa-circle-info me-1"></i>Estes são os lançamentos de execuções anteriores, agora somente leitura — use
@@ -164,7 +164,7 @@
           <div class="col-md-4"><label class="form-label small mb-0">Data da execução *</label><input type="date" class="form-control form-control-sm" id="exData"></div>
         </div>
         <div class="table-responsive mt-2"><table class="table table-sm align-middle mb-2">
-          <thead class="table-light"><tr><th style="width:26%">Funcionário</th><th>Tipo</th><th class="dc-col-regime d-none" style="width:14%">Regime</th><th style="width:16%">Horas / Caixas</th><th style="width:16%">Valor (auto)</th><th></th></tr></thead>
+          <thead class="table-light"><tr><th style="width:24%">Funcionário</th><th>Tipo</th><th class="dc-col-regime d-none" style="width:14%">Regime</th><th class="dc-col-regime d-none" style="width:11%">Preço</th><th class="dc-col-regime d-none" style="width:10%">Caixas</th><th style="width:13%">Horas</th><th style="width:13%"><span class="dc-col-regime d-none">Valor</span><span class="dc-col-padrao">Valor (auto)</span></th><th></th></tr></thead>
           <tbody id="exFuncBody"></tbody></table></div>
         <button type="button" class="btn btn-outline-primary btn-sm" id="btnAddExecFunc"><i class="fas fa-user-plus me-1"></i>Colaborador</button>
 
