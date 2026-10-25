@@ -3074,10 +3074,13 @@ function carregarPerfilProducao(id, periodo) {
             renderCardsProducao(data);
             popularTipoCaixaSelect();
             renderTabelaCaixas(data.lancamentos || []);
+            renderTabelaCaixasDiario(data.lancamentosDiario || []);
             renderPrecos(data);
             renderTabelaValesProducao(data.vales || []);
             renderFechamentoProducao(data);
-            window.__pgCtx = { id: parseInt(id), periodo: periodo, tipo: 'PRODUCAO', valor: data.valorLiquido };
+            // valor = (manual + Diário concluído) − vales; composicao é só informativa (mostrada no modal).
+            window.__pgCtx = { id: parseInt(id), periodo: periodo, tipo: 'PRODUCAO', valor: data.valorLiquido,
+                               composicao: composicaoProducaoTxt(data) };
             carregarPagamentos();
         },
         error: function () { mostrarAlerta('Erro ao carregar perfil de produção.', 'danger', '#alerta', 5000); }
@@ -3117,8 +3120,57 @@ function renderHeaderProducao(data) {
     $('#precoAno').text('(' + (data.ano || '') + ')');
 }
 
+/* Caixas do Diário de Campo (regime PRODUCAO) — só leitura; só diário CONCLUIDA entra no total. */
+function totalCaixasProducao(data) {
+    return (Number(data.totalCaixas) || 0) + (Number(data.caixasDiario) || 0);
+}
+function composicaoProducaoTxt(data) {
+    var txt = 'Manual ' + formatBRL(data.valorManual || 0) + ' + Diário ' + formatBRL(data.valorDiario || 0)
+            + ' = ' + formatBRL(data.valorProducao || 0);
+    if (Number(data.totalVales) > 0) txt += ' − Vales ' + formatBRL(data.totalVales) + ' = ' + formatBRL(data.valorLiquido || 0);
+    return txt;
+}
+function escProducao(v) {
+    return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function renderTabelaCaixasDiario(lancs) {
+    var tbody = $('#bodyCaixasDiario').empty();
+    if (!lancs.length) {
+        tbody.append('<tr><td colspan="8" class="text-center text-muted py-3">Nenhuma caixa lançada no Diário no período.</td></tr>');
+        return;
+    }
+    lancs.forEach(function (l) {
+        var areaTalhao = [l.area, l.talhao].filter(Boolean).map(escProducao).join(' / ') || '—';
+        var tipo = l.tipoCaixa ? escProducao(l.tipoCaixa.split(', ').map(rotuloCaixa).join(', ')) : '—';
+        var num = escProducao(l.numeroDiario || l.idDiario);
+        var link = l.idArea
+            ? '<a href="' + AGRO_CTX + '/view/admin/DetalheAreaProducao.jsp?id=' + parseInt(l.idArea, 10)
+              + '" title="Abrir a área (lista de diários)">' + num + '</a>'
+            : num;
+        var badge = l.contaNoTotal ? ''
+            : ' <span class="badge bg-warning text-dark" title="Diário ainda em andamento: entra no total quando for concluído">'
+              + 'Em andamento — fora do total</span>';
+        tbody.append('<tr' + (l.contaNoTotal ? '' : ' class="text-muted"') + '>'
+            + '<td>' + formatDataBR(l.data) + '</td>'
+            + '<td>' + escProducao(l.atividade || '—') + '</td>'
+            + '<td>' + areaTalhao + '</td>'
+            + '<td>' + tipo + '</td>'
+            + '<td class="text-end">' + Number(l.caixas || 0).toLocaleString('pt-BR') + '</td>'
+            + '<td class="text-end">' + formatBRL(l.precoPorCaixa) + '</td>'
+            + '<td class="text-end fw-bold">' + formatBRL(l.valor) + '</td>'
+            + '<td class="text-nowrap">' + link + badge + '</td></tr>');
+    });
+}
+// Mostra a composição do total (Manual + Diário) no modal de Pagamento compartilhado, só no perfil Produção.
+$(document).on('shown.bs.modal', '#modalPagamento', function () {
+    var ctx = window.__pgCtx || {};
+    if (ctx.tipo !== 'PRODUCAO' || !ctx.composicao) return;
+    $('#pgPrazoInfo').text(ctx.composicao).removeClass('d-none');
+});
+
 function renderCardsProducao(data) {
-    $('#cardTotalCaixas').text(data.totalCaixas || 0);
+    $('#cardTotalCaixas').text(totalCaixasProducao(data).toLocaleString('pt-BR'));
     $('#cardValorProducao').text(formatBRL(data.valorProducao || 0));
     $('#cardTotalVales').text(formatBRL(data.totalVales || 0));
     $('#cardLiquido').text(formatBRL(data.valorLiquido || 0));
@@ -3253,7 +3305,9 @@ function renderTabelaValesProducao(vales) {
 function renderFechamentoProducao(data) {
     $('#painelFechamentoProducao').html(
         '<table class="table table-sm mb-0">'
-        + '<tr><td>Total de caixas</td><td class="text-end fw-bold">' + (data.totalCaixas || 0) + '</td></tr>'
+        + '<tr><td>Total de caixas</td><td class="text-end fw-bold">' + totalCaixasProducao(data).toLocaleString('pt-BR') + '</td></tr>'
+        + '<tr><td class="ps-3 small text-muted">Manual</td><td class="text-end small">' + formatBRL(data.valorManual) + '</td></tr>'
+        + '<tr><td class="ps-3 small text-muted">Diário de Campo (concluído)</td><td class="text-end small">' + formatBRL(data.valorDiario) + '</td></tr>'
         + '<tr><td>Valor Produção</td><td class="text-end text-success fw-bold">' + formatBRL(data.valorProducao) + '</td></tr>'
         + '<tr><td>Total Vales</td><td class="text-end text-warning">- ' + formatBRL(data.totalVales) + '</td></tr>'
         + '<tr class="table-success"><td class="fw-bold">Valor Líquido</td>'
@@ -3288,6 +3342,11 @@ function postProducao(payload, onOk, alertaSel) {
         data: JSON.stringify(payload), dataType: 'json',
         success: function (r) {
             if (r.ok) { if (r.msg) mostrarAlerta(r.msg, 'success', '#alerta', 3000); if (onOk) onOk(); }
+            else if (r.confirmar) {
+                // Já há caixas do Diário de Campo nesta data: só grava se o usuário confirmar.
+                if (confirm(r.msg + '\n\nLançar mesmo assim?'))
+                    postProducao($.extend({}, payload, { confirmardiario: true }), onOk, alertaSel);
+            }
             else mostrarAlerta(r.msg || 'Falha na operação.', 'danger', alertaSel || '#alerta', 4000);
         },
         error: function () { mostrarAlerta('Erro de conexão.', 'danger', alertaSel || '#alerta', 4000); }
@@ -6710,16 +6769,18 @@ function ceCarregarLista() {
     var url = AGRO_CTX + '/ControllerColheita' + (status ? '?status=' + status : '');
     $.getJSON(url, function (lista) {
         var $b = $('#ceTabelaBody').empty();
+        ceLotes = {};
         if (!lista.length) { $b.append('<tr><td colspan="10" class="text-center text-muted py-3">Nenhum lote de colheita.</td></tr>'); return; }
         lista.forEach(function (l) {
+            ceLotes[l.idLote] = l;
             var saldoQtd = (Number(l.quantidadeTotal || 0) - Number(l.quantidadeProcessada || 0));
             var acoes = '';
             if (l.status !== 'FINALIZADO') {
-                if (saldoQtd > 0) acoes += '<button class="btn btn-sm btn-outline-primary ms-1" onclick="ceProcessar(' + l.idLote + ',' + saldoQtd + ')">Processar</button>';
+                if (saldoQtd > 0) acoes += '<button class="btn btn-sm btn-outline-primary ms-1" onclick="ceProcessar(' + Number(l.idLote) + ')"><i class="fas fa-box-open me-1"></i>Processar</button>';
                 acoes += '<button class="btn btn-sm btn-outline-secondary ms-1" onclick="ceFinalizar(' + l.idLote + ')">Finalizar</button>';
             }
-            $b.append('<tr><td>' + (l.numeroDiario || '') + '</td><td>' + formatarData(l.dataColheita) + '</td>' +
-                '<td>' + (l.quadraNome || '—') + '</td><td>' + (l.siglaArea || '—') + '</td><td>' + (l.culturaNome || '—') + '</td>' +
+            $b.append('<tr><td>' + ceEsc(l.numeroDiario || '') + '</td><td>' + formatarData(l.dataColheita) + '</td>' +
+                '<td>' + ceEsc(l.quadraNome || '—') + '</td><td>' + ceEsc(l.siglaArea || '—') + '</td><td>' + ceEsc(l.culturaNome || '—') + '</td>' +
                 '<td class="text-end">' + Number(l.quantidadeTotal || 0).toFixed(2) + ' ' + (l.unidade || 'CX') + '</td>' +
                 '<td class="text-end">' + Number(l.quantidadeProcessada || 0).toFixed(2) + '</td>' +
                 '<td class="text-end">' + saldoQtd.toFixed(2) + '</td>' +
@@ -6729,26 +6790,318 @@ function ceCarregarLista() {
     });
 }
 
-/**
- * Processa uma QUANTIDADE do saldo em estoque — não precisa ser o saldo inteiro (o que não for
- * processado agora continua em estoque, e pode ser processado depois em outra chamada). É a forma
- * dinâmica de lidar com "nem sempre vai ser processado tudo": o lote só vira PROCESSADO quando o
- * acumulado bater a quantidade total; até lá fica em ESTOQUE com o saldo restante.
- */
-function ceProcessar(idLote, saldoAtual) {
-    var txt = prompt('Quantidade a processar agora (saldo em estoque: ' + Number(saldoAtual).toFixed(2) + '):', Number(saldoAtual).toFixed(2));
-    if (txt === null) return;
-    var qtd = parseFloat(txt.replace(',', '.'));
-    if (!qtd || qtd <= 0) { mostrarAlerta('Quantidade inválida.', 'danger', '#alertaColheita'); return; }
-    $.ajax({
-        url: AGRO_CTX + '/ControllerColheita', method: 'POST', contentType: 'application/json; charset=utf-8',
-        data: JSON.stringify({ acao: 'processar', idlote: idLote, quantidade: qtd }),
-        success: function (res) {
-            mostrarAlerta(res.msg, res.ok ? 'success' : 'danger', '#alertaColheita');
-            ceCarregarLista(); ceCarregarIndicadores();
-        },
-        error: function (xhr) { var m = 'Erro ao registrar processamento.'; try { m = JSON.parse(xhr.responseText).msg || m; } catch (e) {} mostrarAlerta(m, 'danger', '#alertaColheita'); }
+/* ---------- Modal "Processar" (onda 3) ----------
+ * Processa uma QUANTIDADE do saldo (não precisa ser tudo: o resto continua em ESTOQUE) e registra a
+ * mão de obra da etapa como um diário de Processamento no talhão do lote:
+ *   embaladores (Produção, cargo Embalador) → regime PRODUCAO, caixas × preço da embalagem;
+ *   demais (CLT/diarista/empreita)           → REGIME_SISTEMA, por horas (mesmo cálculo do Diário).
+ * O preço de cada embalagem vem de Despesas e Custos (EMBALAGEM por alimento + área) e é
+ * gravado/atualizado ao confirmar. Fluxo do Confirmar:
+ *   1) Colheita valida (lote, saldo, safra, embalagens) sem gravar;
+ *   2) Diário cria o diário de Processamento (contrato documentado em docs/modulos/diario-campo.md);
+ *   3) Colheita grava baixa + preços + vínculo lote↔diário numa transação;
+ *   se o passo 3 falhar, o diário do passo 2 é CANCELADO (o Diário não tem exclusão). */
+var ceLotes = {};                 // idLote → lote da última listagem
+var cpLote = null;                // lote aberto no modal
+var cpFuncs = [];                 // funcionários ativos na data (ControllerDiarioCampo?funcionarios=1)
+var cpEmbalagens = [];            // embalagens cadastradas p/ alimento + área (DespesasCustosServlet?embalagens=1)
+var cpIdTipoProc = null;          // id do tipo de atividade "Processamento" (buscado por nome)
+var CP_NOVA = '__NOVA__';
+
+function ceEsc(v) {
+    return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function ceMoeda(v) { return 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function ceQtd(v) { return Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function ceMsgXhr(xhr, padrao) { try { return JSON.parse(xhr.responseText).msg || padrao; } catch (e) { return padrao; } }
+function cpHoje() { return new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10); }
+/** Mesmo código que DespesasCustosDAO.normalizarTipoCaixa gera ("Papelão 7kg" → PAPELAO_7KG). */
+function cpNormTipo(s) {
+    return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim()
+        .replace(/[\s\-]+/g, '_').replace(/[^A-Z0-9_]/g, '');
+}
+function cpSaldo() { return cpLote ? Number(cpLote.quantidadeTotal || 0) - Number(cpLote.quantidadeProcessada || 0) : 0; }
+function cpAlerta(msg, tipo) {
+    $('#cpAlerta').removeClass('d-none alert-success alert-danger alert-warning alert-info').addClass('alert-' + (tipo || 'danger')).html(msg);
+    var corpo = $('#modalProcessar .modal-body')[0]; if (corpo) corpo.scrollTop = 0;
+}
+
+function ceProcessar(idLote) {
+    var l = ceLotes[idLote]; if (!l) return;
+    cpLote = l;
+    var saldo = cpSaldo();
+    $('#cpTituloLote').text('— diário ' + (l.numeroDiario || '#' + l.idLote));
+    $('#cpTalhao').text(l.quadraNome || '—');
+    $('#cpAlimento').text(l.culturaNome || '—');
+    $('#cpArea').text((l.areaNome || '—') + (l.siglaArea ? ' (' + l.siglaArea + ')' : ''));
+    $('#cpColheita').text(formatarData(l.dataColheita));
+    $('#cpSaldo').text(ceQtd(saldo) + ' ' + (l.unidade || 'CX'));
+    var hoje = cpHoje();
+    $('#cpData').val(l.dataColheita && l.dataColheita > hoje ? l.dataColheita : hoje).attr('min', l.dataColheita || '');
+    $('#cpQuantidade').val(saldo.toFixed(2)).attr('max', saldo.toFixed(2));
+    $('#cpFuncBody').empty();
+    $('#cpResponsavel').html('<option value="">Selecione</option>');
+    $('#cpAlerta').addClass('d-none');
+    $('#cpHistorico').empty();
+    $('#cpConfirmar').prop('disabled', false).html('<i class="fas fa-check me-1"></i>Confirmar processamento');
+    cpAtualizarQuantidade(); cpRecalcular();
+
+    var pTipos = cpIdTipoProc ? $.Deferred().resolve().promise()
+        : $.getJSON(AGRO_CTX + '/ControllerDiarioCampo?tiposatividade=1').then(function (tipos) {
+            (tipos || []).forEach(function (t) { if (String(t.nome || '').trim().toLowerCase() === 'processamento') cpIdTipoProc = t.idtipo || t.idTipo || t.id; });
+        });
+    var pEmb = cpCarregarEmbalagens();
+    var pFunc = cpCarregarFuncionarios();
+    $.getJSON(AGRO_CTX + '/ControllerColheita?processamentos=' + Number(l.idLote), function (hist) {
+        if (!hist || !hist.length) return;
+        var itens = hist.slice(0, 3).map(function (h) {
+            return formatarData(h.data) + ': ' + ceQtd(h.quantidade) + (h.numeroDiario ? ' (diário ' + ceEsc(h.numeroDiario) + ')' : '');
+        });
+        $('#cpHistorico').html('<span class="text-muted"><i class="fas fa-clock-rotate-left me-1"></i>Processamentos anteriores:</span> ' + itens.join(' · '));
     });
+    $.when(pTipos, pEmb, pFunc).always(function () {
+        if (!cpIdTipoProc) cpAlerta('Tipo de atividade <strong>Processamento</strong> não encontrado no Diário de Campo — não é possível registrar a etapa.', 'warning');
+        $('#modalProcessar').modal('show');
+        if (cpOpcoesPessoa('EMB').length) cpNovaLinha('EMB');
+    });
+}
+
+function cpCarregarEmbalagens() {
+    if (!cpLote || !cpLote.idCultura || !cpLote.idArea) { cpEmbalagens = []; return $.Deferred().resolve().promise(); }
+    return $.getJSON(AGRO_CTX + '/DespesasCustosServlet?embalagens=1&idAlimento=' + Number(cpLote.idCultura) + '&idArea=' + Number(cpLote.idArea))
+        .then(function (r) { cpEmbalagens = (r && r.embalagens) || []; }, function () { cpEmbalagens = []; });
+}
+
+function cpCarregarFuncionarios() {
+    return $.getJSON(AGRO_CTX + '/ControllerDiarioCampo?funcionarios=1&data=' + encodeURIComponent($('#cpData').val() || ''))
+        .then(function (lista) { cpFuncs = lista || []; }, function () { cpFuncs = []; });
+}
+
+function cpEhEmbalador(f) { return f.tipo === 'PRODUCAO' && /embalador/i.test(f.cargo || ''); }
+function cpOpcoesPessoa(modo) {
+    return cpFuncs.filter(function (f) {
+        return modo === 'EMB' ? cpEhEmbalador(f) : (f.tipo === 'CLT' || f.tipo === 'DIARISTA' || f.tipo === 'EMPREITA');
+    });
+}
+function cpHtmlPessoas(modo, selecionado) {
+    var lista = cpOpcoesPessoa(modo);
+    if (!lista.length) {
+        return '<option value="">' + (modo === 'EMB' ? 'Nenhum embalador ativo na data' : 'Nenhum funcionário ativo na data') + '</option>';
+    }
+    var h = '<option value="">Selecione</option>';
+    lista.forEach(function (f) {
+        h += '<option value="' + Number(f.idPessoa) + '" data-tipo="' + ceEsc(f.tipo) + '" data-ref="' + Number(f.custoRef || 0) +
+            '" data-refextra="' + Number(f.custoRefExtra || 0) + '"' + (String(f.idPessoa) === String(selecionado) ? ' selected' : '') + '>' + ceEsc(f.nome) + '</option>';
+    });
+    return h;
+}
+function cpHtmlEmbalagens(selecionado) {
+    var h = '<option value="">Selecione</option>';
+    cpEmbalagens.forEach(function (e) {
+        h += '<option value="' + ceEsc(e.tipoCaixa) + '" data-preco="' + Number(e.valordespesascustos || 0) + '"' +
+            (e.tipoCaixa === selecionado ? ' selected' : '') + '>' + ceEsc(e.despesascusto || e.tipoCaixa) + ' — ' + ceMoeda(e.valordespesascustos) + '</option>';
+    });
+    return h + '<option value="' + CP_NOVA + '"' + (selecionado === CP_NOVA ? ' selected' : '') + '>+ Nova embalagem…</option>';
+}
+
+function cpNovaLinha(modo) {
+    var emb = modo === 'EMB';
+    var $tr = $('<tr data-modo="' + modo + '">' +
+        '<td><select class="form-select form-select-sm cp-pessoa">' + cpHtmlPessoas(modo) + '</select></td>' +
+        '<td class="small cp-tipo text-nowrap">—</td>' +
+        '<td>' + (emb ? '<span class="badge bg-primary-subtle text-primary border border-primary-subtle">Produção</span>'
+                      : '<span class="badge bg-secondary-subtle text-secondary border">Horas</span>') + '</td>' +
+        '<td>' + (emb ? '<select class="form-select form-select-sm cp-emb">' + cpHtmlEmbalagens('') + '</select>' +
+                        '<input type="text" class="form-control form-control-sm mt-1 d-none cp-nova-nome" maxlength="30" placeholder="Nome da embalagem (ex.: Papelão 7kg)">'
+                      : '<span class="text-muted">—</span>') + '</td>' +
+        '<td class="text-end">' + (emb ? '<input type="number" class="form-control form-control-sm text-end cp-preco" min="0" step="0.01" placeholder="0,00">' +
+                                         '<div class="small text-warning d-none cp-preco-alt">novo preço</div>'
+                                       : '<span class="small text-muted cp-ref"></span>') + '</td>' +
+        '<td>' + (emb ? '<input type="number" class="form-control form-control-sm text-end cp-caixas" min="0" step="1" placeholder="0">' : '<span class="text-muted d-block text-center">—</span>') + '</td>' +
+        '<td>' + (emb ? '<span class="text-muted d-block text-center">—</span>' : '<input type="number" class="form-control form-control-sm text-end cp-horas" min="0" step="0.5" placeholder="0">') + '</td>' +
+        '<td class="text-end fw-semibold cp-valor">R$ 0,00</td>' +
+        '<td class="text-end"><button type="button" class="btn btn-sm btn-link text-danger p-0 cp-remover" title="Remover"><i class="fas fa-xmark"></i></button></td>' +
+        '</tr>');
+    $('#cpFuncBody').append($tr);
+    cpRecalcular();
+    return $tr;
+}
+
+/** Preço da embalagem escolhida na linha: o cadastrado em Despesas ou, se já editado em outra linha, o mesmo. */
+function cpCodigoEmbalagem($tr) {
+    var v = $tr.find('.cp-emb').val();
+    return v === CP_NOVA ? cpNormTipo($tr.find('.cp-nova-nome').val()) : (v || '');
+}
+function cpAoEscolherEmbalagem($tr) {
+    var v = $tr.find('.cp-emb').val();
+    $tr.find('.cp-nova-nome').toggleClass('d-none', v !== CP_NOVA);
+    if (v === CP_NOVA) { $tr.find('.cp-preco').val(''); $tr.find('.cp-nova-nome').trigger('focus'); }
+    else {
+        var codigo = cpCodigoEmbalagem($tr), outro = null;
+        $('#cpFuncBody tr[data-modo="EMB"]').not($tr).each(function () { if (codigo && cpCodigoEmbalagem($(this)) === codigo && $(this).find('.cp-preco').val()) outro = $(this).find('.cp-preco').val(); });
+        $tr.find('.cp-preco').val(outro || (v ? Number($tr.find('.cp-emb :selected').data('preco') || 0).toFixed(2) : ''));
+    }
+    cpRecalcular();
+}
+/** Mesmo tipo de embalagem = mesmo preço: editar numa linha replica nas outras. */
+function cpReplicarPreco($tr) {
+    var codigo = cpCodigoEmbalagem($tr), preco = $tr.find('.cp-preco').val();
+    if (!codigo) return;
+    $('#cpFuncBody tr[data-modo="EMB"]').not($tr).each(function () { if (cpCodigoEmbalagem($(this)) === codigo) $(this).find('.cp-preco').val(preco); });
+}
+
+function cpAtualizarQuantidade() {
+    var saldo = cpSaldo(), q = Number($('#cpQuantidade').val()) || 0;
+    var pct = saldo > 0 ? Math.min(100, Math.max(0, q / saldo * 100)) : 0;
+    $('#cpBarra').css('width', pct + '%').toggleClass('bg-danger', q > saldo).toggleClass('bg-success', q <= saldo);
+    $('#cpRestante').html(q > saldo ? '<span class="text-danger">Maior que o saldo disponível.</span>'
+        : 'Fica em estoque: <strong>' + ceQtd(saldo - q) + '</strong> ' + ceEsc(cpLote ? cpLote.unidade || 'CX' : 'CX'));
+}
+
+function cpRecalcular() {
+    var totCx = 0, totEmb = 0, totHoras = 0;
+    $('#cpFuncBody tr').each(function () {
+        var $tr = $(this), opt = $tr.find('.cp-pessoa :selected'), valor = 0;
+        var tipo = opt.val() ? opt.data('tipo') : '';
+        $tr.find('.cp-tipo').text(tipo ? (tipo === 'PRODUCAO' ? 'Produção' : tipo.charAt(0) + tipo.slice(1).toLowerCase()) : '—');
+        if ($tr.data('modo') === 'EMB') {
+            var cx = Number($tr.find('.cp-caixas').val()) || 0, preco = Number($tr.find('.cp-preco').val()) || 0;
+            valor = cx * preco; totCx += cx; totEmb += valor;
+            var $sel = $tr.find('.cp-emb :selected'), cadastrado = $sel.val() && $sel.val() !== CP_NOVA ? Number($sel.data('preco') || 0) : null;
+            $tr.find('.cp-preco-alt').toggleClass('d-none', !(cadastrado !== null && preco > 0 && Math.abs(preco - cadastrado) > 0.004));
+        } else {
+            var ref = Number(opt.data('ref') || 0), refExtra = Number(opt.data('refextra') || 0), horas = Number($tr.find('.cp-horas').val()) || 0;
+            valor = opt.val() && typeof dcValorFuncionario === 'function' ? dcValorFuncionario(tipo, ref, refExtra, horas) : 0;
+            $tr.find('.cp-ref').text(opt.val() ? (tipo === 'CLT' ? ceMoeda(ref) + '/h' : (tipo === 'DIARISTA' ? ceMoeda(ref) + '/dia' : ceMoeda(ref) + ' fixo')) : '');
+            totHoras += valor;
+        }
+        $tr.find('.cp-valor').text(ceMoeda(valor));
+    });
+    $('#cpTotCaixas').text(totCx.toLocaleString('pt-BR'));
+    $('#cpTotEmb').text(ceMoeda(totEmb)); $('#cpTotHoras').text(ceMoeda(totHoras)); $('#cpTotGeral').text(ceMoeda(totEmb + totHoras));
+    $('#cpVazio').toggle(!$('#cpFuncBody tr').length);
+    cpAtualizarResponsavel();
+}
+
+/** Responsável do diário: escolhido entre os funcionários lançados (igual ao Diário). */
+function cpAtualizarResponsavel() {
+    var atual = $('#cpResponsavel').val(), vistos = {}, primeiro = null, h = '<option value="">Selecione</option>';
+    $('#cpFuncBody .cp-pessoa').each(function () {
+        var id = $(this).val(); if (!id || vistos[id]) return;
+        vistos[id] = true; primeiro = primeiro || id;
+        h += '<option value="' + Number(id) + '">' + ceEsc($(this).find(':selected').text()) + '</option>';
+    });
+    $('#cpResponsavel').html(h).val(atual && vistos[atual] ? atual : (primeiro || ''));
+}
+
+function cpAoMudarData() {
+    cpCarregarFuncionarios().always(function () {
+        $('#cpFuncBody tr').each(function () {
+            var $sel = $(this).find('.cp-pessoa'), atual = $sel.val();
+            $sel.html(cpHtmlPessoas($(this).data('modo'), atual));
+        });
+        cpRecalcular();
+    });
+}
+
+/** Lê o modal; devolve {erro} ou os dados para os 3 passos do Confirmar. */
+function cpColetar() {
+    var data = $('#cpData').val(), qtd = Number($('#cpQuantidade').val()) || 0, saldo = cpSaldo();
+    if (!data) return { erro: 'Informe a data do processamento.' };
+    if (qtd <= 0) return { erro: 'Informe a quantidade processada (maior que zero).' };
+    if (qtd > saldo + 0.0001) return { erro: 'A quantidade processada (' + ceQtd(qtd) + ') é maior que o saldo disponível (' + ceQtd(saldo) + ').' };
+    if (!$('#cpFuncBody tr').length) return { erro: 'Adicione ao menos um funcionário (embalador ou por horas).' };
+    var embalagens = [], funcionarios = [], erro = null, precos = {};
+    $('#cpFuncBody tr').each(function (i) {
+        if (erro) return;
+        var $tr = $(this), linha = 'Linha ' + (i + 1) + ': ', idPessoa = parseInt($tr.find('.cp-pessoa').val()) || 0;
+        if (!idPessoa) { erro = linha + 'escolha o funcionário.'; return; }
+        if ($tr.data('modo') === 'EMB') {
+            var v = $tr.find('.cp-emb').val(), nova = v === CP_NOVA, nome = $.trim($tr.find('.cp-nova-nome').val());
+            var codigo = cpCodigoEmbalagem($tr), preco = Number($tr.find('.cp-preco').val()) || 0, cx = Number($tr.find('.cp-caixas').val()) || 0;
+            if (!v || (nova && !codigo)) { erro = linha + (nova ? 'informe o nome da nova embalagem.' : 'escolha o tipo de embalagem.'); return; }
+            if (preco <= 0) { erro = linha + 'informe o preço da embalagem (maior que zero).'; return; }
+            if (cx <= 0) { erro = linha + 'informe o nº de caixas (maior que zero).'; return; }
+            if (precos[codigo] != null && Math.abs(precos[codigo] - preco) > 0.004) { erro = linha + 'a mesma embalagem está com preços diferentes.'; return; }
+            precos[codigo] = preco;
+            embalagens.push({ idPessoa: idPessoa, tipoCaixa: codigo, descricao: nova ? nome : null, caixas: cx, preco: preco });
+            funcionarios.push({ idPessoa: idPessoa, regimeTrabalho: 'PRODUCAO', quantidadeCaixas: cx, precoPorCaixa: preco,
+                funcaoExercida: 'Embalador' });
+        } else {
+            var horas = Number($tr.find('.cp-horas').val()) || 0;
+            if (horas <= 0) { erro = linha + 'informe as horas trabalhadas.'; return; }
+            funcionarios.push({ idPessoa: idPessoa, regimeTrabalho: 'REGIME_SISTEMA', horasTrabalhadas: horas });
+        }
+    });
+    if (erro) return { erro: erro };
+    var idResp = parseInt($('#cpResponsavel').val()) || 0;
+    if (!idResp) return { erro: 'Escolha o responsável pelo diário de Processamento.' };
+    if (!cpIdTipoProc) return { erro: 'Tipo de atividade Processamento não encontrado no Diário de Campo.' };
+    return { data: data, quantidade: Number(qtd.toFixed(2)), embalagens: embalagens, funcionarios: funcionarios, idResponsavel: idResp };
+}
+
+function cpPost(url, corpo) {
+    return $.ajax({ url: AGRO_CTX + url, method: 'POST', contentType: 'application/json; charset=utf-8', data: JSON.stringify(corpo) });
+}
+
+function cpConfirmar() {
+    var d = cpColetar();
+    if (d.erro) { cpAlerta(d.erro, 'danger'); return; }
+    var l = cpLote, $btn = $('#cpConfirmar');
+    $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>Registrando…');
+    $('#cpAlerta').addClass('d-none');
+    var base = { idlote: l.idLote, data: d.data, quantidade: d.quantidade, embalagens: d.embalagens };
+    var falhar = function (msg) {
+        cpAlerta(msg, 'danger');
+        $btn.prop('disabled', false).html('<i class="fas fa-check me-1"></i>Confirmar processamento');
+    };
+    // 1) valida na Colheita (nada é gravado)
+    cpPost('/ControllerColheita', $.extend({ acao: 'validarprocessamento' }, base)).then(function () {
+        // 2) diário de Processamento (contrato do Diário de Campo)
+        return cpPost('/ControllerDiarioCampo', {
+            acao: 'create', idArea: l.idArea, idQuadra: l.idQuadra, idCultura: l.idCultura, idResponsavel: d.idResponsavel,
+            idTipoAtividade: cpIdTipoProc, status: 'EM_ANDAMENTO', data: d.data,
+            descricao: 'Processamento do lote da colheita ' + (l.numeroDiario || '#' + l.idLote) + ' — ' + ceQtd(d.quantidade) + ' ' + (l.unidade || 'CX'),
+            maquinas: [], insumos: [], despesas: [], funcionarios: d.funcionarios
+        }).then(null, function (xhr) {
+            return $.Deferred().reject({ msg: 'O Diário de Campo recusou o lançamento: ' + ceMsgXhr(xhr, 'erro ao criar o diário de Processamento.') }).promise();
+        });
+    }, function (xhr) {
+        return $.Deferred().reject({ msg: ceMsgXhr(xhr, 'Erro ao validar o processamento.') }).promise();
+    }).then(function (diario) {
+        // 3) baixa + preços + vínculo (transação da Colheita); se falhar, cancela o diário criado
+        return cpPost('/ControllerColheita', $.extend({ acao: 'processarcomdiario', iddiario: diario.iddiario }, base))
+            .then(function () { return diario; }, function (xhr) {
+                var msg = ceMsgXhr(xhr, 'Erro ao registrar o processamento.');
+                return cpPost('/ControllerDiarioCampo', { acao: 'status', iddiario: diario.iddiario, status: 'CANCELADA' })
+                    .then(function () { return $.Deferred().reject({ msg: msg + ' O diário de Processamento ' + ceEsc(diario.numeroDiario || '') + ' foi cancelado.' }).promise(); },
+                          function () { return $.Deferred().reject({ msg: msg + ' Atenção: o diário de Processamento ' + ceEsc(diario.numeroDiario || '') + ' foi criado e não pôde ser cancelado — cancele-o no Diário de Campo.' }).promise(); });
+            });
+    }).then(function (diario) {
+        $('#modalProcessar').modal('hide');
+        mostrarAlerta('Processamento registrado. Diário de Processamento <strong>' + ceEsc(diario.numeroDiario || '') + '</strong> criado no talhão ' + ceEsc(l.quadraNome || '') + '.', 'success', '#alertaColheita', 6000);
+        ceCarregarLista(); ceCarregarIndicadores();
+    }, function (e) {
+        falhar(e && e.msg ? e.msg : 'Erro ao registrar o processamento.');
+    });
+}
+
+function cpInitModal() {
+    var $m = $('#modalProcessar');
+    $('#cpAddEmbalador').off('click').on('click', function () { cpNovaLinha('EMB'); });
+    $('#cpAddOutro').off('click').on('click', function () { cpNovaLinha('HORAS'); });
+    $('#cpUsarSaldo').off('click').on('click', function () { $('#cpQuantidade').val(cpSaldo().toFixed(2)); cpAtualizarQuantidade(); });
+    $('#cpQuantidade').off('input').on('input', cpAtualizarQuantidade);
+    $('#cpData').off('change').on('change', cpAoMudarData);
+    $('#cpConfirmar').off('click').on('click', cpConfirmar);
+    $m.off('.cp')
+      .on('change.cp', '.cp-pessoa', cpRecalcular)
+      .on('change.cp', '.cp-emb', function () { cpAoEscolherEmbalagem($(this).closest('tr')); })
+      .on('input.cp', '.cp-nova-nome', function () { cpRecalcular(); })
+      .on('input.cp', '.cp-preco', function () { cpReplicarPreco($(this).closest('tr')); cpRecalcular(); })
+      .on('input.cp', '.cp-caixas, .cp-horas', cpRecalcular)
+      .on('click.cp', '.cp-remover', function () { $(this).closest('tr').remove(); cpRecalcular(); });
 }
 
 function ceFinalizar(idLote) {
@@ -6778,6 +7131,7 @@ function ceCarregarAreas() {
 function initColheitaEstoque() {
     ceCarregarIndicadores();
     ceCarregarLista();
+    cpInitModal();
     $('#ceFiltroStatus').off('change').on('change', ceCarregarLista);
     $('#btnCadastrarColheita').off('click').on('click', function () {
         ceCarregarAreas();

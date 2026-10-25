@@ -97,7 +97,18 @@ public class ControllerProducao extends HttpServlet {
 
         List<Map<String, Object>> lancamentos = producaoDAO.listarPorMes(id, periodo);
         int totalCaixas = producaoDAO.totalCaixas(id, periodo)[0];
-        BigDecimal valorProducao = producaoDAO.somarValor(id, periodo).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal valorManual = producaoDAO.somarValor(id, periodo).setScale(2, RoundingMode.HALF_UP);
+
+        // Caixas lançadas no Diário de Campo (só leitura): só diário CONCLUIDA entra no total.
+        List<Map<String, Object>> lancDiario = producaoDAO.listarDoDiario(id, periodo);
+        BigDecimal valorDiario = BigDecimal.ZERO, caixasDiario = BigDecimal.ZERO;
+        for (Map<String, Object> l : lancDiario) {
+            if (!Boolean.TRUE.equals(l.get("contaNoTotal"))) continue;
+            valorDiario = valorDiario.add((BigDecimal) l.get("valor"));
+            caixasDiario = caixasDiario.add((BigDecimal) l.get("caixas"));
+        }
+        valorDiario = valorDiario.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal valorProducao = valorManual.add(valorDiario);
 
         List<ValeFuncionario> vales = valeDAO.listarPorMes(id, periodo);
         BigDecimal totalVales = valeDAO.somarPorMes(id, periodo);
@@ -116,6 +127,10 @@ public class ControllerProducao extends HttpServlet {
         perfil.put("tiposCaixa", tiposCaixa);
         perfil.put("lancamentos", lancamentos);
         perfil.put("totalCaixas", totalCaixas);
+        perfil.put("lancamentosDiario", lancDiario);
+        perfil.put("caixasDiario", caixasDiario);
+        perfil.put("valorManual", valorManual);
+        perfil.put("valorDiario", valorDiario);
         perfil.put("valorProducao", valorProducao);
         perfil.put("vales", vales);
         perfil.put("totalVales", totalVales);
@@ -158,6 +173,7 @@ public class ControllerProducao extends HttpServlet {
             writeJson(resp, 400, false, "Data, tipo de caixa e quantidade (>0) são obrigatórios."); return;
         }
         LocalDate d = LocalDate.parse(data);
+        if (avisarDuplicidadeDiario(jo, resp, id, d)) return;
         BigDecimal preco = precoDAO.resolverPreco(tipo, d.getYear(), id);
         producaoDAO.inserir(id, d, tipo, qtd, preco);
         writeJson(resp, 200, true, "Produção registrada.");
@@ -173,6 +189,7 @@ public class ControllerProducao extends HttpServlet {
             writeJson(resp, 400, false, "Dados obrigatórios não informados."); return;
         }
         LocalDate d = LocalDate.parse(data);
+        if (avisarDuplicidadeDiario(jo, resp, id, d)) return;
         BigDecimal preco = precoDAO.resolverPreco(tipo, d.getYear(), id);
         producaoDAO.atualizar(idProd, id, d, tipo, qtd, preco);
         writeJson(resp, 200, true, "Produção atualizada.");
@@ -183,6 +200,31 @@ public class ControllerProducao extends HttpServlet {
         if (idProd == 0) { writeJson(resp, 400, false, "ID obrigatório."); return; }
         producaoDAO.excluir(idProd);
         writeJson(resp, 200, true, "Produção removida.");
+    }
+
+    /**
+     * Evita pagar a mesma caixa duas vezes: se já há caixas do Diário de Campo (EM_ANDAMENTO ou
+     * CONCLUIDA) para a pessoa nesta data, responde {ok:false, confirmar:true} e só grava quando
+     * o front reenvia com {@code confirmardiario=true}. Avisa em vez de bloquear: no mesmo dia a
+     * pessoa pode ter caixas legítimas fora do diário (outro tipo de caixa, outro lote).
+     */
+    private boolean avisarDuplicidadeDiario(JsonObject jo, HttpServletResponse resp, int id, LocalDate d)
+            throws IOException, SQLException {
+        if (jo.has("confirmardiario") && !jo.get("confirmardiario").isJsonNull()
+                && jo.get("confirmardiario").getAsBoolean()) return false;
+        List<String> diarios = producaoDAO.diariosNaData(id, d);
+        if (diarios.isEmpty()) return false;
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("ok", false);
+        m.put("confirmar", true);
+        m.put("msg", "Já há caixas desta pessoa no Diário de Campo em "
+                + d.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                + " (diário " + String.join(", ", diarios) + "). Essas caixas já entram no total a pagar; "
+                + "lançar também aqui pode pagar a mesma caixa duas vezes.");
+        resp.setContentType("application/json");
+        resp.setCharacterEncoding(StandardCharsets.UTF_8.name());
+        try (PrintWriter out = resp.getWriter()) { out.print(gson.toJson(m)); }
+        return true;
     }
 
     /** Define o preço de um tipo de caixa (geral do ano, ou específico do funcionário). */

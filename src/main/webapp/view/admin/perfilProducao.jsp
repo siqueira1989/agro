@@ -103,6 +103,27 @@
                     </div>
                 </div>
             </div>
+
+            <!-- CAIXAS LANÇADAS NO DIÁRIO DE CAMPO (somente leitura; edição é no Diário) -->
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h6 class="text-success fw-bold mb-0"><i class="fas fa-book me-2"></i>Lançadas no Diário de Campo</h6>
+                    <small class="text-muted">Somente leitura — edite no Diário. Só diário <strong>Concluído</strong> entra no total a pagar.</small>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover mb-0">
+                            <thead class="table-light">
+                                <tr><th>Data</th><th>Atividade</th><th>Área / Talhão</th><th>Tipo de Caixa</th>
+                                    <th class="text-end">Caixas</th><th class="text-end">Preço</th><th class="text-end">Valor</th><th>Diário</th></tr>
+                            </thead>
+                            <tbody id="bodyCaixasDiario">
+                                <tr><td colspan="8" class="text-center text-muted py-3">Selecione um período.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- VALES + FECHAMENTO -->
