@@ -145,7 +145,7 @@
 
         <!-- Grade embalador × embalagem: cada célula é o nº de caixas; o preço é o do embalador (cadastro V31). -->
         <div class="card shadow-sm border-0 mb-3">
-          <div class="card-header bg-white d-flex flex-wrap gap-2 justify-content-between align-items-center">
+          <div class="card-header bg-white text-dark d-flex flex-wrap gap-2 justify-content-between align-items-center">
             <span class="fw-semibold"><i class="fas fa-box me-1"></i>Embaladores <small class="text-muted fw-normal">— caixas por embalagem (pago por caixa)</small></span>
             <div class="d-flex gap-2">
               <button type="button" class="btn btn-sm btn-primary" id="cpAddEmbalador"><i class="fas fa-user-plus me-1"></i>Embalador</button>
@@ -190,7 +190,7 @@
         </div>
 
         <div class="card shadow-sm border-0">
-          <div class="card-header bg-white d-flex flex-wrap gap-2 justify-content-between align-items-center">
+          <div class="card-header bg-white text-dark d-flex flex-wrap gap-2 justify-content-between align-items-center">
             <span class="fw-semibold"><i class="fas fa-people-carry-box me-1"></i>Outros funcionários <small class="text-muted fw-normal">— CLT, diarista, empreita (por horas)</small></span>
             <button type="button" class="btn btn-sm btn-outline-primary" id="cpAddOutro"><i class="fas fa-plus me-1"></i>Funcionário</button>
           </div>
