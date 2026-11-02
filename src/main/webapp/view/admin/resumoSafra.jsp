@@ -37,7 +37,7 @@
 
   <!-- RECEITAS (ROMANEIOS) -->
   <div class="card shadow-sm my-3">
-    <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div class="card-header bg-white text-dark fw-bold d-flex justify-content-between align-items-center flex-wrap gap-2">
       <span><i class="fas fa-hand-holding-dollar me-2"></i>Receitas (Romaneios)</span>
       <span class="small text-muted fw-normal" id="rsRecInfo"></span>
     </div>
@@ -62,7 +62,7 @@
   <div class="row g-3">
     <!-- Composição de custos (COE) -->
     <div class="col-12"><div class="card shadow-sm">
-      <div class="card-header bg-white fw-bold"><i class="fas fa-layer-group me-2"></i>Composição do Custo (COE + Fixas)</div>
+      <div class="card-header bg-white text-dark fw-bold"><i class="fas fa-layer-group me-2"></i>Composição do Custo (COE + Fixas)</div>
       <div class="card-body">
         <div class="table-responsive">
         <table class="table table-sm">
@@ -83,7 +83,7 @@
 
     <!-- Rateio por talhão -->
     <div class="col-12"><div class="card shadow-sm">
-      <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <div class="card-header bg-white text-dark d-flex justify-content-between align-items-center flex-wrap gap-2">
         <span class="fw-bold"><i class="fas fa-balance-scale me-2"></i>Rateio Proporcional por Talhão</span>
         <div class="d-flex align-items-center gap-2">
           <label class="form-label small mb-0 text-muted">Alimento:</label>
