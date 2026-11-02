@@ -307,7 +307,8 @@ public class SafraDAO {
             while (rs.next()) {
                 BigDecimal[] v = novaReceita();
                 for (int i = 0; i < 6; i++) v[i] = nz(rs.getBigDecimal(i + 2));
-                m.put((Integer) rs.getObject(1), v);
+                int q = rs.getInt(1);
+                m.put(rs.wasNull() ? null : q, v);
             }
         }
         return m;
