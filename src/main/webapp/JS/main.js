@@ -551,6 +551,21 @@ function abrirModalAtualizacaoDespesasCustosPorId(id) {
     if (!r) return;
     abrirModalAtualizacaoDespesasCustos(r.iddespesascusto, r.despesascusto, r.unidadedespesascustos,
         r.valordespesascustos, r.tipodespesascustos, r.classificacao);
+    // V32: forma de cálculo e Romaneio
+    $('#dcAtuFormaCalculo').val(r.formaCalculo || 'FIXO');
+    $('#dcAtuAplicaRomaneio').prop('checked', !!r.aplicaRomaneio);
+    dcAtualizarPrefixoValor('#dcAtuFormaCalculo', '#dcAtuValorPrefixo');
+}
+
+/** Rótulo curto da forma de cálculo (V32). Usado em: despesascustos.jsp */
+function dcRotuloFormaCalculo(f) {
+    return f === 'PERCENTUAL_VENDA' ? '% da venda bruta' : (f === 'POR_CAIXA' ? 'Por caixa' : 'Fixo');
+}
+
+/** Troca o prefixo do valor (R$ / % / R$/cx) conforme a forma de cálculo. Usado em: despesascustos.jsp */
+function dcAtualizarPrefixoValor(selForma, selPrefixo) {
+    const f = $(selForma).val();
+    $(selPrefixo).text(f === 'PERCENTUAL_VENDA' ? '%' : (f === 'POR_CAIXA' ? 'R$/cx' : 'R$'));
 }
 
 /** Excluir a partir do cache da tabela. Usado em: despesascustos.jsp */
@@ -661,7 +676,12 @@ function CarregarDadosDespesasCustos() {
                 "data": "valordespesascustos",
                 "render": function (data, type, row) {
                     const valor = parseFloat(data);
-                    return isNaN(valor) ? '-' : 'R$ ' + valor.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                    if (isNaN(valor)) return '-';
+                    if (type !== 'display') return valor;
+                    const num = valor.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                    // V32: em PERCENTUAL_VENDA o valor é o percentual
+                    if (row.formaCalculo === 'PERCENTUAL_VENDA') return num + ' %';
+                    return 'R$ ' + num + (row.formaCalculo === 'POR_CAIXA' ? ' /cx' : '');
                 }
             },
             {"data": "tipodespesascustos"},
@@ -672,6 +692,15 @@ function CarregarDadosDespesasCustos() {
                     const rotulo = variavel ? 'Variável' : 'Fixo';
                     const cor = variavel ? 'bg-warning text-dark' : 'bg-secondary';
                     return '<span class="badge ' + cor + '">' + rotulo + '</span>';
+                }
+            },
+            {
+                "data": "formaCalculo",
+                "render": function (data, type, row) {
+                    const rotulo = dcRotuloFormaCalculo(data);
+                    if (type !== 'display') return rotulo + (row.aplicaRomaneio ? ' Romaneio' : '');
+                    return dcEsc(rotulo)
+                         + (row.aplicaRomaneio ? ' <span class="badge bg-primary" title="Usada no Romaneio">Romaneio</span>' : '');
                 }
             },
             {
@@ -732,11 +761,11 @@ function excluirDespesasCustos() {
 }
 
 /** Envia POST para atualizar os dados de uma despesa/custo. Usado em: despesascustos.jsp */
-function atualizarDespesasCustos(id, despesa, unidade, valor, tipo, classificacao) {
+function atualizarDespesasCustos(id, despesa, unidade, valor, tipo, classificacao, romaneio) {
     $.ajax({
         url: AGRO_CTX + '/DespesasCustosServlet',
         method: 'POST',
-        data: {
+        data: $.extend({
             acao: 'update',
             iddespesascustos: id,
             despesascustos: despesa,
@@ -744,7 +773,7 @@ function atualizarDespesasCustos(id, despesa, unidade, valor, tipo, classificaca
             valordespesacustos: valor,
             tipodespesacustos: tipo,
             classificacao: classificacao
-        },
+        }, romaneio || {}),  // romaneio: {formaCalculo, aplicaRomaneio} (V32)
         success: function (resp) {
             mostrarAlerta(resp.msg || 'Despesa atualizada com sucesso!', 'success', '#alerta');
             $('#modalAtualizacao').modal('hide');
@@ -2184,11 +2213,16 @@ $(document).ready(function () {
             caixa.idArea = $('#dcArea').val();
             caixa.tipoCaixa = tipoCaixa;
         }
+        // V32: forma de cálculo e Romaneio (checkbox sempre enviado como true/false)
+        caixa.formaCalculo = $('#dcFormaCalculo').val() || 'FIXO';
+        caixa.aplicaRomaneio = $('#dcAplicaRomaneio').is(':checked') ? 'true' : 'false';
         salvarDespesasCustos(despesa, unidade, valor, tipo, classificacao, caixa);
     });
 
     carregarSelectsCaixaDespesasCustos();
     $('#dcCategoria, #dcTipoCaixa').on('change', alternarCamposCaixaDespesasCustos);
+    $('#dcFormaCalculo').on('change', function () { dcAtualizarPrefixoValor('#dcFormaCalculo', '#dcValorPrefixo'); });
+    $('#dcAtuFormaCalculo').on('change', function () { dcAtualizarPrefixoValor('#dcAtuFormaCalculo', '#dcAtuValorPrefixo'); });
 
     $('#formAtualizacao').on('submit', function (e) {
         e.preventDefault();
@@ -2206,13 +2240,17 @@ $(document).ready(function () {
             ExibirAlerta('Erro', 'Selecione a classificação (Fixo ou Variável).');
             return;
         }
-        atualizarDespesasCustos(id, despesa, unidade, valor, tipo, classificacao);
+        atualizarDespesasCustos(id, despesa, unidade, valor, tipo, classificacao, {
+            formaCalculo: $('#dcAtuFormaCalculo').val() || 'FIXO',
+            aplicaRomaneio: $('#dcAtuAplicaRomaneio').is(':checked') ? 'true' : 'false'
+        });
     });
 
     $('#modalCadastro').on('show.bs.modal hidden.bs.modal', function () {
         $('#formCadastro')[0].reset();
         $('#alertModalCadastro').removeClass().addClass('alert d-none').empty();
         alternarCamposCaixaDespesasCustos();
+        dcAtualizarPrefixoValor('#dcFormaCalculo', '#dcValorPrefixo');
     });
 });
 
@@ -6791,21 +6829,22 @@ function ceCarregarLista() {
     });
 }
 
-/* ---------- Modal "Processar" (onda 3) ----------
+/* ---------- Modal "Processar" (onda 3; grade de embalagens no pacote Romaneio, onda A) ----------
  * Processa uma QUANTIDADE do saldo (não precisa ser tudo: o resto continua em ESTOQUE) e registra a
  * mão de obra da etapa como um diário de Processamento no talhão do lote:
- *   embaladores (Produção, cargo Embalador) → regime PRODUCAO, caixas × preço da embalagem;
+ *   embaladores (Produção, cargo Embalador) → GRADE embalador × embalagem; cada célula = caixas,
+ *       pagas pelo preço do embalador do cadastro de embalagens (V31) → uma linha PRODUCAO por célula;
  *   demais (CLT/diarista/empreita)           → REGIME_SISTEMA, por horas (mesmo cálculo do Diário).
- * O preço de cada embalagem vem de Despesas e Custos (EMBALAGEM por alimento + área) e é
- * gravado/atualizado ao confirmar. Fluxo do Confirmar:
- *   1) Colheita valida (lote, saldo, safra, embalagens) sem gravar;
+ * Fluxo do Confirmar:
+ *   1) Colheita valida (lote, saldo, safra, embalagens/preços) sem gravar;
  *   2) Diário cria o diário de Processamento (contrato documentado em docs/modulos/diario-campo.md);
- *   3) Colheita grava baixa + preços + vínculo lote↔diário numa transação;
+ *   3) Colheita grava baixa + vínculo lote↔diário + detalhe por embalagem numa transação;
  *   se o passo 3 falhar, o diário do passo 2 é CANCELADO (o Diário não tem exclusão). */
 var ceLotes = {};                 // idLote → lote da última listagem
 var cpLote = null;                // lote aberto no modal
 var cpFuncs = [];                 // funcionários ativos na data (ControllerDiarioCampo?funcionarios=1)
-var cpEmbalagens = [];            // embalagens cadastradas p/ alimento + área (DespesasCustosServlet?embalagens=1)
+var cpEmbalagens = [];            // embalagens ATIVAS do alimento + área do lote (ControllerColheita?embalagens=1)
+var cpColunas = [];               // embalagens que são colunas da grade (ordem de exibição)
 var cpIdTipoProc = null;          // id do tipo de atividade "Processamento" (buscado por nome)
 var CP_NOVA = '__NOVA__';
 
@@ -6841,7 +6880,9 @@ function ceProcessar(idLote) {
     var hoje = cpHoje();
     $('#cpData').val(l.dataColheita && l.dataColheita > hoje ? l.dataColheita : hoje).attr('min', l.dataColheita || '');
     $('#cpQuantidade').val(saldo.toFixed(2)).attr('max', saldo.toFixed(2));
-    $('#cpFuncBody').empty();
+    $('#cpFuncBody, #cpGradeHead, #cpGradeBody, #cpGradeFoot').empty();
+    cpColunas = [];
+    $('#cpNovaEmbalagem').addClass('d-none');
     $('#cpResponsavel').html('<option value="">Selecione</option>');
     $('#cpAlerta').addClass('d-none');
     $('#cpHistorico').empty();
@@ -6863,15 +6904,17 @@ function ceProcessar(idLote) {
     });
     $.when(pTipos, pEmb, pFunc).always(function () {
         if (!cpIdTipoProc) cpAlerta('Tipo de atividade <strong>Processamento</strong> não encontrado no Diário de Campo — não é possível registrar a etapa.', 'warning');
+        cpColunas = cpEmbalagens.slice();
+        cpRenderGrade([]);
+        if (cpOpcoesPessoa('EMB').length) cpNovaLinhaEmbalador();
         $('#modalProcessar').modal('show');
-        if (cpOpcoesPessoa('EMB').length) cpNovaLinha('EMB');
     });
 }
 
 function cpCarregarEmbalagens() {
     if (!cpLote || !cpLote.idCultura || !cpLote.idArea) { cpEmbalagens = []; return $.Deferred().resolve().promise(); }
-    return $.getJSON(AGRO_CTX + '/DespesasCustosServlet?embalagens=1&idAlimento=' + Number(cpLote.idCultura) + '&idArea=' + Number(cpLote.idArea))
-        .then(function (r) { cpEmbalagens = (r && r.embalagens) || []; }, function () { cpEmbalagens = []; });
+    return $.getJSON(AGRO_CTX + '/ControllerColheita?embalagens=1&ativo=true&idAlimento=' + Number(cpLote.idCultura) + '&idArea=' + Number(cpLote.idArea))
+        .then(function (lista) { cpEmbalagens = lista || []; }, function () { cpEmbalagens = []; });
 }
 
 function cpCarregarFuncionarios() {

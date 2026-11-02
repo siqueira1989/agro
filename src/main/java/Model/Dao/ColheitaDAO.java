@@ -1,6 +1,7 @@
 package Model.Dao;
 
 import Model.Model.ColheitaLote;
+import Model.Model.Embalagem;
 import Util.PostgresConnection;
 
 import java.math.BigDecimal;
@@ -111,13 +112,16 @@ public class ColheitaDAO {
         }
     }
 
-    /* ============ PROCESSAMENTO COM DIÁRIO (modal "Processar", V30) ============ */
+    /* ============ PROCESSAMENTO COM DIÁRIO (modal "Processar", V30 + V31) ============ */
 
-    /** Uma linha de embalagem do modal Processar: embalador + tipo de embalagem + caixas × preço/caixa. */
+    /**
+     * Uma célula preenchida da grade do modal Processar: embalador × embalagem (cadastro V31) com o
+     * nº de caixas. {@code preco} é o preço do embalador que o modal usou no diário — conferido com
+     * o cadastro, para o diário e o snapshot da Colheita não divergirem.
+     */
     public static class LinhaEmbalagem {
         public int idPessoa;
-        public String tipoCaixa;     // código da embalagem (normalizado por DespesasCustosDAO)
-        public String descricao;     // rótulo de embalagem nova ("Papelão 7kg"); vazio preserva o cadastro
+        public int idEmbalagem;
         public BigDecimal caixas;
         public BigDecimal preco;
     }
@@ -132,8 +136,8 @@ public class ColheitaDAO {
         ColheitaLote l;
         try (Connection c = new PostgresConnection().getConnection()) {
             l = carregarLote(c, idLote, false);
+            validar(c, l, data, quantidade, embalagens);
         }
-        validar(l, data, quantidade, embalagens);
         String[] sf = new SafraDAO().resolverSafra(l.getIdQuadra(), data);
         if (sf == null) {
             throw new IllegalArgumentException("Não há Safra que inclua o talhão " + l.getQuadraNome()
@@ -147,10 +151,10 @@ public class ColheitaDAO {
     }
 
     /**
-     * Grava o processamento numa transação só: baixa do saldo do lote, preço de cada embalagem em
-     * Despesas e Custos (EMBALAGEM por alimento + área; insere ou atualiza o preço) e o vínculo
-     * lote ↔ diário de Processamento com o detalhe por embalador (V30). O diário já foi criado pelo
-     * Diário de Campo; aqui só se confere que é um Processamento do mesmo talhão e ainda sem lote.
+     * Grava o processamento numa transação só: baixa do saldo do lote e o vínculo lote ↔ diário de
+     * Processamento com o detalhe por embalador × embalagem (V30/V31; preço do embalador do cadastro
+     * como snapshot). O diário já foi criado pelo Diário de Campo; aqui só se confere que é um
+     * Processamento do mesmo talhão e ainda sem lote.
      *
      * Transação manual (e não TransacaoUtil) porque as regras lançam IllegalArgumentException no
      * meio das gravações, e TransacaoUtil só faz rollback de SQLException.
@@ -161,18 +165,8 @@ public class ColheitaDAO {
             c.setAutoCommit(false);
             try {
                 ColheitaLote l = carregarLote(c, idLote, true);
-                validar(l, data, quantidade, embalagens);
+                Map<Integer, Embalagem> cadastro = validar(c, l, data, quantidade, embalagens);
                 validarDiarioProcessamento(c, idDiario, l);
-
-                DespesasCustosDAO despDAO = new DespesasCustosDAO();
-                Map<String, Integer> idDespesaPorTipo = new LinkedHashMap<>();
-                for (LinhaEmbalagem e : embalagens) {
-                    String tipo = DespesasCustosDAO.normalizarTipoCaixa(e.tipoCaixa);
-                    if (idDespesaPorTipo.containsKey(tipo)) continue;
-                    String desc = e.descricao == null || e.descricao.isBlank() ? null : e.descricao.trim();
-                    idDespesaPorTipo.put(tipo, despDAO.registrarPrecoCaixa(c, "EMBALAGEM",
-                            l.getIdCultura(), l.getIdArea(), tipo, desc, e.preco));
-                }
 
                 aplicarBaixa(c, l, quantidade);
 
@@ -190,12 +184,12 @@ public class ColheitaDAO {
                     try (ResultSet rs = st.executeQuery()) { rs.next(); idProc = rs.getInt(1); }
                 }
                 try (PreparedStatement st = c.prepareStatement(
-                        "INSERT INTO colheita_processamento_embalagem (idprocessamento, idpessoa, iddespesascusto, "
+                        "INSERT INTO colheita_processamento_embalagem (idprocessamento, idpessoa, idembalagem, "
                       + "tipo_caixa, quantidade_caixas, preco_caixa, valor) VALUES (?,?,?,?,?,?,?)")) {
                     for (LinhaEmbalagem e : embalagens) {
-                        String tipo = DespesasCustosDAO.normalizarTipoCaixa(e.tipoCaixa);
-                        st.setInt(1, idProc); st.setInt(2, e.idPessoa); st.setInt(3, idDespesaPorTipo.get(tipo));
-                        st.setString(4, tipo); st.setBigDecimal(5, e.caixas); st.setBigDecimal(6, e.preco);
+                        st.setInt(1, idProc); st.setInt(2, e.idPessoa); st.setInt(3, e.idEmbalagem);
+                        st.setString(4, cadastro.get(e.idEmbalagem).getCodigo());
+                        st.setBigDecimal(5, e.caixas); st.setBigDecimal(6, e.preco);
                         st.setBigDecimal(7, e.caixas.multiply(e.preco).setScale(2, RoundingMode.HALF_UP));
                         st.addBatch();
                     }
@@ -246,7 +240,50 @@ public class ColheitaDAO {
         }
     }
 
-    private void validar(ColheitaLote l, LocalDate data, BigDecimal quantidade, List<LinhaEmbalagem> embalagens) {
+    /**
+     * Caixas embaladas de um lote por embalagem (soma de todos os processamentos) — contrato lido
+     * pelo Romaneio. Registros anteriores à V31 (sem idembalagem) saem agrupados pelo código, com
+     * idEmbalagem null. Ordem: peso, descrição.
+     */
+    public List<Map<String, Object>> caixasEmbaladas(int idLote) throws SQLException {
+        String sql = "SELECT pe.idembalagem, COALESCE(e.codigo, pe.tipo_caixa) AS codigo, "
+                + "COALESCE(e.descricao, pe.tipo_caixa) AS descricao, e.peso_kg, e.preco_compra, "
+                + "SUM(pe.quantidade_caixas) AS caixas, SUM(pe.valor) AS valor_embalador "
+                + "FROM colheita_processamento p "
+                + "JOIN colheita_processamento_embalagem pe ON pe.idprocessamento = p.idprocessamento "
+                + "LEFT JOIN embalagem e ON e.idembalagem = pe.idembalagem "
+                + "WHERE p.idlote=? GROUP BY pe.idembalagem, COALESCE(e.codigo, pe.tipo_caixa), "
+                + "COALESCE(e.descricao, pe.tipo_caixa), e.peso_kg, e.preco_compra "
+                + "ORDER BY e.peso_kg NULLS LAST, 3";
+        List<Map<String, Object>> out = new ArrayList<>();
+        try (Connection c = new PostgresConnection().getConnection();
+             PreparedStatement st = c.prepareStatement(sql)) {
+            st.setInt(1, idLote);
+            try (ResultSet rs = st.executeQuery()) {
+                while (rs.next()) {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("idEmbalagem", rs.getObject("idembalagem"));
+                    m.put("codigo", rs.getString("codigo"));
+                    m.put("descricao", rs.getString("descricao"));
+                    m.put("pesoKg", rs.getBigDecimal("peso_kg"));
+                    m.put("precoCompra", rs.getBigDecimal("preco_compra"));
+                    m.put("caixas", rs.getBigDecimal("caixas"));
+                    m.put("valorEmbalador", rs.getBigDecimal("valor_embalador"));
+                    out.add(m);
+                }
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Regras comuns da validação e da gravação. Cada célula precisa de embalador, embalagem ativa do
+     * alimento + área do lote, caixas > 0 e o preço do embalador igual ao do cadastro (se alguém mudou
+     * o preço com o modal aberto, recusa em vez de gravar valores diferentes no diário e na Colheita).
+     * Devolve as embalagens usadas, por id.
+     */
+    private Map<Integer, Embalagem> validar(Connection c, ColheitaLote l, LocalDate data, BigDecimal quantidade,
+                                            List<LinhaEmbalagem> embalagens) throws SQLException {
         if ("FINALIZADO".equals(l.getStatus())) {
             throw new IllegalArgumentException("Lote finalizado não pode receber processamento.");
         }
@@ -265,22 +302,35 @@ public class ColheitaDAO {
         if (l.getIdArea() == null || l.getIdCultura() == null) {
             throw new IllegalArgumentException("O lote não tem talhão/área ou alimento definidos — não é possível processar.");
         }
-        Map<String, BigDecimal> precoPorTipo = new LinkedHashMap<>();
+        EmbalagemDAO embDAO = new EmbalagemDAO();
+        Map<Integer, Embalagem> cadastro = new LinkedHashMap<>();
+        java.util.Set<String> pares = new java.util.HashSet<>();
         for (LinhaEmbalagem e : embalagens) {
-            if (e.idPessoa <= 0) throw new IllegalArgumentException("Escolha o embalador de cada linha de embalagem.");
-            String tipo = DespesasCustosDAO.normalizarTipoCaixa(e.tipoCaixa);
-            if (tipo == null) throw new IllegalArgumentException("Escolha o tipo de embalagem de cada embalador.");
+            if (e.idPessoa <= 0) throw new IllegalArgumentException("Escolha o embalador de cada linha da grade.");
+            if (e.idEmbalagem <= 0) throw new IllegalArgumentException("Embalagem não informada numa célula da grade.");
             if (e.caixas == null || e.caixas.signum() <= 0) {
-                throw new IllegalArgumentException("Informe o nº de caixas (maior que zero) de cada embalador.");
+                throw new IllegalArgumentException("O nº de caixas de cada célula preenchida deve ser maior que zero.");
             }
-            if (e.preco == null || e.preco.signum() <= 0) {
-                throw new IllegalArgumentException("Informe o preço da embalagem (maior que zero).");
+            if (!pares.add(e.idPessoa + ":" + e.idEmbalagem)) {
+                throw new IllegalArgumentException("O mesmo embalador e embalagem aparecem duas vezes.");
             }
-            BigDecimal anterior = precoPorTipo.putIfAbsent(tipo, e.preco);
-            if (anterior != null && anterior.compareTo(e.preco) != 0) {
-                throw new IllegalArgumentException("A embalagem " + tipo + " está com preços diferentes em duas linhas — use o mesmo preço.");
+            Embalagem emb = cadastro.get(e.idEmbalagem);
+            if (emb == null) {
+                emb = embDAO.buscar(c, e.idEmbalagem);
+                if (emb == null) throw new IllegalArgumentException("Embalagem não encontrada.");
+                if (!emb.isAtivo()) throw new IllegalArgumentException("A embalagem " + emb.getDescricao() + " está desativada.");
+                if (!emb.getIdAlimento().equals(l.getIdCultura()) || !emb.getIdArea().equals(l.getIdArea())) {
+                    throw new IllegalArgumentException("A embalagem " + emb.getDescricao() + " não é do alimento/área do lote.");
+                }
+                cadastro.put(e.idEmbalagem, emb);
+            }
+            if (e.preco == null || e.preco.compareTo(emb.getPrecoEmbalador()) != 0) {
+                throw new IllegalArgumentException("O preço do embalador da embalagem " + emb.getDescricao()
+                        + " mudou para R$ " + emb.getPrecoEmbalador().setScale(2, RoundingMode.HALF_UP)
+                        + ". Feche e abra o modal de novo.");
             }
         }
+        return cadastro;
     }
 
     private void validarDiarioProcessamento(Connection c, int idDiario, ColheitaLote l) throws SQLException {

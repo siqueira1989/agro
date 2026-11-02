@@ -64,6 +64,7 @@
           <th>Valor</th>
           <th>Tipo</th>
           <th>Classificação</th>
+          <th>Cálculo</th>
           <th>Categoria</th>
           <th>Ações</th>
         </tr>
@@ -92,9 +93,9 @@
             <select id="dcCategoria" name="categoria" class="form-select">
               <option value="GERAL">Geral</option>
               <option value="CAIXA_COLHEITA">Caixa de colheita</option>
-              <option value="EMBALAGEM">Embalagem</option>
+              <%-- EMBALAGEM obsoleta (preço de embalagem mora no cadastro de embalagens da Colheita); só leitura. --%>
             </select>
-            <small class="text-muted">Caixa de colheita / Embalagem: preço por alimento e área, usado no Diário de Campo e na Colheita.</small>
+            <small class="text-muted">Caixa de colheita: preço por alimento e área, usado no Diário de Campo.</small>
           </div>
           <div id="dcCamposCaixa" class="d-none">
             <div class="row">
@@ -131,7 +132,7 @@
             <div class="col-6 mb-3">
               <label for="valor"><i class="fas fa-sack-dollar me-1 text-muted"></i>Valor:</label>
               <div class="input-group">
-                <span class="input-group-text">R$</span>
+                <span class="input-group-text" id="dcValorPrefixo">R$</span>
                 <input type="text" id="valor" name="valor" class="form-control" placeholder="0,00">
               </div>
             </div>
@@ -148,6 +149,22 @@
               <option value="VARIAVEL">Variável</option>
             </select>
             <small class="text-muted">Variável: o valor pode mudar a cada compra (ex.: marmita); o valor acima vira apenas referência.</small>
+          </div>
+          <div class="row align-items-end">
+            <div class="col-7 mb-3">
+              <label for="dcFormaCalculo"><i class="fas fa-calculator me-1 text-muted"></i>Forma de cálculo:</label>
+              <select id="dcFormaCalculo" class="form-select">
+                <option value="FIXO">Fixo (R$)</option>
+                <option value="PERCENTUAL_VENDA">% da venda bruta</option>
+                <option value="POR_CAIXA">Por caixa (R$/cx)</option>
+              </select>
+            </div>
+            <div class="col-5 mb-3">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="dcAplicaRomaneio">
+                <label class="form-check-label" for="dcAplicaRomaneio">Usar no Romaneio</label>
+              </div>
+            </div>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -183,7 +200,7 @@
             <div class="col-6 mb-3">
               <label for="atualizacaoValor"><i class="fas fa-sack-dollar me-1 text-muted"></i>Valor:</label>
               <div class="input-group">
-                <span class="input-group-text">R$</span>
+                <span class="input-group-text" id="dcAtuValorPrefixo">R$</span>
                 <input type="text" id="atualizacaoValor" name="valordespesacusto" class="form-control" placeholder="0,00">
               </div>
             </div>
@@ -199,6 +216,22 @@
               <option value="FIXO">Fixo</option>
               <option value="VARIAVEL">Variável</option>
             </select>
+          </div>
+          <div class="row align-items-end">
+            <div class="col-7 mb-3">
+              <label for="dcAtuFormaCalculo"><i class="fas fa-calculator me-1 text-muted"></i>Forma de cálculo:</label>
+              <select id="dcAtuFormaCalculo" class="form-select">
+                <option value="FIXO">Fixo (R$)</option>
+                <option value="PERCENTUAL_VENDA">% da venda bruta</option>
+                <option value="POR_CAIXA">Por caixa (R$/cx)</option>
+              </select>
+            </div>
+            <div class="col-5 mb-3">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="dcAtuAplicaRomaneio">
+                <label class="form-check-label" for="dcAtuAplicaRomaneio">Usar no Romaneio</label>
+              </div>
+            </div>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
