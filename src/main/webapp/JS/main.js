@@ -7051,22 +7051,37 @@ function cpAtualizarQuantidade() {
 }
 
 function cpRecalcular() {
-    var totCx = 0, totEmb = 0, totHoras = 0;
+    var totCx = 0, totEmb = 0, totHoras = 0, porCol = {};
+    var preco = {};
+    cpColunas.forEach(function (e) { preco[e.idEmbalagem] = Number(e.precoEmbalador || 0); porCol[e.idEmbalagem] = { cx: 0, valor: 0 }; });
+    $('#cpGradeBody tr').each(function () {
+        var $tr = $(this), lcx = 0, lval = 0;
+        $tr.find('.cp-cel').each(function () {
+            var id = $(this).data('emb'), cx = Number($(this).val()) || 0;
+            $(this).toggleClass('bg-primary-subtle', cx > 0);
+            lcx += cx; lval += cx * preco[id];
+            porCol[id].cx += cx; porCol[id].valor += cx * preco[id];
+        });
+        $tr.find('.cp-lcx').text(lcx.toLocaleString('pt-BR'));
+        $tr.find('.cp-lvalor').text(ceMoeda(lval));
+        totCx += lcx; totEmb += lval;
+    });
+    if (cpColunas.length) {
+        var f = '<tr><td>Total por embalagem</td>';
+        cpColunas.forEach(function (e) {
+            var p = porCol[e.idEmbalagem];
+            f += '<td class="text-center">' + p.cx.toLocaleString('pt-BR') + ' cx<div class="fw-normal text-muted">' + ceMoeda(p.valor) + '</div></td>';
+        });
+        $('#cpGradeFoot').html(f + '<td class="text-end">' + totCx.toLocaleString('pt-BR') + '</td><td class="text-end text-nowrap">' + ceMoeda(totEmb) + '</td><td></td></tr>');
+    } else $('#cpGradeFoot').empty();
     $('#cpFuncBody tr').each(function () {
-        var $tr = $(this), opt = $tr.find('.cp-pessoa :selected'), valor = 0;
+        var $tr = $(this), opt = $tr.find('.cp-pessoa :selected');
         var tipo = opt.val() ? opt.data('tipo') : '';
-        $tr.find('.cp-tipo').text(tipo ? (tipo === 'PRODUCAO' ? 'Produção' : tipo.charAt(0) + tipo.slice(1).toLowerCase()) : '—');
-        if ($tr.data('modo') === 'EMB') {
-            var cx = Number($tr.find('.cp-caixas').val()) || 0, preco = Number($tr.find('.cp-preco').val()) || 0;
-            valor = cx * preco; totCx += cx; totEmb += valor;
-            var $sel = $tr.find('.cp-emb :selected'), cadastrado = $sel.val() && $sel.val() !== CP_NOVA ? Number($sel.data('preco') || 0) : null;
-            $tr.find('.cp-preco-alt').toggleClass('d-none', !(cadastrado !== null && preco > 0 && Math.abs(preco - cadastrado) > 0.004));
-        } else {
-            var ref = Number(opt.data('ref') || 0), refExtra = Number(opt.data('refextra') || 0), horas = Number($tr.find('.cp-horas').val()) || 0;
-            valor = opt.val() && typeof dcValorFuncionario === 'function' ? dcValorFuncionario(tipo, ref, refExtra, horas) : 0;
-            $tr.find('.cp-ref').text(opt.val() ? (tipo === 'CLT' ? ceMoeda(ref) + '/h' : (tipo === 'DIARISTA' ? ceMoeda(ref) + '/dia' : ceMoeda(ref) + ' fixo')) : '');
-            totHoras += valor;
-        }
+        $tr.find('.cp-tipo').text(tipo ? tipo.charAt(0) + tipo.slice(1).toLowerCase() : '—');
+        var ref = Number(opt.data('ref') || 0), refExtra = Number(opt.data('refextra') || 0), horas = Number($tr.find('.cp-horas').val()) || 0;
+        var valor = opt.val() && typeof dcValorFuncionario === 'function' ? dcValorFuncionario(tipo, ref, refExtra, horas) : 0;
+        $tr.find('.cp-ref').text(opt.val() ? (tipo === 'CLT' ? ceMoeda(ref) + '/h' : (tipo === 'DIARISTA' ? ceMoeda(ref) + '/dia' : ceMoeda(ref) + ' fixo')) : '');
+        totHoras += valor;
         $tr.find('.cp-valor').text(ceMoeda(valor));
     });
     $('#cpTotCaixas').text(totCx.toLocaleString('pt-BR'));
@@ -7078,7 +7093,7 @@ function cpRecalcular() {
 /** Responsável do diário: escolhido entre os funcionários lançados (igual ao Diário). */
 function cpAtualizarResponsavel() {
     var atual = $('#cpResponsavel').val(), vistos = {}, primeiro = null, h = '<option value="">Selecione</option>';
-    $('#cpFuncBody .cp-pessoa').each(function () {
+    $('#cpGradeBody .cp-epessoa, #cpFuncBody .cp-pessoa').each(function () {
         var id = $(this).val(); if (!id || vistos[id]) return;
         vistos[id] = true; primeiro = primeiro || id;
         h += '<option value="' + Number(id) + '">' + ceEsc($(this).find(':selected').text()) + '</option>';
@@ -7088,11 +7103,8 @@ function cpAtualizarResponsavel() {
 
 function cpAoMudarData() {
     cpCarregarFuncionarios().always(function () {
-        $('#cpFuncBody tr').each(function () {
-            var $sel = $(this).find('.cp-pessoa'), atual = $sel.val();
-            $sel.html(cpHtmlPessoas($(this).data('modo'), atual));
-        });
-        cpRecalcular();
+        $('#cpFuncBody .cp-pessoa').each(function () { $(this).html(cpHtmlPessoas('HORAS', $(this).val())); });
+        cpRenderGrade(cpEstadoGrade());
     });
 }
 
@@ -7102,28 +7114,35 @@ function cpColetar() {
     if (!data) return { erro: 'Informe a data do processamento.' };
     if (qtd <= 0) return { erro: 'Informe a quantidade processada (maior que zero).' };
     if (qtd > saldo + 0.0001) return { erro: 'A quantidade processada (' + ceQtd(qtd) + ') é maior que o saldo disponível (' + ceQtd(saldo) + ').' };
-    if (!$('#cpFuncBody tr').length) return { erro: 'Adicione ao menos um funcionário (embalador ou por horas).' };
-    var embalagens = [], funcionarios = [], erro = null, precos = {};
+    if (!$('#cpGradeBody tr').length && !$('#cpFuncBody tr').length) return { erro: 'Adicione ao menos um embalador ou um funcionário por horas.' };
+    var embalagens = [], funcionarios = [], erro = null, vistos = {};
+    var porId = {};
+    cpColunas.forEach(function (e) { porId[e.idEmbalagem] = e; });
+    $('#cpGradeBody tr').each(function (i) {
+        if (erro) return;
+        var $tr = $(this), linha = 'Embalador ' + (i + 1) + ': ', idPessoa = parseInt($tr.find('.cp-epessoa').val()) || 0, celulas = 0;
+        if (!idPessoa) { erro = linha + 'escolha o funcionário.'; return; }
+        if (vistos[idPessoa]) { erro = linha + 'este embalador já está em outra linha da grade.'; return; }
+        vistos[idPessoa] = true;
+        $tr.find('.cp-cel').each(function () {
+            var cx = Number($(this).val()) || 0;
+            if (cx < 0) { erro = linha + 'caixas não podem ser negativas.'; return; }
+            if (!cx) return;
+            var e = porId[$(this).data('emb')];
+            celulas++;
+            embalagens.push({ idPessoa: idPessoa, idEmbalagem: e.idEmbalagem, caixas: cx, preco: Number(e.precoEmbalador) });
+            funcionarios.push({ idPessoa: idPessoa, regimeTrabalho: 'PRODUCAO', quantidadeCaixas: cx, precoPorCaixa: Number(e.precoEmbalador),
+                funcaoExercida: ('Embalador — ' + e.descricao).slice(0, 60) });
+        });
+        if (!erro && !celulas) erro = linha + 'informe as caixas de ao menos uma embalagem (ou remova a linha).';
+    });
     $('#cpFuncBody tr').each(function (i) {
         if (erro) return;
-        var $tr = $(this), linha = 'Linha ' + (i + 1) + ': ', idPessoa = parseInt($tr.find('.cp-pessoa').val()) || 0;
+        var $tr = $(this), linha = 'Funcionário por horas ' + (i + 1) + ': ', idPessoa = parseInt($tr.find('.cp-pessoa').val()) || 0;
         if (!idPessoa) { erro = linha + 'escolha o funcionário.'; return; }
-        if ($tr.data('modo') === 'EMB') {
-            var v = $tr.find('.cp-emb').val(), nova = v === CP_NOVA, nome = $.trim($tr.find('.cp-nova-nome').val());
-            var codigo = cpCodigoEmbalagem($tr), preco = Number($tr.find('.cp-preco').val()) || 0, cx = Number($tr.find('.cp-caixas').val()) || 0;
-            if (!v || (nova && !codigo)) { erro = linha + (nova ? 'informe o nome da nova embalagem.' : 'escolha o tipo de embalagem.'); return; }
-            if (preco <= 0) { erro = linha + 'informe o preço da embalagem (maior que zero).'; return; }
-            if (cx <= 0) { erro = linha + 'informe o nº de caixas (maior que zero).'; return; }
-            if (precos[codigo] != null && Math.abs(precos[codigo] - preco) > 0.004) { erro = linha + 'a mesma embalagem está com preços diferentes.'; return; }
-            precos[codigo] = preco;
-            embalagens.push({ idPessoa: idPessoa, tipoCaixa: codigo, descricao: nova ? nome : null, caixas: cx, preco: preco });
-            funcionarios.push({ idPessoa: idPessoa, regimeTrabalho: 'PRODUCAO', quantidadeCaixas: cx, precoPorCaixa: preco,
-                funcaoExercida: 'Embalador' });
-        } else {
-            var horas = Number($tr.find('.cp-horas').val()) || 0;
-            if (horas <= 0) { erro = linha + 'informe as horas trabalhadas.'; return; }
-            funcionarios.push({ idPessoa: idPessoa, regimeTrabalho: 'REGIME_SISTEMA', horasTrabalhadas: horas });
-        }
+        var horas = Number($tr.find('.cp-horas').val()) || 0;
+        if (horas <= 0) { erro = linha + 'informe as horas trabalhadas.'; return; }
+        funcionarios.push({ idPessoa: idPessoa, regimeTrabalho: 'REGIME_SISTEMA', horasTrabalhadas: horas });
     });
     if (erro) return { erro: erro };
     var idResp = parseInt($('#cpResponsavel').val()) || 0;
@@ -7180,19 +7199,120 @@ function cpConfirmar() {
 
 function cpInitModal() {
     var $m = $('#modalProcessar');
-    $('#cpAddEmbalador').off('click').on('click', function () { cpNovaLinha('EMB'); });
-    $('#cpAddOutro').off('click').on('click', function () { cpNovaLinha('HORAS'); });
+    $('#cpAddEmbalador').off('click').on('click', function () { cpNovaLinhaEmbalador(); });
+    $('#cpAddEmbalagem').off('click').on('click', cpAbrirNovaEmbalagem);
+    $('#cpEmbExistente').off('change').on('change', function () { $('#cpEmbNovaCampos').toggleClass('d-none', $(this).val() !== CP_NOVA); });
+    $('#cpEmbCancelar').off('click').on('click', function () { $('#cpNovaEmbalagem').addClass('d-none'); });
+    $('#cpEmbIncluir').off('click').on('click', cpIncluirEmbalagem);
+    $('#cpAddOutro').off('click').on('click', function () { cpNovaLinha(); });
     $('#cpUsarSaldo').off('click').on('click', function () { $('#cpQuantidade').val(cpSaldo().toFixed(2)); cpAtualizarQuantidade(); });
     $('#cpQuantidade').off('input').on('input', cpAtualizarQuantidade);
     $('#cpData').off('change').on('change', cpAoMudarData);
     $('#cpConfirmar').off('click').on('click', cpConfirmar);
     $m.off('.cp')
-      .on('change.cp', '.cp-pessoa', cpRecalcular)
-      .on('change.cp', '.cp-emb', function () { cpAoEscolherEmbalagem($(this).closest('tr')); })
-      .on('input.cp', '.cp-nova-nome', function () { cpRecalcular(); })
-      .on('input.cp', '.cp-preco', function () { cpReplicarPreco($(this).closest('tr')); cpRecalcular(); })
-      .on('input.cp', '.cp-caixas, .cp-horas', cpRecalcular)
-      .on('click.cp', '.cp-remover', function () { $(this).closest('tr').remove(); cpRecalcular(); });
+      .on('change.cp', '.cp-pessoa, .cp-epessoa', cpRecalcular)
+      .on('input.cp', '.cp-cel, .cp-horas', cpRecalcular)
+      .on('click.cp', '.cp-remover, .cp-eremover', function () { $(this).closest('tr').remove(); cpRecalcular(); });
+}
+
+/* ---------- Cadastro de embalagens (V31) — modal "Embalagens" ----------
+ * Por alimento + área: descrição, código (gerado da descrição se vazio), peso, preço de compra (custo no
+ * Romaneio) e preço pago ao embalador por caixa (Processar). Sem exclusão: só ativar/desativar. */
+var emLista = [];
+
+function emAlerta(msg, tipo) {
+    $('#emAlerta').removeClass('d-none alert-success alert-danger alert-warning alert-info').addClass('alert-' + (tipo || 'danger')).html(msg);
+}
+
+function emCarregarSelects() {
+    if ($('#emAlimento').data('carregado')) return $.Deferred().resolve().promise();
+    $('#emAlimento').data('carregado', true);
+    var pA = $.getJSON(AGRO_CTX + '/ControllerAlimento', function (lista) {
+        var o = '';
+        (Array.isArray(lista) ? lista : []).forEach(function (a) { o += '<option value="' + Number(a.idproduto) + '">' + ceEsc(a.nomeproduto) + '</option>'; });
+        $('#emAlimento').html('<option value="">Selecione</option>' + o);
+        $('#emFiltroAlimento').html('<option value="">Todos os alimentos</option>' + o);
+    });
+    var pR = $.getJSON(AGRO_CTX + '/ControllerAreaProducao', function (lista) {
+        var o = '';
+        (Array.isArray(lista) ? lista : []).forEach(function (a) {
+            o += '<option value="' + Number(a.idAreaProducao) + '">' + ceEsc(a.PropriedadeAreaProducao) + (a.SiglasAreaProducao ? ' (' + ceEsc(a.SiglasAreaProducao) + ')' : '') + '</option>';
+        });
+        $('#emArea').html('<option value="">Selecione</option>' + o);
+        $('#emFiltroArea').html('<option value="">Todas as áreas</option>' + o);
+    });
+    return $.when(pA, pR);
+}
+
+function emListar() {
+    var q = { embalagens: 1, idAlimento: $('#emFiltroAlimento').val() || '', idArea: $('#emFiltroArea').val() || '', ativo: $('#emFiltroAtivo').val() };
+    $.getJSON(AGRO_CTX + '/ControllerColheita', q, function (lista) {
+        emLista = lista || [];
+        var $b = $('#emTabela').empty();
+        if (!emLista.length) { $b.append('<tr><td colspan="9" class="text-center text-muted py-3">Nenhuma embalagem.</td></tr>'); return; }
+        emLista.forEach(function (e) {
+            var id = Number(e.idEmbalagem);
+            $b.append('<tr' + (e.ativo ? '' : ' class="text-muted"') + '><td>' + ceEsc(e.descricao) + '</td><td><code>' + ceEsc(e.codigo) + '</code></td>' +
+                '<td class="text-end">' + cpPesoTxt(e.pesoKg) + '</td><td>' + ceEsc(e.nomeAlimento) + '</td>' +
+                '<td>' + ceEsc(e.nomeArea) + (e.siglaArea ? ' (' + ceEsc(e.siglaArea) + ')' : '') + '</td>' +
+                '<td class="text-end">' + ceMoeda(e.precoCompra) + '</td><td class="text-end">' + ceMoeda(e.precoEmbalador) + '/cx</td>' +
+                '<td>' + (e.ativo ? '<span class="badge bg-success">Ativa</span>' : '<span class="badge bg-secondary">Desativada</span>') + '</td>' +
+                '<td class="text-end text-nowrap"><button class="btn btn-sm btn-outline-primary" onclick="emEditar(' + id + ')" title="Editar"><i class="fas fa-pen"></i></button> ' +
+                '<button class="btn btn-sm ' + (e.ativo ? 'btn-outline-secondary' : 'btn-outline-success') + '" onclick="emAtivar(' + id + ',' + (!e.ativo) + ')">' +
+                (e.ativo ? 'Desativar' : 'Ativar') + '</button></td></tr>');
+        });
+    }).fail(function (xhr) { emAlerta(ceEsc(ceMsgXhr(xhr, 'Erro ao carregar embalagens.'))); });
+}
+
+function emLimpar() {
+    $('#emId').val('0');
+    $('#emDescricao, #emCodigo, #emPeso, #emCompra, #emEmbalador').val('');
+    $('#emCodigo').attr('placeholder', 'gerado da descrição');
+    $('#emAlimento').val($('#emFiltroAlimento').val() || ''); $('#emArea').val($('#emFiltroArea').val() || '');
+    $('#emFormTitulo').html('<i class="fas fa-plus me-1"></i>Nova embalagem');
+}
+
+function emEditar(id) {
+    var e = emLista.filter(function (x) { return x.idEmbalagem === id; })[0]; if (!e) return;
+    $('#emId').val(e.idEmbalagem);
+    $('#emAlimento').val(String(e.idAlimento)); $('#emArea').val(String(e.idArea));
+    $('#emDescricao').val(e.descricao); $('#emCodigo').val(e.codigo); $('#emPeso').val(e.pesoKg);
+    $('#emCompra').val(e.precoCompra); $('#emEmbalador').val(e.precoEmbalador);
+    $('#emFormTitulo').html('<i class="fas fa-pen me-1"></i>Editar embalagem — ' + ceEsc(e.descricao));
+    $('#modalEmbalagens .modal-body').scrollTop(0);
+}
+
+function emSalvar() {
+    var id = parseInt($('#emId').val()) || 0;
+    var atual = emLista.filter(function (x) { return x.idEmbalagem === id; })[0];
+    cpPost('/ControllerColheita', {
+        acao: 'salvarembalagem', target: 'emAlerta', idEmbalagem: id,
+        idAlimento: parseInt($('#emAlimento').val()) || 0, idArea: parseInt($('#emArea').val()) || 0,
+        descricao: $.trim($('#emDescricao').val()), codigo: $.trim($('#emCodigo').val()),
+        pesoKg: Number($('#emPeso').val()) || null, precoCompra: Number($('#emCompra').val()) || null,
+        precoEmbalador: Number($('#emEmbalador').val()) || null, ativo: atual ? atual.ativo : true
+    }).then(function (r) {
+        emAlerta(ceEsc(r.msg), 'success'); emLimpar(); emListar();
+    }, function (xhr) { emAlerta(ceEsc(ceMsgXhr(xhr, 'Erro ao salvar a embalagem.'))); });
+}
+
+function emAtivar(id, ativo) {
+    cpPost('/ControllerColheita', { acao: 'ativarembalagem', idEmbalagem: id, ativo: !!ativo })
+        .then(function (r) { emAlerta(ceEsc(r.msg), 'success'); emListar(); },
+              function (xhr) { emAlerta(ceEsc(ceMsgXhr(xhr, 'Erro ao alterar a situação.'))); });
+}
+
+function emAbrir() {
+    $('#emAlerta').addClass('d-none');
+    emCarregarSelects().always(function () { emLimpar(); emListar(); $('#modalEmbalagens').modal('show'); });
+}
+
+function emInit() {
+    $('#btnEmbalagens').off('click').on('click', emAbrir);
+    $('#emSalvar').off('click').on('click', emSalvar);
+    $('#emLimpar').off('click').on('click', emLimpar);
+    $('#emFiltroAlimento, #emFiltroArea, #emFiltroAtivo').off('change').on('change', emListar);
+    $('#emDescricao').off('input').on('input', function () { $('#emCodigo').attr('placeholder', cpNormTipo($(this).val()) || 'gerado da descrição'); });
 }
 
 function ceFinalizar(idLote) {
@@ -7223,6 +7343,7 @@ function initColheitaEstoque() {
     ceCarregarIndicadores();
     ceCarregarLista();
     cpInitModal();
+    emInit();
     $('#ceFiltroStatus').off('change').on('change', ceCarregarLista);
     $('#btnCadastrarColheita').off('click').on('click', function () {
         ceCarregarAreas();
