@@ -29,7 +29,7 @@
 - [ ] **Sem validação de sobreposição:** é possível cadastrar duas safras com o mesmo talhão no mesmo período. Nesse caso `resolverSafra` escolhe pela ordem de status (EM_ANDAMENTO > PLANEJADA > FINALIZADA) e, no empate, uma qualquer (sem ORDER BY de desempate), o que pode mandar diários para a safra errada. Sugestão: bloquear no create/update. É regra nova, então precisa da decisão do Gerente.
 - [ ] Safra 4: o talhão "Silas Sabia SS" tem área 0 ha, por isso o "Custo por ha" aparece R$ 0,00. É dado do módulo Área de Produção.
 - [ ] Detalhe visual: depois de um erro de validação no modal, a mensagem continua visível quando o salvamento seguinte dá certo (o modal fecha, então quase não aparece).
-- [ ] **Reteste das receitas com romaneios reais:** depende da onda B (módulo Romaneio, V33). Em 2026-11-02 a tabela `romaneio` ainda não existia. O teste foi feito sem romaneios, com uma simulação na tela e com a SQL validada numa tabela temporária (com rollback). Na V33, conferir se os nomes das colunas batem: `id_safra`, `id_quadra`, `status`, `total_caixas`, `valor_bruto`, `total_despesas`, `valor_liquido`, `valor_pago`.
+- [x] Reteste das receitas com romaneio real feito pelo Gerente em 2026-11-02 (teste integrado): bruta R$ 5.050, despesas R$ 1.289, líquida R$ 3.761, resultado R$ 2.761 (margem 73,41%), "Tudo recebido" após 2 pagamentos. Nomes das colunas da V33 conferem.
 
 ## Histórico
 - 2026-08-25 — cadastro por área (todas as quadras), resumo com filtro por alimento e datas em formato BR.
