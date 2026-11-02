@@ -7323,8 +7323,32 @@ function ceFinalizar(idLote) {
         success: function (res) {
             mostrarAlerta(res.msg, res.ok ? 'success' : 'danger', '#alertaColheita');
             ceCarregarLista(); ceCarregarIndicadores();
+            if (res.ok) ceOferecerRomaneio(idLote);
         },
         error: function (xhr) { var m = 'Erro ao finalizar lote.'; try { m = JSON.parse(xhr.responseText).msg || m; } catch (e) {} mostrarAlerta(m, 'danger', '#alertaColheita'); }
+    });
+}
+
+/** Lote finalizado com caixas embaladas → oferece seguir para o cadastro do romaneio (contrato: cadastroRomaneio.jsp?lote=ID). */
+function ceOferecerRomaneio(idLote) {
+    $.getJSON(AGRO_CTX + '/ControllerColheita', { caixasembaladas: idLote }, function (linhas) {
+        var caixas = 0;
+        (linhas || []).forEach(function (l) { caixas += Number(l.caixas) || 0; });
+        if (caixas <= 0) return;
+        var $m = $('#modalIrRomaneio');
+        if (!$m.length) {
+            $m = $('<div class="modal fade" id="modalIrRomaneio" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content">' +
+                '<div class="modal-header"><h5 class="modal-title text-dark">Lote finalizado</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>' +
+                '<div class="modal-body text-dark"><p class="mb-1">Lote finalizado. Seguir para o cadastro do romaneio?</p><small class="text-muted" id="irRomaneioInfo"></small></div>' +
+                '<div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Ficar aqui</button>' +
+                '<button type="button" class="btn btn-success" id="btnIrRomaneio">Ir para o Romaneio</button></div>' +
+                '</div></div></div>').appendTo('body');
+        }
+        $('#irRomaneioInfo').text(caixas + ' caixa(s) embalada(s) neste lote.');
+        $('#btnIrRomaneio').off('click').on('click', function () {
+            window.location.href = AGRO_CTX + '/view/admin/cadastroRomaneio.jsp?lote=' + encodeURIComponent(idLote);
+        });
+        bootstrap.Modal.getOrCreateInstance($m[0]).show();
     });
 }
 
