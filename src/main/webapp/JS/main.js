@@ -7428,3 +7428,512 @@ $(document).ready(function () {
     if (!$('#ceTabelaBody').length) return;
     initColheitaEstoque();
 });
+
+/* ========================================================================================== */
+/* MÓDULO ROMANEIO — romaneio.jsp (lista, pagamentos em grupo) e cadastroRomaneio.jsp (MR1)    */
+/* ========================================================================================== */
+/* Venda das caixas embaladas de um lote a um parceiro comprador. Situação: ABERTO (falta preço)
+ * → PENDENTE (todos os itens com preço) → FINALIZADO (líquido pago); CANCELADO libera as caixas.
+ * O servidor (ControllerRomaneio) recalcula e valida tudo; aqui os cálculos são só a prévia ao vivo. */
+
+var RM_STATUS = {
+    ABERTO: { rot: 'Aberto', cls: 'bg-info text-dark' }, PENDENTE: { rot: 'Pendente', cls: 'bg-warning text-dark' },
+    FINALIZADO: { rot: 'Finalizado', cls: 'bg-success' }, CANCELADO: { rot: 'Cancelado', cls: 'bg-secondary' }
+};
+var RM_FORMAS_PAG = { DINHEIRO: 'Dinheiro', PIX: 'Pix', CHEQUE_PROPRIO: 'Cheque próprio', CHEQUE_TERCEIRO: 'Cheque de terceiros' };
+var RM_FORMAS_DESP = { FIXO: 'Valor fixo', PERCENTUAL_VENDA: '% da venda bruta', POR_CAIXA: 'R$ por caixa', EMBALAGEM: 'Caixas × preço de compra' };
+var rmLista = {};          // idRomaneio → romaneio da última listagem
+var rpPendentes = [];      // romaneios PENDENTES do parceiro no modal de pagamento
+
+function rmEsc(v) {
+    return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function rmMoeda(v) { return 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function rmQtd(v) { return Number(v || 0).toLocaleString('pt-BR', { maximumFractionDigits: 2 }); }
+function rmNum(v) { var s = String(v == null ? '' : v).trim().replace(',', '.'); if (s === '') return null; var n = parseFloat(s); return isNaN(n) ? null : n; }
+function rmArred(n) { return Math.round((Number(n) + Number.EPSILON) * 100) / 100; }
+function rmHoje() { return new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10); }
+function rmMsgXhr(xhr, padrao) { try { return JSON.parse(xhr.responseText).msg || padrao; } catch (e) { return padrao; } }
+function rmBadge(s) { var x = RM_STATUS[s] || { rot: s || '', cls: 'bg-secondary' }; return '<span class="badge ' + x.cls + '">' + rmEsc(x.rot) + '</span>'; }
+function rmAlerta(sel, msg, tipo) {
+    $(sel).removeClass('d-none alert-success alert-danger alert-warning alert-info').addClass('alert-' + (tipo || 'danger')).html(msg);
+}
+function rmPost(dados) {
+    return $.ajax({ url: AGRO_CTX + '/ControllerRomaneio', type: 'POST', contentType: 'application/json; charset=UTF-8',
+        data: JSON.stringify(dados), dataType: 'json' });
+}
+
+/* ---------- romaneio.jsp: lista e cards ---------- */
+function rmCarregarLista() {
+    $.getJSON(AGRO_CTX + '/ControllerRomaneio', function (lista) {
+        rmLista = {};
+        var tot = 0, canc = 0, bruto = 0, liq = 0, pend = 0, aReceber = 0, fin = 0, recebido = 0;
+        (lista || []).forEach(function (r) {
+            rmLista[r.idRomaneio] = r;
+            if (r.status === 'CANCELADO') { canc++; return; }
+            tot++; bruto += Number(r.valorBruto || 0); liq += Number(r.valorLiquido || 0); recebido += Number(r.valorPago || 0);
+            if (r.status === 'PENDENTE') { pend++; aReceber += Number(r.valorLiquido || 0) - Number(r.valorPago || 0); }
+            if (r.status === 'FINALIZADO') fin++;
+        });
+        $('#rmCardTotal').text(tot);
+        $('#rmCardTotalSub').text('Venda bruta ' + rmMoeda(bruto) + ' · líquida ' + rmMoeda(liq) + (canc ? ' · ' + canc + ' cancelado(s)' : ''));
+        $('#rmCardPendentes').text(pend);
+        $('#rmCardPendentesSub').text('A receber ' + rmMoeda(aReceber));
+        $('#rmCardFinalizados').text(fin);
+        $('#rmCardFinalizadosSub').text('Recebido ' + rmMoeda(recebido));
+
+        var filtro = $('#rmFiltroStatus').val();
+        var $b = $('#rmTabelaBody').empty();
+        var linhas = (lista || []).filter(function (r) { return !filtro || r.status === filtro; });
+        if (!linhas.length) { $b.append('<tr><td colspan="11" class="text-center text-muted py-3">Nenhum romaneio.</td></tr>'); return; }
+        linhas.forEach(function (r) {
+            var id = Number(r.idRomaneio), editavel = r.status === 'ABERTO' || r.status === 'PENDENTE';
+            var urlCad = AGRO_CTX + '/view/admin/cadastroRomaneio.jsp?id=' + id;
+            var acoes = editavel
+                ? '<a class="btn btn-sm btn-outline-primary ms-1" title="Editar" href="' + urlCad + '"><i class="fas fa-pen"></i></a>'
+                : '<a class="btn btn-sm btn-outline-secondary ms-1" title="Ver" href="' + urlCad + '"><i class="fas fa-eye"></i></a>';
+            if (r.status !== 'ABERTO' && r.status !== 'CANCELADO')
+                acoes += '<button class="btn btn-sm btn-outline-success ms-1" title="Pagamentos" onclick="rmHistorico(' + id + ')"><i class="fas fa-receipt"></i></button>';
+            if (editavel && Number(r.valorPago || 0) === 0)
+                acoes += '<button class="btn btn-sm btn-outline-danger ms-1" title="Cancelar" onclick="rmCancelar(' + id + ')"><i class="fas fa-ban"></i></button>';
+            $b.append('<tr><td class="fw-semibold">' + rmEsc(r.numero) + '</td><td>' + formatarData(r.dataEmissao) + '</td>' +
+                '<td>' + rmEsc(r.nomeParceiro || '—') + '</td>' +
+                '<td>' + rmEsc(r.siglaArea || r.nomeArea || '—') + ' / ' + rmEsc(r.nomeQuadra || '—') + '</td>' +
+                '<td>' + rmEsc(r.nomeAlimento || '—') + '</td>' +
+                '<td class="text-end">' + rmQtd(r.totalCaixas) + '</td>' +
+                '<td class="text-end">' + rmMoeda(r.valorBruto) + '</td>' +
+                '<td class="text-end">' + rmMoeda(r.valorLiquido) + '</td>' +
+                '<td class="text-end">' + rmMoeda(r.valorPago) + '</td>' +
+                '<td>' + rmBadge(r.status) + '</td><td class="text-end text-nowrap">' + acoes + '</td></tr>');
+        });
+    }).fail(function (xhr) { mostrarAlerta(rmMsgXhr(xhr, 'Erro ao carregar os romaneios.'), 'danger', '#alertaRomaneio'); });
+}
+
+function rmCancelar(id) {
+    var r = rmLista[id]; if (!r) return;
+    if (!confirm('Cancelar o romaneio ' + r.numero + '? As caixas voltam para o saldo do lote.')) return;
+    rmPost({ acao: 'cancelar', idRomaneio: id, target: '#alertaRomaneio' })
+        .done(function (res) { mostrarAlerta(res.msg, 'success', '#alertaRomaneio'); rmCarregarLista(); })
+        .fail(function (xhr) { mostrarAlerta(rmMsgXhr(xhr, 'Não foi possível cancelar.'), 'danger', '#alertaRomaneio'); });
+}
+
+/* ---------- "Romaneio Cad.": escolha do lote ---------- */
+function rmAbrirLote() {
+    $('#rmLoteAlerta').addClass('d-none');
+    $('#rmSelLote').html('<option value="">Carregando…</option>');
+    $('#modalRmLote').modal('show');
+    $.getJSON(AGRO_CTX + '/ControllerRomaneio?lotes=1', function (lotes) {
+        if (!lotes || !lotes.length) {
+            $('#rmSelLote').html('<option value="">Nenhuma colheita processada com caixas a romanear</option>');
+            return;
+        }
+        $('#rmSelLote').html('<option value="">Selecione</option>' + lotes.map(function (l) {
+            var saldo = Number(l.embaladas || 0) - Number(l.romaneadas || 0);
+            return '<option value="' + Number(l.idLote) + '">' + rmEsc((l.numeroDiario || '#' + l.idLote) + ' — ' + formatarData(l.dataColheita)
+                + ' — ' + (l.nomeQuadra || '—') + ' (' + (l.siglaArea || l.nomeArea || '') + ') — ' + (l.nomeAlimento || '')
+                + ' — ' + rmQtd(saldo) + ' de ' + rmQtd(l.embaladas) + ' cx a romanear') + '</option>';
+        }).join(''));
+    }).fail(function (xhr) { rmAlerta('#rmLoteAlerta', rmEsc(rmMsgXhr(xhr, 'Erro ao carregar as colheitas.'))); });
+}
+
+/* ---------- Pagamento em grupo ---------- */
+function rpAbrir() {
+    $('#rpAlerta').addClass('d-none');
+    $('#rpData').val(rmHoje()); $('#rpForma').val('DINHEIRO'); $('#rpValor, #rpBanco, #rpNumeroCheque, #rpEmitente, #rpBomPara, #rpObservacao').val('');
+    rpFormaMudou();
+    rpPendentes = []; rpRenderPendentes();
+    $('#rpParceiro').html('<option value="">Carregando…</option>');
+    $('#rpConfirmar').prop('disabled', false);
+    $('#modalRmPagamento').modal('show');
+    $.getJSON(AGRO_CTX + '/ControllerRomaneio?parceiros=1', function (ps) {
+        var comPend = (ps || []).filter(function (p) { return p.qtdPendentes > 0; });
+        if (!comPend.length) { $('#rpParceiro').html('<option value="">Nenhum parceiro com romaneio pendente</option>'); return; }
+        $('#rpParceiro').html('<option value="">Selecione</option>' + comPend.map(function (p) {
+            return '<option value="' + Number(p.idParceiro) + '">' + rmEsc(p.nome + ' — ' + p.qtdPendentes + ' pendente(s), saldo ' + rmMoeda(p.saldoPendente)) + '</option>';
+        }).join(''));
+    }).fail(function (xhr) { rmAlerta('#rpAlerta', rmEsc(rmMsgXhr(xhr, 'Erro ao carregar os parceiros.'))); });
+}
+
+function rpFormaMudou() {
+    var f = $('#rpForma').val();
+    $('#rpChequeCampos').toggleClass('d-none', f.indexOf('CHEQUE') !== 0);
+    $('#rpEmitenteCol').toggleClass('d-none', f !== 'CHEQUE_TERCEIRO');
+}
+
+function rpCarregarPendentes() {
+    var id = $('#rpParceiro').val();
+    rpPendentes = []; rpRenderPendentes();
+    if (!id) return;
+    $.getJSON(AGRO_CTX + '/ControllerRomaneio?pendentes=' + encodeURIComponent(id), function (lista) {
+        rpPendentes = lista || [];
+        rpRenderPendentes();
+        if (rmNum($('#rpValor').val())) rpDistribuir();
+    }).fail(function (xhr) { rmAlerta('#rpAlerta', rmEsc(rmMsgXhr(xhr, 'Erro ao carregar os romaneios do parceiro.'))); });
+}
+
+function rpRenderPendentes() {
+    var $b = $('#rpBody').empty();
+    if (!rpPendentes.length) {
+        $b.append('<tr><td colspan="7" class="text-center text-muted py-2">' + ($('#rpParceiro').val() ? 'Nenhum romaneio pendente.' : 'Escolha o parceiro.') + '</td></tr>');
+    }
+    rpPendentes.forEach(function (r, i) {
+        var saldo = rmArred(Number(r.valorLiquido || 0) - Number(r.valorPago || 0));
+        $b.append('<tr><td class="fw-semibold">' + rmEsc(r.numero) + '</td><td>' + formatarData(r.dataEmissao) + '</td>' +
+            '<td>' + rmEsc(r.nomeQuadra || '—') + '</td>' +
+            '<td class="text-end">' + rmMoeda(r.valorLiquido) + '</td><td class="text-end">' + rmMoeda(r.valorPago) + '</td>' +
+            '<td class="text-end">' + rmMoeda(saldo) + '</td>' +
+            '<td><input type="number" class="form-control form-control-sm text-end rp-aplicar" min="0" step="0.01" data-i="' + i + '" data-saldo="' + saldo + '"></td></tr>');
+    });
+    rpTotais();
+}
+
+/** Distribui o valor do pagamento do romaneio mais antigo para o mais novo, até o saldo de cada um. */
+function rpDistribuir() {
+    var resto = rmArred(rmNum($('#rpValor').val()) || 0);
+    $('.rp-aplicar').each(function () {
+        var saldo = Number($(this).data('saldo')), ap = rmArred(Math.min(saldo, resto));
+        $(this).val(ap > 0 ? ap.toFixed(2) : '');
+        resto = rmArred(resto - Math.max(ap, 0));
+    });
+    rpTotais();
+}
+
+function rpTotais() {
+    var tot = 0, totSaldo = 0, ok = true;
+    $('.rp-aplicar').each(function () {
+        var v = rmNum($(this).val()) || 0, saldo = Number($(this).data('saldo'));
+        totSaldo += saldo;
+        var inval = v < 0 || v > saldo + 0.0001;
+        $(this).toggleClass('is-invalid', inval); if (inval) ok = false;
+        tot += v;
+    });
+    tot = rmArred(tot);
+    $('#rpTotalSaldo').text(rmMoeda(totSaldo));
+    $('#rpTotalDistribuido').text(rmMoeda(tot));
+    var valor = rmArred(rmNum($('#rpValor').val()) || 0), dif = rmArred(valor - tot);
+    var $d = $('#rpDiferenca').removeClass('text-success text-danger');
+    if (!rpPendentes.length || !valor) $d.text('');
+    else if (!ok) $d.addClass('text-danger').text('Há romaneio com valor acima do saldo.');
+    else if (dif > 0) $d.addClass('text-danger').text('Falta distribuir ' + rmMoeda(dif) + (valor > totSaldo ? ' (o valor passa do saldo total do parceiro).' : '.'));
+    else if (dif < 0) $d.addClass('text-danger').text('Distribuído ' + rmMoeda(-dif) + ' a mais que o valor do pagamento.');
+    else $d.addClass('text-success').text('Distribuição confere com o valor do pagamento.');
+}
+
+function rpConfirmar() {
+    var itens = [];
+    $('.rp-aplicar').each(function () {
+        var v = rmNum($(this).val());
+        if (v) itens.push({ idRomaneio: rpPendentes[Number($(this).data('i'))].idRomaneio, valor: v.toFixed(2) });
+    });
+    var dados = {
+        acao: 'pagar', target: '#rpAlerta', idParceiro: Number($('#rpParceiro').val() || 0), data: $('#rpData').val(),
+        forma: $('#rpForma').val(), valor: $('#rpValor').val(), banco: $('#rpBanco').val(), numeroCheque: $('#rpNumeroCheque').val(),
+        emitente: $('#rpEmitente').val(), bomPara: $('#rpBomPara').val(), observacao: $('#rpObservacao').val(), itens: itens
+    };
+    if (!dados.idParceiro) { rmAlerta('#rpAlerta', 'Escolha o parceiro.'); return; }
+    if (!rmNum(dados.valor)) { rmAlerta('#rpAlerta', 'Informe o valor do pagamento.'); return; }
+    $('#rpConfirmar').prop('disabled', true);
+    rmPost(dados).done(function (res) {
+        $('#modalRmPagamento').modal('hide');
+        mostrarAlerta(res.msg, 'success', '#alertaRomaneio');
+        rmCarregarLista();
+    }).fail(function (xhr) {
+        rmAlerta('#rpAlerta', rmEsc(rmMsgXhr(xhr, 'Não foi possível registrar o pagamento.')));
+        var corpo = $('#modalRmPagamento .modal-body')[0]; if (corpo) corpo.scrollTop = 0;
+    }).always(function () { $('#rpConfirmar').prop('disabled', false); });
+}
+
+/* ---------- Histórico de pagamentos de um romaneio (estorno) ---------- */
+function rmHistorico(id) {
+    var r = rmLista[id]; if (!r) return;
+    $('#rhAlerta').addClass('d-none');
+    $('#rhNumero').text(r.numero);
+    var saldo = Number(r.valorLiquido || 0) - Number(r.valorPago || 0);
+    $('#rhResumo').html('<div class="col-6 col-md-3">Parceiro<br><b>' + rmEsc(r.nomeParceiro || '—') + '</b></div>' +
+        '<div class="col-6 col-md-3">Líquido<br><b>' + rmMoeda(r.valorLiquido) + '</b></div>' +
+        '<div class="col-6 col-md-3">Pago<br><b>' + rmMoeda(r.valorPago) + '</b></div>' +
+        '<div class="col-6 col-md-3">Saldo<br><b>' + rmMoeda(saldo) + '</b> ' + rmBadge(r.status) + '</div>');
+    $('#rhBody').html('<tr><td colspan="6" class="text-muted">Carregando…</td></tr>');
+    $('#modalRmHistorico').modal('show');
+    $.getJSON(AGRO_CTX + '/ControllerRomaneio?pagamentos=' + Number(id), function (lista) {
+        var $b = $('#rhBody').empty();
+        if (!lista || !lista.length) { $b.append('<tr><td colspan="6" class="text-center text-muted py-2">Nenhum pagamento.</td></tr>'); return; }
+        lista.forEach(function (p) {
+            var det = [];
+            if (p.banco) det.push('Banco ' + p.banco);
+            if (p.numeroCheque) det.push('nº ' + p.numeroCheque);
+            if (p.emitente) det.push('emitente ' + p.emitente);
+            if (p.bomPara) det.push('bom para ' + formatarData(p.bomPara));
+            if (p.observacao) det.push(p.observacao);
+            var outros = (p.itens || []).filter(function (i) { return i.idRomaneio !== Number(id); });
+            var detHtml = rmEsc(det.join(' · '));
+            if (outros.length) detHtml += '<div class="small text-muted">Dividido com: ' + outros.map(function (i) { return rmEsc(i.numero) + ' (' + rmMoeda(i.valor) + ')'; }).join(', ') + '</div>';
+            $b.append('<tr><td>' + formatarData(p.dataPagamento) + '</td><td>' + rmEsc(RM_FORMAS_PAG[p.forma] || p.forma) + '</td>' +
+                '<td class="small">' + (detHtml || '—') + '</td><td class="text-end">' + rmMoeda(p.valor) + '</td>' +
+                '<td class="text-end fw-semibold">' + rmMoeda(p.valorNoRomaneio) + '</td>' +
+                '<td class="text-end"><button class="btn btn-sm btn-outline-danger" onclick="rmEstornar(' + Number(p.idPagamento) + ',' + Number(id) + ',' + (outros.length) + ')">' +
+                '<i class="fas fa-rotate-left me-1"></i>Estornar</button></td></tr>');
+        });
+    }).fail(function (xhr) { rmAlerta('#rhAlerta', rmEsc(rmMsgXhr(xhr, 'Erro ao carregar os pagamentos.'))); });
+}
+
+function rmEstornar(idPagamento, idRomaneio, qtdOutros) {
+    var aviso = 'Estornar este pagamento?' + (qtdOutros ? ' Ele também foi distribuído para ' + qtdOutros + ' outro(s) romaneio(s), que também serão estornados.' : '')
+        + ' O romaneio volta para Pendente.';
+    if (!confirm(aviso)) return;
+    rmPost({ acao: 'estornar', idPagamento: idPagamento, target: '#rhAlerta' }).done(function (res) {
+        $.getJSON(AGRO_CTX + '/ControllerRomaneio', function (lista) {
+            (lista || []).forEach(function (r) { rmLista[r.idRomaneio] = r; });
+            rmHistorico(idRomaneio);
+            rmAlerta('#rhAlerta', rmEsc(res.msg), 'success');
+        });
+        rmCarregarLista();
+    }).fail(function (xhr) { rmAlerta('#rhAlerta', rmEsc(rmMsgXhr(xhr, 'Não foi possível estornar.'))); });
+}
+
+function initRomaneio() {
+    rmCarregarLista();
+    $('#rmFiltroStatus').off('change').on('change', rmCarregarLista);
+    $('#btnRmCadastrar').off('click').on('click', rmAbrirLote);
+    $('#btnRmContinuar').off('click').on('click', function () {
+        var id = $('#rmSelLote').val();
+        if (!id) { rmAlerta('#rmLoteAlerta', 'Selecione a colheita.'); return; }
+        window.location.href = AGRO_CTX + '/view/admin/cadastroRomaneio.jsp?lote=' + encodeURIComponent(id);
+    });
+    $('#btnRmPagamento').off('click').on('click', rpAbrir);
+    $('#rpParceiro').off('change').on('change', rpCarregarPendentes);
+    $('#rpForma').off('change').on('change', rpFormaMudou);
+    $('#rpValor').off('input').on('input', function () { rpDistribuir(); });
+    $('#rpDistribuir').off('click').on('click', rpDistribuir);
+    $('#rpBody').off('input', '.rp-aplicar').on('input', '.rp-aplicar', rpTotais);
+    $('#rpConfirmar').off('click').on('click', rpConfirmar);
+}
+
+/* ---------- cadastroRomaneio.jsp (passo MR1): ?lote=<idLote> (novo) ou ?id=<idromaneio> (edição) ---------- */
+var crCtx = null;          // resposta de ?contexto=1
+var crDespesas = [];       // despesas de venda em edição (sem a linha automática de embalagem)
+var crSomenteLeitura = false;
+
+function initCadastroRomaneio() {
+    var qs = new URLSearchParams(window.location.search);
+    var id = qs.get('id'), lote = qs.get('lote');
+    if (!id && !lote) { rmAlerta('#alertaCadRomaneio', 'Abra esta página pela lista de romaneios ou pela Colheita (falta o lote).'); $('#crSalvar').prop('disabled', true); return; }
+    var url = AGRO_CTX + '/ControllerRomaneio?contexto=1&' + (id ? 'id=' + encodeURIComponent(id) : 'lote=' + encodeURIComponent(lote));
+    $.getJSON(url, function (ctx) { crCtx = ctx; crMontar(); })
+        .fail(function (xhr) { rmAlerta('#alertaCadRomaneio', rmEsc(rmMsgXhr(xhr, 'Erro ao carregar o romaneio.'))); $('#crSalvar').prop('disabled', true); });
+}
+
+function crMontar() {
+    var L = crCtx.lote, r = crCtx.romaneio || null;
+    $('#crDiario').text(L.numeroDiario || '#' + L.idLote);
+    $('#crDataColheita').text(formatarData(L.dataColheita));
+    $('#crArea').text((L.nomeArea || '—') + (L.siglaArea ? ' (' + L.siglaArea + ')' : ''));
+    $('#crTalhao').text(L.nomeQuadra || '—');
+    $('#crAlimento').text(L.nomeAlimento || '—');
+    if (crCtx.safra) $('#crSafra').removeClass('text-danger').text(crCtx.safra.nome + ' (' + crCtx.safra.status + ')');
+    else $('#crSafra').addClass('text-danger').text('Nenhuma safra cobre o talhão na data da colheita — cadastre a safra antes de salvar.');
+    $('#crTitulo').text(r ? 'Romaneio ' + r.numero : 'Novo romaneio');
+    $('#crStatusBadge').html(r ? rmBadge(r.status) : '');
+    document.title = 'Agro - ' + (r ? 'Romaneio ' + r.numero : 'Novo romaneio');
+    if (!r && L.status !== 'PROCESSADO' && L.status !== 'FINALIZADO')
+        rmAlerta('#alertaCadRomaneio', 'Este lote ainda não está Processado (situação ' + rmEsc(L.status) + '): o romaneio não poderá ser salvo.', 'warning');
+
+    $('#crParceiro').html('<option value="">Selecione</option>' + (crCtx.parceiros || []).map(function (p) {
+        return '<option value="' + Number(p.idParceiro) + '">' + rmEsc(p.nome) + '</option>';
+    }).join(''));
+    if (r) $('#crParceiro').val(String(r.idParceiro));
+    var hoje = rmHoje();
+    $('#crDataEmissao').attr('min', L.dataColheita).val(r ? r.dataEmissao : (L.dataColheita > hoje ? L.dataColheita : hoje));
+    $('#crMotorista').val(r ? r.motorista || '' : '');
+    $('#crPlaca').val(r ? r.placa || '' : '');
+    $('#crObservacao').val(r ? r.observacao || '' : '');
+
+    // Itens: uma linha por classificação × embalagem embalada no lote.
+    var porChave = {};
+    if (r) (r.itens || []).forEach(function (i) { porChave[i.idClassificacao + ':' + i.idEmbalagem] = i; });
+    var $b = $('#crItensBody').empty();
+    var classes = crCtx.classificacoes || [], embs = crCtx.embalagens || [];
+    if (!classes.length) $b.append('<tr><td colspan="5" class="text-danger small">O alimento do lote não tem classificações cadastradas (Produção → Alimento).</td></tr>');
+    else if (!embs.length) $b.append('<tr><td colspan="5" class="text-danger small">O lote não tem caixas embaladas (Processar na Colheita e Estoque).</td></tr>');
+    classes.forEach(function (c) {
+        embs.forEach(function (e, ie) {
+            var it = porChave[c.idClassificacao + ':' + e.idEmbalagem];
+            $b.append('<tr' + (ie === 0 ? ' class="border-top border-2"' : '') + ' data-classe="' + Number(c.idClassificacao) + '" data-emb="' + Number(e.idEmbalagem) + '">' +
+                '<td>' + (ie === 0 ? '<b>' + rmEsc(c.nome) + '</b>' : '<span class="text-muted small">' + rmEsc(c.nome) + '</span>') + '</td>' +
+                '<td>' + rmEsc(e.descricao) + ' <span class="text-muted small">' + rmQtd(e.pesoKg) + ' kg</span></td>' +
+                '<td><input type="number" class="form-control form-control-sm text-end cr-cx" min="0" step="1" value="' + (it ? Number(it.caixas) : '') + '"></td>' +
+                '<td><input type="number" class="form-control form-control-sm text-end cr-preco" min="0" step="0.01" value="' + (it && it.precoUnitario != null ? Number(it.precoUnitario) : '') + '"></td>' +
+                '<td class="text-end cr-valor">—</td></tr>');
+        });
+    });
+
+    // Despesas: na edição, as gravadas no romaneio (snapshot); no cadastro, as do cadastro com "Usar no Romaneio".
+    if (r) {
+        crDespesas = (r.despesas || []).filter(function (d) { return d.formaCalculo !== 'EMBALAGEM'; }).map(function (d) {
+            return { idDespesasCusto: d.idDespesasCusto || null, descricao: d.descricao, formaCalculo: d.formaCalculo,
+                percentual: d.percentual, valorUnitario: d.valorUnitario, valor: d.valor };
+        });
+    } else {
+        crDespesas = (crCtx.despesasRomaneio || []).map(crDespesaDoCadastro);
+    }
+    $('#crDespesaIncluir').html('<option value="">Incluir outra despesa…</option>' + (crCtx.despesasCadastro || []).map(function (d) {
+        return '<option value="' + Number(d.iddespesascusto) + '">' + rmEsc(d.despesascusto) + ' — ' + rmEsc(RM_FORMAS_DESP[d.formaCalculo || 'FIXO']) + '</option>';
+    }).join(''));
+    crRenderDespesas();
+
+    crSomenteLeitura = !!r && (r.status === 'FINALIZADO' || r.status === 'CANCELADO');
+    $('#crPagina').find('input, select, button').not('a').prop('disabled', crSomenteLeitura);
+    $('#crSalvar').toggleClass('d-none', crSomenteLeitura);
+    if (crSomenteLeitura) rmAlerta('#alertaCadRomaneio', 'Romaneio ' + (r.status === 'FINALIZADO' ? 'finalizado (pago por inteiro)' : 'cancelado') + ': somente leitura.', 'info');
+    crRecalcular();
+}
+
+function crDespesaDoCadastro(d) {
+    var f = d.formaCalculo || 'FIXO', v = Number(d.valordespesascustos || 0);
+    return { idDespesasCusto: d.iddespesascusto, descricao: d.despesascusto, formaCalculo: f,
+        percentual: f === 'PERCENTUAL_VENDA' ? v : null, valorUnitario: f === 'POR_CAIXA' ? v : null, valor: f === 'FIXO' ? v : null };
+}
+
+function crRenderDespesas() {
+    var $b = $('#crDespesasBody').empty();
+    $b.append('<tr class="table-light"><td>Custo de embalagem <span class="badge bg-light text-dark border">automático</span></td>' +
+        '<td class="small">' + RM_FORMAS_DESP.EMBALAGEM + '</td><td class="text-end small text-muted" id="crDpEmbParam">—</td>' +
+        '<td class="text-end" id="crDpEmbValor">R$ 0,00</td><td></td></tr>');
+    crDespesas.forEach(function (d, i) {
+        var param = '';
+        if (d.formaCalculo === 'PERCENTUAL_VENDA')
+            param = '<div class="input-group input-group-sm"><input type="number" class="form-control text-end cr-dp" data-i="' + i + '" data-campo="percentual" min="0" max="100" step="0.01" value="' + (d.percentual != null ? Number(d.percentual) : '') + '"><span class="input-group-text">%</span></div>';
+        else if (d.formaCalculo === 'POR_CAIXA')
+            param = '<div class="input-group input-group-sm"><span class="input-group-text">R$/cx</span><input type="number" class="form-control text-end cr-dp" data-i="' + i + '" data-campo="valorUnitario" min="0" step="0.01" value="' + (d.valorUnitario != null ? Number(d.valorUnitario) : '') + '"></div>';
+        var valor = d.formaCalculo === 'FIXO'
+            ? '<input type="number" class="form-control form-control-sm text-end cr-dp" data-i="' + i + '" data-campo="valor" min="0" step="0.01" value="' + (d.valor != null ? Number(d.valor) : '') + '">'
+            : '<span class="cr-dp-valor" data-i="' + i + '">R$ 0,00</span>';
+        $b.append('<tr><td>' + rmEsc(d.descricao) + '</td><td class="small">' + rmEsc(RM_FORMAS_DESP[d.formaCalculo] || d.formaCalculo) + '</td>' +
+            '<td class="text-end">' + param + '</td><td class="text-end">' + valor + '</td>' +
+            '<td><button type="button" class="btn btn-sm btn-link text-danger p-0 cr-dp-remover" data-i="' + i + '" title="Remover"><i class="fas fa-xmark"></i></button></td></tr>');
+    });
+}
+
+function crIncluirDespesa() {
+    var id = Number($('#crDespesaIncluir').val() || 0);
+    if (!id) return;
+    var d = (crCtx.despesasCadastro || []).filter(function (x) { return Number(x.iddespesascusto) === id; })[0];
+    if (!d) return;
+    if (crDespesas.some(function (x) { return Number(x.idDespesasCusto) === id; })) { rmAlerta('#alertaCadRomaneio', 'Essa despesa já está no romaneio.', 'warning'); return; }
+    crDespesas.push(crDespesaDoCadastro(d));
+    $('#crDespesaIncluir').val('');
+    crRenderDespesas(); crRecalcular();
+}
+
+/** Prévia ao vivo: itens, saldo de caixas por embalagem, despesas, bruto, líquido e situação. */
+function crRecalcular() {
+    if (!crCtx) return;
+    var embs = crCtx.embalagens || [], porEmb = {}, totalCx = 0, bruto = 0, nItens = 0, todosComPreco = true;
+    $('#crItensBody tr[data-emb]').each(function () {
+        var cx = rmNum($(this).find('.cr-cx').val()), preco = rmNum($(this).find('.cr-preco').val());
+        var $v = $(this).find('.cr-valor');
+        if (!cx || cx <= 0) { $v.text('—'); return; }
+        nItens++; totalCx += cx;
+        var emb = Number($(this).data('emb')); porEmb[emb] = (porEmb[emb] || 0) + cx;
+        if (preco == null) { todosComPreco = false; $v.html('<span class="text-muted small">sem preço</span>'); return; }
+        var v = rmArred(cx * preco); bruto += v; $v.text(rmMoeda(v));
+    });
+    bruto = rmArred(bruto);
+    $('#crTotalCaixas').text(rmQtd(totalCx));
+    $('#crTotalBruto').text(rmMoeda(bruto));
+
+    // Saldo por embalagem (embaladas − outros romaneios − este).
+    var $s = $('#crSaldoBody').empty(), excesso = false, todosZero = embs.length > 0, semSaldoAntes = embs.length > 0, custoEmb = 0;
+    embs.forEach(function (e) {
+        var deste = porEmb[e.idEmbalagem] || 0, disp = Number(e.embaladas || 0) - Number(e.outrosRomaneios || 0), saldo = rmArred(disp - deste);
+        custoEmb += deste * Number(e.precoCompra || 0);
+        if (saldo < 0) excesso = true;
+        if (saldo !== 0) todosZero = false;
+        if (disp > 0) semSaldoAntes = false;
+        $s.append('<tr><td>' + rmEsc(e.descricao) + '</td><td class="text-end">' + rmQtd(e.embaladas) + '</td>' +
+            '<td class="text-end">' + rmQtd(e.outrosRomaneios) + '</td><td class="text-end">' + rmQtd(deste) + '</td>' +
+            '<td class="text-end fw-semibold ' + (saldo < 0 ? 'text-danger' : saldo === 0 ? 'text-success' : '') + '">' + rmQtd(saldo) + '</td></tr>');
+    });
+    var $info = $('#crSaldoInfo').removeClass('text-danger text-success text-muted');
+    if (excesso) $info.addClass('text-danger').html('<i class="fas fa-triangle-exclamation me-1"></i>Caixas acima do embalado em alguma embalagem.');
+    else if (semSaldoAntes && !nItens) $info.addClass('text-muted').html('O lote já está totalmente romaneado.');
+    else if (todosZero) $info.addClass('text-success').html('<i class="fas fa-circle-check me-1"></i>Com este romaneio o lote fica <b>totalmente romaneado</b>.');
+    else $info.addClass('text-muted').text('O saldo continua disponível para outros romaneios do lote.');
+
+    // Despesas.
+    custoEmb = rmArred(custoEmb);
+    $('#crDpEmbParam').text(rmQtd(totalCx) + ' cx');
+    $('#crDpEmbValor').text(rmMoeda(custoEmb));
+    var totalDesp = custoEmb;
+    crDespesas.forEach(function (d, i) {
+        var v = 0;
+        if (d.formaCalculo === 'PERCENTUAL_VENDA') v = rmArred(bruto * Number(d.percentual || 0) / 100);
+        else if (d.formaCalculo === 'POR_CAIXA') v = rmArred(totalCx * Number(d.valorUnitario || 0));
+        else v = rmArred(Number(d.valor || 0));
+        $('.cr-dp-valor[data-i="' + i + '"]').text(rmMoeda(v));
+        totalDesp += v;
+    });
+    totalDesp = rmArred(totalDesp);
+    var liquido = rmArred(bruto - totalDesp), pago = crCtx.romaneio ? Number(crCtx.romaneio.valorPago || 0) : 0;
+    $('#crTotalDespesas, #crResDespesas').text(rmMoeda(totalDesp));
+    $('#crResBruto').text(rmMoeda(bruto));
+    $('#crResLiquido').text(rmMoeda(liquido)).toggleClass('text-danger', liquido < 0);
+    $('#crResPago').text(rmMoeda(pago)).toggleClass('text-danger fw-semibold', pago > 0 && liquido < pago);
+    var st = !nItens ? null : !todosComPreco ? 'ABERTO' : (pago > 0 && rmArred(liquido - pago) === 0 ? 'FINALIZADO' : 'PENDENTE');
+    $('#crResStatus').html(st ? rmBadge(st) : '<span class="text-muted">—</span>');
+}
+
+function crSalvar() {
+    if (crSomenteLeitura || !crCtx) return;
+    var r = crCtx.romaneio || null, itens = [];
+    $('#crItensBody tr[data-emb]').each(function () {
+        var cx = rmNum($(this).find('.cr-cx').val());
+        if (!cx || cx <= 0) return;
+        var preco = rmNum($(this).find('.cr-preco').val());
+        itens.push({ idClassificacao: Number($(this).data('classe')), idEmbalagem: Number($(this).data('emb')), caixas: cx, precoUnitario: preco });
+    });
+    var dados = {
+        acao: 'salvar', target: '#alertaCadRomaneio', idRomaneio: r ? r.idRomaneio : 0, idLote: crCtx.lote.idLote,
+        idParceiro: Number($('#crParceiro').val() || 0), dataEmissao: $('#crDataEmissao').val(),
+        motorista: $('#crMotorista').val(), placa: $('#crPlaca').val(), observacao: $('#crObservacao').val(),
+        itens: itens, despesas: crDespesas
+    };
+    if (!dados.idParceiro) { rmAlerta('#alertaCadRomaneio', 'Escolha o parceiro comprador.'); window.scrollTo(0, 0); return; }
+    if (!itens.length) { rmAlerta('#alertaCadRomaneio', 'Informe as caixas de pelo menos uma classificação.'); window.scrollTo(0, 0); return; }
+    $('#crSalvar').prop('disabled', true);
+    rmPost(dados).done(function (res) {
+        var salvo = res.romaneio;
+        if (window.history && history.replaceState) history.replaceState(null, '', AGRO_CTX + '/view/admin/cadastroRomaneio.jsp?id=' + Number(salvo.idRomaneio));
+        $.getJSON(AGRO_CTX + '/ControllerRomaneio?contexto=1&id=' + Number(salvo.idRomaneio), function (ctx) {
+            crCtx = ctx; crMontar();
+            rmAlerta('#alertaCadRomaneio', rmEsc(res.msg) + ' <a href="' + AGRO_CTX + '/view/admin/romaneio.jsp" class="alert-link">Voltar aos romaneios</a>', 'success');
+            window.scrollTo(0, 0);
+        });
+    }).fail(function (xhr) {
+        rmAlerta('#alertaCadRomaneio', rmEsc(rmMsgXhr(xhr, 'Não foi possível salvar o romaneio.')));
+        window.scrollTo(0, 0);
+    }).always(function () { if (!crSomenteLeitura) $('#crSalvar').prop('disabled', false); });
+}
+
+function initCadastroRomaneioEventos() {
+    $('#crItensBody').off('input', 'input').on('input', 'input', crRecalcular);
+    $('#crDespesasBody').off('input', '.cr-dp').on('input', '.cr-dp', function () {
+        var d = crDespesas[Number($(this).data('i'))]; if (!d) return;
+        d[$(this).data('campo')] = rmNum($(this).val());
+        crRecalcular();
+    });
+    $('#crDespesasBody').off('click', '.cr-dp-remover').on('click', '.cr-dp-remover', function () {
+        crDespesas.splice(Number($(this).data('i')), 1);
+        crRenderDespesas(); crRecalcular();
+    });
+    $('#crDespesaIncluirBtn').off('click').on('click', crIncluirDespesa);
+    $('#crPlaca').off('input').on('input', function () { this.value = this.value.toUpperCase(); });
+    $('#crSalvar').off('click').on('click', crSalvar);
+}
+
+/* ========== romaneio.jsp / cadastroRomaneio.jsp init ========== */
+$(document).ready(function () {
+    if ($('#rmTabelaBody').length) initRomaneio();
+    if ($('#crItensBody').length) { initCadastroRomaneioEventos(); initCadastroRomaneio(); }
+});
