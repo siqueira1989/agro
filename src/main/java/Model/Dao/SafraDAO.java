@@ -217,6 +217,13 @@ public class SafraDAO {
             BigDecimal custoPorHa = totalArea.signum() > 0 ? custoTotal.divide(totalArea, 2, RoundingMode.HALF_UP) : BigDecimal.ZERO;
             BigDecimal custoPorSaca = nz(s.getEstimativaProducao()).signum() > 0 ? custoTotal.divide(s.getEstimativaProducao(), 2, RoundingMode.HALF_UP) : BigDecimal.ZERO;
 
+            // Receitas de venda (romaneios da safra, exceto CANCELADO), por talhão. Vazio se a
+            // tabela romaneio ainda não existir — o resumo de custos não depende dela.
+            boolean temRomaneio = tabelaExiste(c, "romaneio");
+            Map<Integer, BigDecimal[]> recPorQuadra = temRomaneio ? receitasPorQuadra(c, idSafra) : new LinkedHashMap<>();
+            BigDecimal[] recTotal = novaReceita();
+            for (BigDecimal[] v : recPorQuadra.values()) somarReceita(recTotal, v);
+
             // Rateio proporcional por talhão (base: numero de plantas)
             List<Map<String, Object>> rateio = new ArrayList<>();
             for (SafraTalhao t : talhoes) {
@@ -232,6 +239,10 @@ public class SafraDAO {
                 // Pendências (PLANEJADA/EM_ANDAMENTO): só informativas — não entram no custo.
                 Object[] pend = pendenciasTalhao(c, t.getIdQuadra(), s.getDataInicial(), s.getDataFinal());
                 r.put("qtdPendentes", pend[0]); r.put("valorPendente", pend[1]);
+                // Receita do talhão e resultado = receita líquida − custo lançado no Diário.
+                BigDecimal[] rec = recPorQuadra.getOrDefault(t.getIdQuadra(), novaReceita());
+                putReceita(r, rec);
+                r.put("resultadoTalhao", rec[R_LIQ].subtract(custoReal));
                 rateio.add(r);
             }
 
@@ -247,8 +258,67 @@ public class SafraDAO {
             out.put("pctMaoObra", pct(cMo, custoTotal)); out.put("pctDespesasFixas", pct(despFixas, custoTotal));
             out.put("pctDespesas", pct(cDesp, custoTotal));
             out.put("rateio", rateio);
+            // Receitas (romaneios): campos novos, os de custo acima não mudam.
+            out.put("temRomaneio", temRomaneio);
+            putReceita(out, recTotal);
+            out.put("aReceber", recTotal[R_LIQ].subtract(recTotal[R_PAGO]));
+            BigDecimal resultado = recTotal[R_LIQ].subtract(custoTotal);
+            out.put("resultado", resultado);
+            out.put("margemPct", pct(resultado, recTotal[R_LIQ]));
+            // Romaneios sem talhão (ou de talhão fora da safra) entram no total, não no rateio.
+            BigDecimal recNosTalhoes = BigDecimal.ZERO;
+            for (SafraTalhao t : talhoes) {
+                BigDecimal[] v = recPorQuadra.get(t.getIdQuadra());
+                if (v != null) recNosTalhoes = recNosTalhoes.add(v[R_LIQ]);
+            }
+            out.put("receitaLiquidaSemTalhao", recTotal[R_LIQ].subtract(recNosTalhoes));
         }
         return out;
+    }
+
+    // Índices do vetor de receita: bruta, despesas de venda, líquida, recebido, qtd, caixas.
+    private static final int R_BRUTA = 0, R_DESP = 1, R_LIQ = 2, R_PAGO = 3, R_QTD = 4, R_CX = 5;
+
+    private static BigDecimal[] novaReceita() {
+        BigDecimal[] v = new BigDecimal[6];
+        java.util.Arrays.fill(v, BigDecimal.ZERO);
+        return v;
+    }
+
+    private static void somarReceita(BigDecimal[] acc, BigDecimal[] v) {
+        for (int i = 0; i < acc.length; i++) acc[i] = acc[i].add(v[i]);
+    }
+
+    private static void putReceita(Map<String, Object> m, BigDecimal[] v) {
+        m.put("receitaBruta", v[R_BRUTA]); m.put("despesasVenda", v[R_DESP]);
+        m.put("receitaLiquida", v[R_LIQ]); m.put("recebido", v[R_PAGO]);
+        m.put("qtdRomaneios", v[R_QTD].intValue()); m.put("caixasVendidas", v[R_CX]);
+    }
+
+    /** Somas dos romaneios não cancelados da safra, por id_quadra (chave null = sem talhão). */
+    private Map<Integer, BigDecimal[]> receitasPorQuadra(Connection c, int idSafra) throws SQLException {
+        Map<Integer, BigDecimal[]> m = new LinkedHashMap<>();
+        String sql = "SELECT id_quadra, COALESCE(SUM(valor_bruto),0), COALESCE(SUM(total_despesas),0), "
+                + "COALESCE(SUM(valor_liquido),0), COALESCE(SUM(valor_pago),0), COUNT(*), COALESCE(SUM(total_caixas),0) "
+                + "FROM romaneio WHERE id_safra=? AND status <> 'CANCELADO' GROUP BY id_quadra";
+        try (PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, idSafra);
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                BigDecimal[] v = novaReceita();
+                for (int i = 0; i < 6; i++) v[i] = nz(rs.getBigDecimal(i + 2));
+                m.put((Integer) rs.getObject(1), v);
+            }
+        }
+        return m;
+    }
+
+    private static boolean tabelaExiste(Connection c, String tabela) throws SQLException {
+        try (PreparedStatement ps = c.prepareStatement("SELECT to_regclass(?) IS NOT NULL")) {
+            ps.setString(1, "public." + tabela);
+            ResultSet rs = ps.executeQuery();
+            return rs.next() && rs.getBoolean(1);
+        }
     }
 
     private BigDecimal custoRealTalhao(Connection c, int idSafra, int idQuadra, LocalDate ini, LocalDate fim) throws SQLException {

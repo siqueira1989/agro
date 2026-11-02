@@ -35,6 +35,30 @@
       <div class="fs-4 fw-bold" id="rsPorSaca">R$ 0,00</div><div class="small">Custo Estimado por <span id="rsUnidade">Saca</span></div></div></div></div>
   </div>
 
+  <!-- RECEITAS (ROMANEIOS) -->
+  <div class="card shadow-sm my-3">
+    <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <span><i class="fas fa-hand-holding-dollar me-2"></i>Receitas (Romaneios)</span>
+      <span class="small text-muted fw-normal" id="rsRecInfo"></span>
+    </div>
+    <div class="card-body">
+      <div id="rsRecVazio" class="text-muted fst-italic d-none"><i class="fas fa-circle-info me-1"></i>Sem vendas registradas nesta safra.</div>
+      <div id="rsRecConteudo" class="d-none">
+        <div class="row g-3">
+          <div class="col-6 col-md-3"><div class="border rounded p-2 text-center h-100">
+            <div class="fs-5 fw-bold" id="rsRecBruta">—</div><div class="small text-muted">Receita bruta</div></div></div>
+          <div class="col-6 col-md-3"><div class="border rounded p-2 text-center h-100" title="Comissão, embalagem, frete e vales descontados na venda.">
+            <div class="fs-5 fw-bold text-danger" id="rsRecDesp">—</div><div class="small text-muted">Despesas de venda</div></div></div>
+          <div class="col-6 col-md-3"><div class="border rounded p-2 text-center h-100">
+            <div class="fs-5 fw-bold" id="rsRecLiq">—</div><div class="small text-muted">Receita líquida</div></div></div>
+          <div class="col-6 col-md-3"><div class="border rounded p-2 text-center h-100" title="Receita líquida − custo total da safra (produção). Margem = resultado ÷ receita líquida.">
+            <div class="fs-5 fw-bold" id="rsRecResultado">—</div><div class="small text-muted">Resultado <span id="rsRecMargem"></span></div></div></div>
+        </div>
+        <div class="small mt-2" id="rsRecReceber"></div>
+      </div>
+    </div>
+  </div>
+
   <div class="row g-3">
     <!-- Composição de custos (COE) -->
     <div class="col-12"><div class="card shadow-sm">
@@ -70,12 +94,12 @@
       </div>
       <div class="card-body p-0"><div class="table-responsive">
         <table class="table table-sm table-striped mb-0">
-          <thead class="table-light"><tr><th>Talhão</th><th>Alimento</th><th class="text-end">Plantas</th><th class="text-end">Part.%</th><th class="text-end" title="Custo Total da safra (incluindo as Despesas Fixas) dividido entre os talhões pela proporção de plantas de cada um.">Custo dividido (por nº de plantas) <i class="fas fa-circle-info text-muted small"></i></th><th class="text-end" title="Soma do custo das atividades CONCLUÍDAS deste talhão no Diário de Campo, dentro do período da safra. Atividades planejadas ou em andamento não entram.">Custo lançado no Diário <i class="fas fa-circle-info text-muted small"></i></th><th class="text-end" title="Custo lançado − custo dividido. Verde: o talhão gastou menos que a sua parte; vermelho: gastou mais.">Diferença <i class="fas fa-circle-info text-muted small"></i></th></tr></thead>
+          <thead class="table-light"><tr><th>Talhão</th><th>Alimento</th><th class="text-end">Plantas</th><th class="text-end">Part.%</th><th class="text-end" title="Custo Total da safra (incluindo as Despesas Fixas) dividido entre os talhões pela proporção de plantas de cada um.">Custo dividido (por nº de plantas) <i class="fas fa-circle-info text-muted small"></i></th><th class="text-end" title="Soma do custo das atividades CONCLUÍDAS deste talhão no Diário de Campo, dentro do período da safra. Atividades planejadas ou em andamento não entram.">Custo lançado no Diário <i class="fas fa-circle-info text-muted small"></i></th><th class="text-end" title="Custo lançado − custo dividido. Verde: o talhão gastou menos que a sua parte; vermelho: gastou mais.">Diferença <i class="fas fa-circle-info text-muted small"></i></th><th class="text-end" title="Receita líquida dos romaneios deste talhão (bruto − despesas de venda), sem os cancelados.">Receita líquida <i class="fas fa-circle-info text-muted small"></i></th><th class="text-end" title="Receita líquida − custo lançado no Diário. Verde: lucro; vermelho: prejuízo.">Resultado <i class="fas fa-circle-info text-muted small"></i></th></tr></thead>
           <tbody id="rsRateioBody"></tbody>
           <tfoot>
-            <tr class="fw-bold"><td colspan="4">Total (filtro atual)</td><td class="text-end" id="rsFiltroRateadoTotal">R$ 0,00</td><td class="text-end" id="rsFiltroRealTotal">R$ 0,00</td><td class="text-end" id="rsFiltroDifTotal">R$ 0,00</td></tr>
-            <tr id="rsFiltroPendRow" class="d-none"><td colspan="7" class="small text-end fw-normal" id="rsFiltroPendTotal"></td></tr>
-            <tr><td colspan="7" class="small text-muted fw-normal" id="rsRateioNota"></td></tr>
+            <tr class="fw-bold"><td colspan="4">Total (filtro atual)</td><td class="text-end" id="rsFiltroRateadoTotal">R$ 0,00</td><td class="text-end" id="rsFiltroRealTotal">R$ 0,00</td><td class="text-end" id="rsFiltroDifTotal">R$ 0,00</td><td class="text-end" id="rsFiltroRecTotal">—</td><td class="text-end" id="rsFiltroResTotal">—</td></tr>
+            <tr id="rsFiltroPendRow" class="d-none"><td colspan="9" class="small text-end fw-normal" id="rsFiltroPendTotal"></td></tr>
+            <tr><td colspan="9" class="small text-muted fw-normal" id="rsRateioNota"></td></tr>
           </tfoot>
         </table>
       </div></div>

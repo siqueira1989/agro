@@ -5928,6 +5928,7 @@ $(document).ready(function () {
             ? 'O custo dividido inclui as Despesas Fixas da safra (' + sfMoney(r.despesasFixas) +
               '), que não são lançadas por quadra; por isso os totais das colunas não coincidem. '
             : '') + 'Só atividades concluídas entram no custo.');
+        rsRenderReceitas(r);
         rsRenderRateio();
     });
     $('#rsFiltroAlimento').off('change').on('change', rsRenderRateio);
@@ -5940,8 +5941,9 @@ function rsRenderRateio() {
     var filtro = $('#rsFiltroAlimento').val();
     var lista = filtro ? rsCacheRateio.filter(function (x) { return x.alimento === filtro; }) : rsCacheRateio;
     var $b = $('#rsRateioBody').empty();
-    if (!lista.length) $b.append('<tr><td colspan="7" class="text-center text-muted py-2">Sem talhões.</td></tr>');
+    if (!lista.length) $b.append('<tr><td colspan="9" class="text-center text-muted py-2">Sem talhões.</td></tr>');
     var totalRateado = 0, totalReal = 0, totalDif = 0, totalPendQtd = 0, totalPendValor = 0;
+    var totalRec = 0, totalRes = 0, temVenda = false;
     lista.forEach(function (x) {
         var rateado = Number(x.custoRateado) || 0, real = Number(x.custoReal) || 0;
         var qtdPend = Number(x.qtdPendentes) || 0, valPend = Number(x.valorPendente) || 0;
@@ -5962,8 +5964,14 @@ function rsRenderRateio() {
         }
         $b.append('<tr><td>' + rsEsc(x.talhao) + '</td><td>' + rsEsc(x.alimento || '—') + '</td><td class="text-end">' + Number(x.numeroPlantas).toLocaleString('pt-BR') +
             '</td><td class="text-end">' + rsEsc(x.participacaoPct) + '%</td><td class="text-end">' + sfMoney(rateado) +
-            '</td><td class="text-end">' + celReal + '</td><td class="text-end">' + celDif + '</td></tr>');
+            '</td><td class="text-end">' + celReal + '</td><td class="text-end">' + celDif + '</td>' + rsCelulasReceita(x) + '</tr>');
+        if ((Number(x.qtdRomaneios) || 0) > 0) {
+            temVenda = true; totalRec += Number(x.receitaLiquida) || 0; totalRes += Number(x.resultadoTalhao) || 0;
+        }
     });
+    $('#rsFiltroRecTotal').html(temVenda ? sfMoney(totalRec) : '<span class="text-muted">—</span>');
+    $('#rsFiltroResTotal').html(temVenda ? '<span class="' + rsClasseRes(totalRes) + '">' + sfMoney(totalRes) + '</span>' : '<span class="text-muted">—</span>')
+        .attr('title', 'Soma dos talhões com venda registrada.');
     $('#rsFiltroRateadoTotal').text(sfMoney(totalRateado));
     $('#rsFiltroRealTotal').text(sfMoney(totalReal));
     $('#rsFiltroDifTotal').html('<span class="' + rsClasseDif(totalDif) + '">' + sfMoney(totalDif) + '</span>')
@@ -5971,6 +5979,41 @@ function rsRenderRateio() {
     $('#rsFiltroPendRow').toggleClass('d-none', totalPendQtd === 0);
     $('#rsFiltroPendTotal').text('Pendente (fora do custo): ' + totalPendQtd + ' atividade(s) em andamento/planejada(s), ' + sfMoney(totalPendValor));
 }
+
+/** Colunas Receita líquida e Resultado de um talhão; "—" quando o talhão não tem venda. */
+function rsCelulasReceita(x) {
+    if (!((Number(x.qtdRomaneios) || 0) > 0))
+        return '<td class="text-end text-muted" title="Sem venda registrada para este talhão.">—</td><td class="text-end text-muted">—</td>';
+    var res = Number(x.resultadoTalhao) || 0;
+    return '<td class="text-end" title="' + x.qtdRomaneios + ' romaneio(s)">' + sfMoney(x.receitaLiquida) + '</td>' +
+        '<td class="text-end"><span class="' + rsClasseRes(res) + '">' + sfMoney(res) + '</span></td>';
+}
+
+/** Seção "Receitas (Romaneios)": cards, margem e "a receber"; sem vendas, só o aviso. */
+function rsRenderReceitas(r) {
+    var qtd = Number(r.qtdRomaneios) || 0;
+    $('#rsRecVazio').toggleClass('d-none', qtd > 0);
+    $('#rsRecConteudo').toggleClass('d-none', qtd === 0);
+    if (qtd === 0) { $('#rsRecInfo').text(''); return; }
+    $('#rsRecInfo').text(qtd + ' romaneio(s) · ' + Number(r.caixasVendidas || 0).toLocaleString('pt-BR') + ' caixa(s) vendidas');
+    $('#rsRecBruta').text(sfMoney(r.receitaBruta));
+    $('#rsRecDesp').text(sfMoney(r.despesasVenda));
+    $('#rsRecLiq').text(sfMoney(r.receitaLiquida));
+    var res = Number(r.resultado) || 0;
+    $('#rsRecResultado').text(sfMoney(res)).removeClass('text-success text-danger').addClass(rsClasseRes(res));
+    $('#rsRecMargem').text('(margem ' + Number(r.margemPct || 0).toLocaleString('pt-BR') + '%)')
+        .removeClass('text-success text-danger').addClass(rsClasseRes(res));
+    var aReceber = Number(r.aReceber) || 0;
+    var semTalhao = Number(r.receitaLiquidaSemTalhao) || 0;
+    $('#rsRecReceber').html(
+        (aReceber > 0
+            ? '<i class="fas fa-clock text-warning me-1"></i>A receber: <strong>' + sfMoney(aReceber) + '</strong> (recebido ' + sfMoney(r.recebido) + ')'
+            : '<i class="fas fa-check text-success me-1"></i>Tudo recebido (' + sfMoney(r.recebido) + ')') +
+        (semTalhao !== 0 ? '<br><span class="text-muted">' + sfMoney(semTalhao) + ' de receita líquida em romaneios sem talhão da safra: entra no total, não no rateio.</span>' : ''));
+}
+
+/** Resultado: verde quando é lucro (positivo), vermelho quando é prejuízo (negativo). */
+function rsClasseRes(v) { return v > 0 ? 'text-success' : (v < 0 ? 'text-danger' : ''); }
 
 /** Verde quando gastou menos que a sua parte (negativo), vermelho quando mais (positivo). */
 function rsClasseDif(v) { return v < 0 ? 'text-success' : (v > 0 ? 'text-danger' : ''); }
