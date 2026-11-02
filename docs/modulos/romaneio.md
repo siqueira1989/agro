@@ -52,7 +52,7 @@ Observação: romaneios ABERTO entram com a venda parcial, porque os itens sem p
 - **Alimento / Classificação:** lê `alimentoclassificacao` e `classificacao`.
 
 ## Pendências
-- [ ] **Teste da tela no navegador não feito**: o login caiu no restart do Tomcat (02/11) e a senha não foi digitada. O backend foi testado pelo DAO (35 cenários, ver Histórico) e o `main.js` foi compilado no navegador sem erro de sintaxe. Falta abrir `romaneio.jsp` e `cadastroRomaneio.jsp?lote=` logado e conferir layout, prévia ao vivo, modais de pagamento/histórico e o JSON do controller.
+- [ ] Conferência **visual** do layout: o teste no Chrome foi feito com a janela minimizada (viewport 0×0), conduzindo a tela por JS e lendo o DOM, sem screenshot.
 - [ ] Estorno é exclusão (sem trilha de auditoria). Se o usuário quiser histórico de estornos, acrescentar `estornado_em`/motivo em vez de apagar.
 - [ ] Ao reeditar, o custo de embalagem usa o `preco_compra` **atual** do cadastro (é recalculado a cada salvar). Os demais parâmetros ficam como gravados no romaneio.
 - [ ] Processamentos anteriores à V31 (sem `idembalagem`) não entram no saldo do romaneio.
@@ -70,3 +70,16 @@ Observação: romaneios ABERTO entram com a venda parcial, porque os itens sem p
     - pagamento em grupo quitando R1 (FINALIZADO) e parcial no R2; recusas de soma ≠ valor, parte > saldo, cheque de terceiro sem emitente e romaneio de outro parceiro;
     - editar FINALIZADO recusado; líquido < pago recusado; cancelar com pagamento recusado;
     - estorno voltando os dois a PENDENTE; cancelar liberando o saldo do lote.
+  - **Teste no Chrome, logado** (o Gerente refez o login), com dados próprios **apagados no fim**: parceiros 74/75, embalagens 8/9, diário 107, lote 15, romaneios 5–7.
+    - "Romaneio Cad." lista só o lote com saldo ("150 de 150 cx") e leva a `?lote=15`;
+    - MR1 com área, talhão, alimento, safra, parceiros PARCEIRO, grade 2 × 2 e 3 despesas do cadastro mais a linha de embalagem;
+    - prévia ao vivo igual ao servidor: bruto R$ 1.200, despesas R$ 631, líquido R$ 569, situação Aberto;
+    - salvar troca a URL para `?id=` e mostra o nº 2026-000001;
+    - excesso de caixas mostrado em vermelho (saldo −10) e recusado pelo servidor ("tem só 40");
+    - restante exato → "lote fica totalmente romaneado" e Pendente; o lote some do "Romaneio Cad.";
+    - edição preservando frete, vale e motorista; preço incluído → Pendente (líquido R$ 1.553);
+    - cards 2 / R$ 4.400 / R$ 3.013;
+    - pagamento em grupo em cheque de terceiros (campos aparecem pela forma; sem banco/nº é recusado): R$ 2.053 distribuídos como 1.553 + 500, com o R1 Finalizado e o R2 parcial;
+    - histórico com "Dividido com"; estorno voltando os dois a Pendente;
+    - cancelar liberando 60 cx; o cancelado abre somente leitura;
+    - **fluxo da Colheita:** Finalizar lote → modal "Ir para o Romaneio" → `cadastroRomaneio.jsp?lote=15` com o lote FINALIZADO aceito e o romaneio 2026-000003 salvo.
