@@ -6950,6 +6950,7 @@ function ceProcessar(idLote) {
         cpColunas = cpEmbalagens.slice();
         cpRenderGrade([]);
         if (cpOpcoesPessoa('EMB').length) cpNovaLinhaEmbalador();
+        cpAtualizarResponsavel();
         $('#modalProcessar').modal('show');
     });
 }
@@ -7133,21 +7134,27 @@ function cpRecalcular() {
     cpAtualizarResponsavel();
 }
 
-/** Responsável do diário: escolhido entre os funcionários lançados (igual ao Diário). */
+/** Responsável do diário: todos os funcionários ativos na data (cpFuncs) + os lançados no modal, por nome.
+ *  Sugere o primeiro lançado quando ainda não há escolha. */
 function cpAtualizarResponsavel() {
-    var atual = $('#cpResponsavel').val(), vistos = {}, primeiro = null, h = '<option value="">Selecione</option>';
+    var atual = $('#cpResponsavel').val(), pessoas = {}, primeiro = null;
+    cpFuncs.forEach(function (f) { pessoas[f.idPessoa] = f.nome; });
     $('#cpGradeBody .cp-epessoa, #cpFuncBody .cp-pessoa').each(function () {
-        var id = $(this).val(); if (!id || vistos[id]) return;
-        vistos[id] = true; primeiro = primeiro || id;
-        h += '<option value="' + Number(id) + '">' + ceEsc($(this).find(':selected').text()) + '</option>';
+        var id = $(this).val(); if (!id) return;
+        primeiro = primeiro || id;
+        if (!pessoas[id]) pessoas[id] = $(this).find(':selected').text();
     });
-    $('#cpResponsavel').html(h).val(atual && vistos[atual] ? atual : (primeiro || ''));
+    var ids = Object.keys(pessoas).sort(function (a, b) { return String(pessoas[a]).localeCompare(String(pessoas[b]), 'pt-BR'); });
+    var h = '<option value="">Selecione</option>';
+    ids.forEach(function (id) { h += '<option value="' + Number(id) + '">' + ceEsc(pessoas[id]) + '</option>'; });
+    $('#cpResponsavel').html(h).val(atual && pessoas[atual] ? atual : (primeiro || ''));
 }
 
 function cpAoMudarData() {
     cpCarregarFuncionarios().always(function () {
         $('#cpFuncBody .cp-pessoa').each(function () { $(this).html(cpHtmlPessoas('HORAS', $(this).val())); });
         cpRenderGrade(cpEstadoGrade());
+        cpAtualizarResponsavel();
     });
 }
 
