@@ -52,7 +52,7 @@ Observação: romaneios ABERTO entram com a venda parcial, porque os itens sem p
 - **Alimento / Classificação:** lê `alimentoclassificacao` e `classificacao`.
 
 ## Pendências
-- [ ] Conferência **visual** do layout: o teste no Chrome foi feito com a janela minimizada (viewport 0×0), conduzindo a tela por JS e lendo o DOM, sem screenshot.
+- [x] Conferência visual feita pelo Gerente Geral em 02/11 no teste integrado (navegador do app, tela visível): lista e cards, "Romaneio Cad.", MR1 com grade classificação × embalagem, despesas, caixas embaladas e resumo. Tudo ok.
 - [ ] Estorno é exclusão (sem trilha de auditoria). Se o usuário quiser histórico de estornos, acrescentar `estornado_em`/motivo em vez de apagar.
 - [ ] Ao reeditar, o custo de embalagem usa o `preco_compra` **atual** do cadastro (é recalculado a cada salvar). Os demais parâmetros ficam como gravados no romaneio.
 - [ ] Processamentos anteriores à V31 (sem `idembalagem`) não entram no saldo do romaneio.
