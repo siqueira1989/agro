@@ -85,6 +85,10 @@
         <servlet-class>Controller.ControllerColheita</servlet-class>
     </servlet>
     <servlet>
+        <servlet-name>ControllerRomaneio</servlet-name>
+        <servlet-class>Controller.ControllerRomaneio</servlet-class>
+    </servlet>
+    <servlet>
         <servlet-name>ControllerMaquina</servlet-name>
         <servlet-class>Controller.ControllerMaquina</servlet-class>
     </servlet>
@@ -167,6 +171,10 @@
     <servlet-mapping>
         <servlet-name>ControllerColheita</servlet-name>
         <url-pattern>/ControllerColheita</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>ControllerRomaneio</servlet-name>
+        <url-pattern>/ControllerRomaneio</url-pattern>
     </servlet-mapping>
     <servlet-mapping>
         <servlet-name>ControllerMaquina</servlet-name>

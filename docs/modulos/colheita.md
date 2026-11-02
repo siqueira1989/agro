@@ -70,14 +70,15 @@ Desde a onda A do pacote Romaneio (02/11), o módulo também tem o **cadastro de
 - **Diário de Campo**: a atividade "Colheita" alimenta os lotes (`DiarioCampoDAO` também lê `colheita_lote`).
   O modal Processar **consome** do Diário: `GET ?tiposatividade=1`, `GET ?funcionarios=1&data=`, `POST acao=create` (Processamento), `POST acao=status` (CANCELADA, como compensação) e a função JS `dcValorFuncionario`. Se o Diário mudar algum desses formatos, o modal quebra.
 - **Perfil Produção** (lê `colheita_processamento_embalagem`): mostra o tipo de embalagem por linha do diário, casando preço + caixas da linha com o detalhe. Conferido com a grade em 02/11: cada célula vira uma linha do perfil com o tipo certo. Rótulo hoje vem do código formatado ("Caixa Papelão 7kg"), porque o perfil procura o nome em Despesas (`iddespesascusto`, NULL desde a V31). Renomear/remover `tipo_caixa`, `quantidade_caixas`, `preco_caixa`, `idpessoa` quebra o perfil.
-- **Romaneio** (onda B, a criar): lê a tabela `embalagem` (`preco_compra`, `peso_kg`) e as caixas embaladas por lote (contrato acima).
+- **Romaneio** (onda B): lê a tabela `embalagem` (`preco_compra`, `peso_kg`) e as caixas embaladas por lote (`GET /ControllerColheita?caixasembaladas=<idLote>`, contrato acima).
+  A Colheita **depende** do Romaneio no fluxo "Finalizar → Romaneio" (onda C): depois de finalizar um lote com caixas embaladas > 0, pergunta "Lote finalizado. Seguir para o cadastro do romaneio?" e redireciona para `view/admin/cadastroRomaneio.jsp?lote=<idLote>` (URL é contrato fixo; se o Romaneio mudar a URL ou o parâmetro `lote`, o botão quebra).
 - **Despesas e Custos**: o Processar não usa mais a categoria EMBALAGEM (V28). Usa só `DespesasCustosDAO.normalizarTipoCaixa` (static) para gerar o código da embalagem.
 - **Safra**: `SafraDAO.resolverSafra` (só leitura) na validação.
 - **Área de Produção** (`GET /ControllerAreaProducao`), **Alimento** (`GET /ControllerAlimento`): selects do cadastro de embalagens.
 - A lista de lotes (GET) tem `idArea` e `areaNome` (desde a onda 3).
 
 ## Pendências
-- [ ] **Onda C:** redirecionamento "Finalizar → Romaneio". Não foi feito porque o módulo Romaneio ainda não existe.
+- [ ] **Onda C — reteste final:** o redirecionamento "Finalizar → Romaneio" está implementado (02/11), mas `cadastroRomaneio.jsp` ainda não existia no teste (404). Retestar quando a onda B do Romaneio estiver no ar: a página deve abrir com o lote já escolhido.
 - [ ] **Perfil Produção** (levar à conversa do módulo): (1) mostrar `embalagem.descricao` (LEFT JOIN por `idembalagem`) em vez do código formatado; (2) com a grade, um embalador pode ter duas embalagens com o mesmo preço e o mesmo nº de caixas no mesmo diário, e aí o perfil mostra "—" (ambíguo), porque `diario_funcionario` não guarda a embalagem. Uma solução seria o Diário guardar `idembalagem` na linha, o que é mudança no Diário.
 - [ ] **Atomicidade total** (baixa + diário numa única transação de banco) depende do Diário. Hoje são duas transações com compensação. Para ter uma só, o Diário precisaria expor `inserirCompleto(Connection c, DiarioCampo d)` e as validações do `handleSalvar`/`validarRegimeCaixa` num método reutilizável.
 - [ ] Cancelar depois, no Diário, um diário de Processamento já ligado a um lote não desfaz a baixa nem as caixas embaladas (o Romaneio vai contar essas caixas). Definir a regra (bloquear o cancelamento no Diário ou estornar na Colheita).

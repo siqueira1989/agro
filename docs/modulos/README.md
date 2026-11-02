@@ -42,6 +42,7 @@ Dê à conversa o nome do módulo (ex.: "Módulo Classificação") para achá-la
 | 17 | Perfil Produção (caixa) | `producao-caixa` | ControllerProducao | RH (Perfis) |
 | 18 | Pagamento | `pagamento` | ControllerPagamento | RH (modal nos perfis) |
 | 19 | Ponto Eletrônico | `ponto-eletronico` | ControllerPontoEletronico | RH |
+| 20 | Romaneio | `romaneio` | ControllerRomaneio | Produção |
 | — | Núcleo (login, menu, relatórios, utilitários, build) | `nucleo` | Login, Logout, RelatorioExport | — |
 
 ## Pares que se tocam (coordenar entre conversas)

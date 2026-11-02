@@ -60,6 +60,9 @@
                     <a class="dropdown-item" href="<%=request.getContextPath()%>/view/admin/colheitaestoque.jsp">
                         <i class="fas fa-boxes-stacked me-1"></i>Colheita e Estoque
                     </a>
+                    <a class="dropdown-item" href="<%=request.getContextPath()%>/view/admin/romaneio.jsp">
+                        <i class="fas fa-truck me-1"></i>Romaneio
+                    </a>
                 </div>
             </li>
 
