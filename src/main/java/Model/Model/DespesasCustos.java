@@ -52,6 +52,24 @@ public class DespesasCustos {
     public String getNomeArea() { return nomeArea; }
     public void setNomeArea(String nomeArea) { this.nomeArea = nomeArea; }
 
+    /* V32 — despesas de venda do Romaneio. Em PERCENTUAL_VENDA, valordespesascustos é o % (18 = 18%). */
+    public static final String FORMA_FIXO = "FIXO";
+    public static final String FORMA_PERCENTUAL_VENDA = "PERCENTUAL_VENDA";
+    public static final String FORMA_POR_CAIXA = "POR_CAIXA";
+
+    private String formaCalculo = FORMA_FIXO;
+    private boolean aplicaRomaneio;
+
+    public static boolean isFormaCalculoValida(String f) {
+        return FORMA_FIXO.equals(f) || FORMA_PERCENTUAL_VENDA.equals(f) || FORMA_POR_CAIXA.equals(f);
+    }
+
+    public String getFormaCalculo() { return formaCalculo; }
+    public void setFormaCalculo(String formaCalculo) { this.formaCalculo = formaCalculo; }
+
+    public boolean isAplicaRomaneio() { return aplicaRomaneio; }
+    public void setAplicaRomaneio(boolean aplicaRomaneio) { this.aplicaRomaneio = aplicaRomaneio; }
+
     public String getSiglaArea() { return siglaArea; }
     public void setSiglaArea(String siglaArea) { this.siglaArea = siglaArea; }
 

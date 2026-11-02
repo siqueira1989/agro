@@ -44,6 +44,7 @@ public class DespesasCustosDAO {
         "d.iddespesascusto, d.despesascusto, d.unidadedespesascustos, "
       + "d.valordespesascustos, d.tipodespesascustos, d.classificacao, "
       + "d.categoria, d.id_alimento, d.id_area_producao, d.tipo_caixa, "
+      + "d.forma_calculo, d.aplica_romaneio, "
       + "a.nomeproduto AS nome_alimento, ap.propriedadeareaproducao AS nome_area, "
       + "ap.siglasareaproducao AS sigla_area";
 
@@ -73,7 +74,8 @@ public class DespesasCustosDAO {
     public void create(DespesasCustos despesaCusto) throws SQLException {
         String sql = "INSERT INTO despesascusto (despesascusto, unidadedespesascustos, "
                    + "valordespesascustos, tipodespesascustos, classificacao, "
-                   + "categoria, id_alimento, id_area_producao, tipo_caixa) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                   + "categoria, id_alimento, id_area_producao, tipo_caixa, forma_calculo, aplica_romaneio) "
+                   + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         try (Connection conexao = new PostgresConnection().getConnection();
              PreparedStatement stmt = conexao.prepareStatement(sql)) {
@@ -90,6 +92,8 @@ public class DespesasCustosDAO {
             stmt.setObject(7, geral ? null : despesaCusto.getIdAlimento(), Types.INTEGER);
             stmt.setObject(8, geral ? null : despesaCusto.getIdAreaProducao(), Types.INTEGER);
             stmt.setString(9, geral ? null : normalizarTipoCaixa(despesaCusto.getTipoCaixa()));
+            stmt.setString(10, formaCalculo(despesaCusto));
+            stmt.setBoolean(11, despesaCusto.isAplicaRomaneio());
             stmt.executeUpdate();
         }
     }
@@ -109,7 +113,8 @@ public class DespesasCustosDAO {
 
     public void update(DespesasCustos despesaCusto) throws SQLException {
         String sql = "UPDATE despesascusto SET despesascusto = ?, unidadedespesascustos = ?, "
-                   + "valordespesascustos = ?, tipodespesascustos = ?, classificacao = ? WHERE iddespesascusto = ?";
+                   + "valordespesascustos = ?, tipodespesascustos = ?, classificacao = ?, "
+                   + "forma_calculo = ?, aplica_romaneio = ? WHERE iddespesascusto = ?";
 
         try (Connection conexao = new PostgresConnection().getConnection();
              PreparedStatement stmt = conexao.prepareStatement(sql)) {
@@ -119,7 +124,9 @@ public class DespesasCustosDAO {
             stmt.setBigDecimal(3, valor(despesaCusto));
             stmt.setString(4, despesaCusto.getTipodespesascustos());
             stmt.setString(5, despesaCusto.getClassificacao());
-            stmt.setInt(6, despesaCusto.getIddespesascusto());
+            stmt.setString(6, formaCalculo(despesaCusto));
+            stmt.setBoolean(7, despesaCusto.isAplicaRomaneio());
+            stmt.setInt(8, despesaCusto.getIddespesascusto());
             stmt.executeUpdate();
         }
     }
@@ -133,6 +140,26 @@ public class DespesasCustosDAO {
             stmt.setInt(1, despesaCusto.getIddespesascusto());
             stmt.executeUpdate();
         }
+    }
+
+    /**
+     * V32 — despesas de venda oferecidas no Romaneio ({@code aplica_romaneio = true}), por descrição.
+     * Em {@code PERCENTUAL_VENDA}, {@code valordespesascustos} é o percentual (18 = 18%).
+     */
+    public List<DespesasCustos> listarRomaneio() throws SQLException {
+        try (Connection c = new PostgresConnection().getConnection()) {
+            return listarRomaneio(c);
+        }
+    }
+
+    public List<DespesasCustos> listarRomaneio(Connection c) throws SQLException {
+        String sql = "SELECT " + COLUNAS + FROM + " WHERE d.aplica_romaneio ORDER BY d.despesascusto";
+        List<DespesasCustos> lista = new ArrayList<>();
+        try (PreparedStatement stmt = c.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+            while (rs.next()) lista.add(mapear(rs));
+        }
+        return lista;
     }
 
     public List<DespesasCustos> listAll() throws SQLException {
@@ -159,7 +186,8 @@ public class DespesasCustosDAO {
     public boolean VerificarDadosUpdate(DespesasCustos despesaCusto) throws SQLException {
         String sql = "SELECT 1 FROM despesascusto WHERE iddespesascusto = ? AND despesascusto = ? "
                    + "AND unidadedespesascustos = ? AND valordespesascustos = ? "
-                   + "AND tipodespesascustos = ? AND classificacao = ? LIMIT 1";
+                   + "AND tipodespesascustos = ? AND classificacao = ? "
+                   + "AND forma_calculo = ? AND aplica_romaneio = ? LIMIT 1";
 
         try (Connection conexao = new PostgresConnection().getConnection();
              PreparedStatement stmt = conexao.prepareStatement(sql)) {
@@ -170,10 +198,17 @@ public class DespesasCustosDAO {
             stmt.setBigDecimal(4, valor(despesaCusto));
             stmt.setString(5, despesaCusto.getTipodespesascustos());
             stmt.setString(6, despesaCusto.getClassificacao());
+            stmt.setString(7, formaCalculo(despesaCusto));
+            stmt.setBoolean(8, despesaCusto.isAplicaRomaneio());
             try (ResultSet rs = stmt.executeQuery()) {
                 return rs.next();
             }
         }
+    }
+
+    /** V32 — forma de cálculo do bean, FIXO quando ausente. */
+    private static String formaCalculo(DespesasCustos d) {
+        return d.getFormaCalculo() == null ? DespesasCustos.FORMA_FIXO : d.getFormaCalculo();
     }
 
     /** Os mesmos dados já pertencem a OUTRO registro? (também consultava a tabela errada) */
@@ -378,6 +413,8 @@ public class DespesasCustosDAO {
         d.setNomeAlimento(rs.getString("nome_alimento"));
         d.setNomeArea(rs.getString("nome_area"));
         d.setSiglaArea(rs.getString("sigla_area"));
+        d.setFormaCalculo(rs.getString("forma_calculo"));
+        d.setAplicaRomaneio(rs.getBoolean("aplica_romaneio"));
         return d;
     }
 

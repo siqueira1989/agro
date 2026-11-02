@@ -66,6 +66,7 @@ public class DespesasCustosServlet extends HttpServlet {
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         response.setContentType("application/json");
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+        if (request.getParameter("romaneio") != null) { handleListarRomaneio(response); return; }
         if (request.getParameter("precoCaixa") != null) { handleBuscarPrecoCaixa(request, response); return; }
         if (request.getParameter("embalagens") != null) { handleListarEmbalagens(request, response); return; }
         if (request.getParameter("tiposCaixa") != null) { handleTiposCaixa(response); return; }
@@ -172,6 +173,7 @@ public class DespesasCustosServlet extends HttpServlet {
             bean.setIdAlimento(idAlimento);
             bean.setIdAreaProducao(idArea);
             bean.setTipoCaixa(tipoCaixa);
+            aplicarCamposRomaneio(request, bean, null);
 
             despesasCustosDAO.create(bean);
 
@@ -215,6 +217,7 @@ public class DespesasCustosServlet extends HttpServlet {
             bean.setValordespesascustos(valor);
             bean.setTipodespesascustos(tipodespesacustos);
             bean.setClassificacao(classificacao.toUpperCase());
+            aplicarCamposRomaneio(request, bean, despesasCustosDAO.read(bean.getIddespesascusto()));
             if (despesasCustosDAO.VerificarDadosUpdate(bean)) {
                 writeJson(response, HttpServletResponse.SC_BAD_REQUEST, false, "Despesa/Custo está igual ao cadastro anterior.", "modalAtualizacao");
                 return;
@@ -226,6 +229,8 @@ public class DespesasCustosServlet extends HttpServlet {
             despesasCustosDAO.update(bean);
 
             writeJson(response, HttpServletResponse.SC_OK, true, "Despesa atualizada com sucesso!", "page");
+        } catch (IllegalArgumentException e) {
+            writeJson(response, HttpServletResponse.SC_BAD_REQUEST, false, e.getMessage(), "modalAtualizacao");
         } catch (Exception e) {
             // P1-15/P2-20: pilha completa no log; ao usuário vai só o código.
             String cod = Util.LogUtil.erro(DespesasCustosServlet.class, "Falha tratada em DespesasCustosServlet.", e);
@@ -285,6 +290,51 @@ public class DespesasCustosServlet extends HttpServlet {
     }
 
     /** GET ?embalagens=1&idAlimento=&idArea= → {ok,msg,target,embalagens:[...]} */
+    /* ============================================================
+       V32 — despesas de venda do Romaneio (forma_calculo, aplica_romaneio).
+       ============================================================ */
+
+    /** GET ?romaneio=1 → {ok,msg,target,despesas:[...]} — só aplica_romaneio = true. */
+    private void handleListarRomaneio(HttpServletResponse response) throws IOException {
+        try {
+            List<DespesasCustos> lista = despesasCustosDAO.listarRomaneio();
+            Map<String, Object> extras = new HashMap<>();
+            extras.put("despesas", lista);
+            writeJson(response, HttpServletResponse.SC_OK, true,
+                    lista.isEmpty() ? "Nenhuma despesa marcada para o Romaneio." : "", "page", extras);
+        } catch (SQLException e) {
+            String cod = Util.LogUtil.erro(DespesasCustosServlet.class, "Falha ao listar despesas do Romaneio.", e);
+            writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, false, "Erro ao listar despesas do Romaneio: " + cod, "page");
+        }
+    }
+
+    /**
+     * Lê {@code formaCalculo} e {@code aplicaRomaneio} ("true"/"1"/"on") do request. Parâmetro ausente
+     * mantém o valor de {@code existente} (update) ou o padrão FIXO/false (create).
+     * PERCENTUAL_VENDA exige valor entre 0 e 100.
+     */
+    private void aplicarCamposRomaneio(HttpServletRequest request, DespesasCustos bean, DespesasCustos existente) {
+        String forma = request.getParameter("formaCalculo");
+        if (isBlank(forma)) {
+            forma = existente != null ? existente.getFormaCalculo() : DespesasCustos.FORMA_FIXO;
+        } else {
+            forma = forma.trim().toUpperCase();
+        }
+        if (!DespesasCustos.isFormaCalculoValida(forma)) {
+            throw new IllegalArgumentException("Forma de cálculo inválida.");
+        }
+        if (DespesasCustos.FORMA_PERCENTUAL_VENDA.equals(forma)
+                && (bean.getValordespesascustos() < 0 || bean.getValordespesascustos() > 100)) {
+            throw new IllegalArgumentException("Para % da venda bruta, informe um percentual entre 0 e 100.");
+        }
+        bean.setFormaCalculo(forma);
+
+        String aplica = request.getParameter("aplicaRomaneio");
+        bean.setAplicaRomaneio(isBlank(aplica)
+                ? existente != null && existente.isAplicaRomaneio()
+                : "true".equalsIgnoreCase(aplica.trim()) || "1".equals(aplica.trim()) || "on".equalsIgnoreCase(aplica.trim()));
+    }
+
     private void handleListarEmbalagens(HttpServletRequest request, HttpServletResponse response) throws IOException {
         try {
             Integer idAlimento = parseIntOuNull(request.getParameter("idAlimento"));
