@@ -24,3 +24,5 @@
 - [ ] —
 
 ## Histórico
+
+- 2026-11-02: padronização visual do botão de novo registro (Gerente)

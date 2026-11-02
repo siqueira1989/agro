@@ -30,3 +30,4 @@
 
 ## Histórico
 - 2026-08-29 — auditoria: conexões em try-with-resources e exceções propagadas no DAO.
+- 2026-11-02: padronização visual do botão de novo registro (Gerente)

@@ -81,3 +81,4 @@ safra, mas não paga ninguém. O perfil soma:
   (PAPELAO_7KG) → "Caixa Papelão 10kg" e "Caixa Papelão 7kg" em linhas separadas; diário B com 2 linhas iguais
   (10 cx × R$ 2,00) e tipos diferentes → "—" nas duas. Dados de teste (pessoa 69, diários TESTE-PP-A/B, lote e
   processamentos) apagados.
+- 2026-11-02: padronização visual do botão de novo registro (Gerente)

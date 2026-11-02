@@ -83,3 +83,4 @@ Observação: romaneios ABERTO entram com a venda parcial, porque os itens sem p
     - histórico com "Dividido com"; estorno voltando os dois a Pendente;
     - cancelar liberando 60 cx; o cancelado abre somente leitura;
     - **fluxo da Colheita:** Finalizar lote → modal "Ir para o Romaneio" → `cadastroRomaneio.jsp?lote=15` com o lote FINALIZADO aceito e o romaneio 2026-000003 salvo.
+- 2026-11-02: padronização visual do botão de novo registro (Gerente)

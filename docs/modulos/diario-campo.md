@@ -69,3 +69,4 @@ Tipo de atividade "Processamento" (V29). Atividades com regime por caixa = Colhe
   Produção via `DespesasCustosDAO.registrarPrecoCaixa(c, …)`; linhas com outros preços não mudam o cadastro, e
   preço já cadastrado nunca é sobrescrito pelo Diário. `inserirCompleto`/`adicionarExecucao` passaram a dar rollback
   também em `RuntimeException` (o registro pode lançar `IllegalArgumentException`). Processamento: nada (onda 3).
+- 2026-11-02: padronização visual do botão de novo registro (Gerente)

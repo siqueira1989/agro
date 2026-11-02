@@ -27,3 +27,4 @@
 
 ## Histórico
 - 2026-06-23 — corrigidos DIARIA→DIARISTA e insert sempre na tabela pai.
+- 2026-11-02: padronização visual do botão de novo registro (Gerente)
