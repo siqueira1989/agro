@@ -22,6 +22,7 @@
 - **Estoque**: movimento de entrada guarda o parceiro (`EstoqueMovimentoDAO`, `ControllerEstoque`).
 
 ## Pendências
+- [ ] `AtualizarParceiro.jsp` não compila (HTTP 500: usa `parceiro.getEndereco()`, que não existe mais). Página órfã — nenhum menu/botão leva a ela; a edição é pelo modal de `parceiro.jsp`. Mantida por decisão do usuário em 2026-11-02.
 - [ ] —
 
 ## Histórico
