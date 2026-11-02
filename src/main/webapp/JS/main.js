@@ -6940,59 +6940,106 @@ function cpHtmlPessoas(modo, selecionado) {
     });
     return h;
 }
-function cpHtmlEmbalagens(selecionado) {
-    var h = '<option value="">Selecione</option>';
-    cpEmbalagens.forEach(function (e) {
-        h += '<option value="' + ceEsc(e.tipoCaixa) + '" data-preco="' + Number(e.valordespesascustos || 0) + '"' +
-            (e.tipoCaixa === selecionado ? ' selected' : '') + '>' + ceEsc(e.despesascusto || e.tipoCaixa) + ' — ' + ceMoeda(e.valordespesascustos) + '</option>';
-    });
-    return h + '<option value="' + CP_NOVA + '"' + (selecionado === CP_NOVA ? ' selected' : '') + '>+ Nova embalagem…</option>';
+function cpPesoTxt(kg) { return Number(kg || 0).toLocaleString('pt-BR', { maximumFractionDigits: 3 }) + ' kg'; }
+
+/** Estado atual da grade: [{pessoa, celulas: {idEmbalagem: caixas}}] — usado para redesenhar sem perder o que foi digitado. */
+function cpEstadoGrade() {
+    return $('#cpGradeBody tr').map(function () {
+        var cel = {};
+        $(this).find('.cp-cel').each(function () { cel[$(this).data('emb')] = $(this).val(); });
+        return { pessoa: $(this).find('.cp-epessoa').val(), celulas: cel };
+    }).get();
 }
 
-function cpNovaLinha(modo) {
-    var emb = modo === 'EMB';
-    var $tr = $('<tr data-modo="' + modo + '">' +
-        '<td><select class="form-select form-select-sm cp-pessoa">' + cpHtmlPessoas(modo) + '</select></td>' +
+/** Desenha cabeçalho, linhas e rodapé da grade embalador × embalagem. */
+function cpRenderGrade(estado) {
+    var h = '<tr><th style="min-width:190px">Embalador</th>';
+    cpColunas.forEach(function (e) {
+        h += '<th class="text-center" style="min-width:110px">' + ceEsc(e.descricao) +
+            '<div class="fw-normal text-muted">' + cpPesoTxt(e.pesoKg) + ' · ' + ceMoeda(e.precoEmbalador) + '/cx</div></th>';
+    });
+    h += '<th class="text-end" style="min-width:70px">Caixas</th><th class="text-end" style="min-width:100px">Valor</th><th style="width:32px"></th></tr>';
+    $('#cpGradeHead').html(cpColunas.length ? h : '');
+    $('#cpGradeBody').empty();
+    if (cpColunas.length) (estado || []).forEach(function (s) { cpNovaLinhaEmbalador(s); });
+    var semEmb = !cpOpcoesPessoa('EMB').length;
+    $('#cpGradeVazia').html(!cpColunas.length
+        ? 'Nenhuma embalagem ativa para ' + ceEsc(cpLote ? cpLote.culturaNome : '') + ' em ' + ceEsc(cpLote ? cpLote.areaNome : '') +
+          '. Clique em <strong>+ Embalagem</strong> para cadastrar.'
+        : (semEmb ? 'Nenhum embalador (Produção, cargo Embalador) ativo na data.' : ''))
+        .toggle(!cpColunas.length || semEmb);
+    $('#cpAddEmbalador').prop('disabled', !cpColunas.length || semEmb);
+    cpRecalcular();
+}
+
+function cpNovaLinhaEmbalador(s) {
+    s = s || { pessoa: '', celulas: {} };
+    var tds = '<td><select class="form-select form-select-sm cp-epessoa">' + cpHtmlPessoas('EMB', s.pessoa) + '</select></td>';
+    cpColunas.forEach(function (e) {
+        var v = s.celulas[e.idEmbalagem];
+        tds += '<td><input type="number" class="form-control form-control-sm text-end cp-cel" min="0" step="1" placeholder="0" data-emb="' +
+            Number(e.idEmbalagem) + '" value="' + (v ? ceEsc(v) : '') + '"></td>';
+    });
+    tds += '<td class="text-end cp-lcx">0</td><td class="text-end fw-semibold text-nowrap cp-lvalor">R$ 0,00</td>' +
+        '<td class="text-end"><button type="button" class="btn btn-sm btn-link text-danger p-0 cp-eremover" title="Remover"><i class="fas fa-xmark"></i></button></td>';
+    var $tr = $('<tr>' + tds + '</tr>');
+    $('#cpGradeBody').append($tr);
+    cpRecalcular();
+    return $tr;
+}
+
+/** Painel "+ Embalagem": inclui na grade uma embalagem cadastrada (fora da grade) ou cadastra uma nova com os dois preços. */
+function cpAbrirNovaEmbalagem() {
+    var ids = cpColunas.map(function (e) { return e.idEmbalagem; });
+    var fora = cpEmbalagens.filter(function (e) { return ids.indexOf(e.idEmbalagem) < 0; });
+    var h = '';
+    fora.forEach(function (e) { h += '<option value="' + Number(e.idEmbalagem) + '">' + ceEsc(e.descricao) + ' — ' + ceMoeda(e.precoEmbalador) + '/cx</option>'; });
+    $('#cpEmbExistente').html(h + '<option value="' + CP_NOVA + '">+ Nova embalagem…</option>').val(fora.length ? String(fora[0].idEmbalagem) : CP_NOVA);
+    $('#cpEmbDescricao, #cpEmbPeso, #cpEmbCompra, #cpEmbEmbalador').val('');
+    $('#cpEmbNovaCampos').toggleClass('d-none', $('#cpEmbExistente').val() !== CP_NOVA);
+    $('#cpNovaEmbalagem').removeClass('d-none');
+}
+
+function cpIncluirEmbalagem() {
+    var v = $('#cpEmbExistente').val();
+    if (v !== CP_NOVA) {
+        var e = cpEmbalagens.filter(function (x) { return String(x.idEmbalagem) === v; })[0];
+        if (e) { var est = cpEstadoGrade(); cpColunas.push(e); cpRenderGrade(est); }
+        $('#cpNovaEmbalagem').addClass('d-none');
+        return;
+    }
+    var $btn = $('#cpEmbIncluir').prop('disabled', true);
+    cpPost('/ControllerColheita', {
+        acao: 'salvarembalagem', idAlimento: cpLote.idCultura, idArea: cpLote.idArea, target: 'cpAlerta',
+        descricao: $.trim($('#cpEmbDescricao').val()), pesoKg: Number($('#cpEmbPeso').val()) || null,
+        precoCompra: Number($('#cpEmbCompra').val()) || null, precoEmbalador: Number($('#cpEmbEmbalador').val()) || null
+    }).then(function (r) {
+        var est = cpEstadoGrade();
+        cpEmbalagens.push(r.embalagem); cpColunas.push(r.embalagem);
+        cpRenderGrade(est);
+        if (!$('#cpGradeBody tr').length && cpOpcoesPessoa('EMB').length) cpNovaLinhaEmbalador();
+        $('#cpNovaEmbalagem').addClass('d-none');
+        cpAlerta(ceEsc(r.msg) + ' Coluna incluída na grade.', 'success');
+    }, function (xhr) {
+        cpAlerta(ceEsc(ceMsgXhr(xhr, 'Erro ao cadastrar a embalagem.')), 'danger');
+    }).always(function () { $btn.prop('disabled', false); });
+}
+
+/** Linha de funcionário por horas (CLT/diarista/empreita) — mesmas colunas do Diário. */
+function cpNovaLinha() {
+    var $tr = $('<tr>' +
+        '<td><select class="form-select form-select-sm cp-pessoa">' + cpHtmlPessoas('HORAS') + '</select></td>' +
         '<td class="small cp-tipo text-nowrap">—</td>' +
-        '<td>' + (emb ? '<span class="badge bg-primary-subtle text-primary border border-primary-subtle">Produção</span>'
-                      : '<span class="badge bg-secondary-subtle text-secondary border">Horas</span>') + '</td>' +
-        '<td>' + (emb ? '<select class="form-select form-select-sm cp-emb">' + cpHtmlEmbalagens('') + '</select>' +
-                        '<input type="text" class="form-control form-control-sm mt-1 d-none cp-nova-nome" maxlength="30" placeholder="Nome da embalagem (ex.: Papelão 7kg)">'
-                      : '<span class="text-muted">—</span>') + '</td>' +
-        '<td class="text-end">' + (emb ? '<input type="number" class="form-control form-control-sm text-end cp-preco" min="0" step="0.01" placeholder="0,00">' +
-                                         '<div class="small text-warning d-none cp-preco-alt">novo preço</div>'
-                                       : '<span class="small text-muted cp-ref"></span>') + '</td>' +
-        '<td>' + (emb ? '<input type="number" class="form-control form-control-sm text-end cp-caixas" min="0" step="1" placeholder="0">' : '<span class="text-muted d-block text-center">—</span>') + '</td>' +
-        '<td>' + (emb ? '<span class="text-muted d-block text-center">—</span>' : '<input type="number" class="form-control form-control-sm text-end cp-horas" min="0" step="0.5" placeholder="0">') + '</td>' +
+        '<td><span class="badge bg-secondary-subtle text-secondary border">Horas</span></td>' +
+        '<td class="text-end"><span class="small text-muted cp-ref"></span></td>' +
+        '<td><span class="text-muted d-block text-center">—</span></td>' +
+        '<td><input type="number" class="form-control form-control-sm text-end cp-horas" min="0" step="0.5" placeholder="0"></td>' +
         '<td class="text-end fw-semibold text-nowrap cp-valor">R$ 0,00</td>' +
         '<td class="text-end"><button type="button" class="btn btn-sm btn-link text-danger p-0 cp-remover" title="Remover"><i class="fas fa-xmark"></i></button></td>' +
         '</tr>');
     $('#cpFuncBody').append($tr);
     cpRecalcular();
     return $tr;
-}
-
-/** Preço da embalagem escolhida na linha: o cadastrado em Despesas ou, se já editado em outra linha, o mesmo. */
-function cpCodigoEmbalagem($tr) {
-    var v = $tr.find('.cp-emb').val();
-    return v === CP_NOVA ? cpNormTipo($tr.find('.cp-nova-nome').val()) : (v || '');
-}
-function cpAoEscolherEmbalagem($tr) {
-    var v = $tr.find('.cp-emb').val();
-    $tr.find('.cp-nova-nome').toggleClass('d-none', v !== CP_NOVA);
-    if (v === CP_NOVA) { $tr.find('.cp-preco').val(''); $tr.find('.cp-nova-nome').trigger('focus'); }
-    else {
-        var codigo = cpCodigoEmbalagem($tr), outro = null;
-        $('#cpFuncBody tr[data-modo="EMB"]').not($tr).each(function () { if (codigo && cpCodigoEmbalagem($(this)) === codigo && $(this).find('.cp-preco').val()) outro = $(this).find('.cp-preco').val(); });
-        $tr.find('.cp-preco').val(outro || (v ? Number($tr.find('.cp-emb :selected').data('preco') || 0).toFixed(2) : ''));
-    }
-    cpRecalcular();
-}
-/** Mesmo tipo de embalagem = mesmo preço: editar numa linha replica nas outras. */
-function cpReplicarPreco($tr) {
-    var codigo = cpCodigoEmbalagem($tr), preco = $tr.find('.cp-preco').val();
-    if (!codigo) return;
-    $('#cpFuncBody tr[data-modo="EMB"]').not($tr).each(function () { if (cpCodigoEmbalagem($(this)) === codigo) $(this).find('.cp-preco').val(preco); });
 }
 
 function cpAtualizarQuantidade() {
