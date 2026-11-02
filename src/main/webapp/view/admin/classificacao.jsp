@@ -15,7 +15,7 @@
             <div class="bg-success text-white p-3 rounded mb-3 d-flex justify-content-between align-items-center">
                 <h2 class="m-0"><i class="fas fa-tags"></i> Classificações</h2>
                       <button id="btnCadastro" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalCadastro">
-                    <i class="fas fa-plus"></i> Nova Classificação
+                    <i class="fas fa-plus-circle me-1"></i> Nova Classificação
                 </button>
             </div>
 

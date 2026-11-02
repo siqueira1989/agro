@@ -12,7 +12,12 @@
         </header>
 
         <div class="container-fluid content mt-2">
-            <h2 class="mb-2 text-white border bg-success p-2 rounded shadow-custom">Parceiros</h2>
+            <div class="mb-2 text-white border bg-success p-2 rounded shadow-custom d-flex justify-content-between align-items-center">
+                <h2 class="m-0">Parceiros</h2>
+                <a href="<%=request.getContextPath()%>/view/admin/CadastroParceiro.jsp" class="btn btn-primary btn-sm">
+                    <i class="fas fa-plus-circle me-1"></i> Cadastrar Parceiro
+                </a>
+            </div>
             <div id="alerta" class="alert d-none " role="alert"></div>
            
 
@@ -76,15 +81,6 @@
                             <h4 id="countInsumos" class="fw-bold mb-0">0</h4>
                         </div>
                     </div>
-                </div>
-            </div>
-
-            <!-- HEADER + BOTÃO -->
-            <div class="row mb-3">
-                <div class="col text-end">
-                     <a href="<%=request.getContextPath()%>/view/admin/CadastroParceiro.jsp" class="btn btn-success">
-                          <i class="fas fa-user-plus"></i> Cadastrar Parceiro
-                    </a>
                 </div>
             </div>
 
@@ -227,7 +223,7 @@
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="fas fa-times me-1"></i>Cancelar</button>
                         <button type="button" class="btn btn-success" id="btnSalvarParceiro">
                             <i class="fas fa-save me-1"></i>Salvar
                         </button>
@@ -253,7 +249,7 @@
 
             <!-- Rodapé com botões -->
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="fas fa-times me-1"></i>Cancelar</button>
                 <button type="button" class="btn btn-danger" id="btnConfirmarDesativar">
                     <i class="fas fa-user-slash me-1"></i> Desativar
                 </button>

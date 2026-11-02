@@ -51,8 +51,8 @@
         <div class="card-header">Classificações Cadastradas</div>
         <div class="card-body">
             <div class="mb-3 text-end">
-                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalClassificacao">
-                    <i class="fas fa-plus"></i> Adicionar Classificação
+                <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalClassificacao">
+                    <i class="fas fa-plus-circle me-1"></i> Adicionar Classificação
                 </button>
             </div>
 

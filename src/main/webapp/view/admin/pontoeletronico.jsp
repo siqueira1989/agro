@@ -270,9 +270,9 @@
                                 <input type="text" id="faltaMotivo" class="form-control form-control-sm"
                                        maxlength="200">
                             </div>
-                            <button class="btn btn-danger btn-sm w-100"
+                            <button class="btn btn-primary btn-sm w-100"
                                     onclick="registrarFalta()">
-                                <i class="fas fa-plus me-1"></i>Registrar Falta
+                                <i class="fas fa-plus-circle me-1"></i>Registrar Falta
                             </button>
                         </div>
                     </div>
@@ -310,9 +310,9 @@
                                 <input type="text" id="valeDesc" class="form-control form-control-sm"
                                        maxlength="200">
                             </div>
-                            <button class="btn btn-warning btn-sm w-100"
+                            <button class="btn btn-primary btn-sm w-100"
                                     onclick="registrarVale()">
-                                <i class="fas fa-plus me-1"></i>Registrar Vale
+                                <i class="fas fa-plus-circle me-1"></i>Registrar Vale
                             </button>
                         </div>
                     </div>

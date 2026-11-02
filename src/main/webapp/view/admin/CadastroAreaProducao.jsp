@@ -60,7 +60,7 @@
     <div class="card shadow-sm mb-3">
       <div class="card-header bg-white d-flex justify-content-between align-items-center">
         <h5 class="text-success fw-bold mb-0"><i class="fas fa-th-large me-2"></i>Quadras de Produção</h5>
-        <button type="button" class="btn btn-outline-success btn-sm" id="btnAddQuadraRow"><i class="fas fa-plus me-1"></i>Adicionar Quadra</button>
+        <button type="button" class="btn btn-primary btn-sm" id="btnAddQuadraRow"><i class="fas fa-plus-circle me-1"></i>Adicionar Quadra</button>
       </div>
       <div class="card-body p-0">
         <div class="table-responsive">

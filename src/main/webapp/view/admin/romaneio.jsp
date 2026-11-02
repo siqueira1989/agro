@@ -14,7 +14,7 @@
     <h2 class="m-0"><i class="fas fa-truck me-2"></i>Romaneios</h2>
     <div class="d-flex gap-2">
       <button class="btn btn-light btn-sm" id="btnRmPagamento"><i class="fas fa-hand-holding-dollar me-1"></i>Registrar pagamento</button>
-      <button class="btn btn-warning btn-sm" id="btnRmCadastrar"><i class="fas fa-plus me-1"></i>Romaneio Cad.</button>
+      <button class="btn btn-primary btn-sm" id="btnRmCadastrar"><i class="fas fa-plus-circle me-1"></i>Romaneio Cad.</button>
     </div>
   </div>
   <div id="alertaRomaneio" class="alert d-none" role="alert"></div>
@@ -72,7 +72,7 @@
       <small class="text-muted d-block mt-2" id="rmSelLoteInfo">Só aparecem os lotes Processados que ainda têm caixas embaladas sem romaneio.</small>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+      <button class="btn btn-secondary" data-bs-dismiss="modal"><i class="fas fa-times me-1"></i>Cancelar</button>
       <button class="btn btn-warning" id="btnRmContinuar">Continuar</button>
     </div>
   </div></div>

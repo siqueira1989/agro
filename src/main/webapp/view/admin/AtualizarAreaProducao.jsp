@@ -86,7 +86,7 @@
           <div class="col-md-3"><label class="form-label">Tipo de planta</label>
             <select class="form-select" id="addQuadraAlimento"><option value="">Selecione</option></select></div>
           <div class="col-md-2">
-            <button type="button" class="btn btn-success w-100" id="btnAddQuadraEdit"><i class="fas fa-plus me-1"></i>Adicionar</button></div>
+            <button type="button" class="btn btn-primary btn-sm w-100" id="btnAddQuadraEdit"><i class="fas fa-plus-circle me-1"></i>Adicionar</button></div>
         </div>
       </div>
     </div>

@@ -84,7 +84,7 @@
           <span class="small text-muted text-uppercase fw-semibold"><i class="fas fa-receipt me-1"></i>Despesas de venda</span>
           <div class="d-flex gap-2">
             <select class="form-select form-select-sm" id="crDespesaIncluir" style="min-width:220px"></select>
-            <button type="button" class="btn btn-sm btn-outline-success text-nowrap" id="crDespesaIncluirBtn"><i class="fas fa-plus me-1"></i>Incluir</button>
+            <button type="button" class="btn btn-primary btn-sm text-nowrap" id="crDespesaIncluirBtn"><i class="fas fa-plus-circle me-1"></i>Incluir</button>
           </div>
         </div>
         <div class="card-body p-0">

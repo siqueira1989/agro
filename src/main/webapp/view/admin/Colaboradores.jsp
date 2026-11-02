@@ -13,8 +13,11 @@
 
 <div class="container-fluid content mt-3">
 
-    <div class="bg-success text-white p-3 rounded mb-4">
+    <div class="bg-success text-white p-3 rounded mb-4 d-flex justify-content-between align-items-center">
         <h2 class="m-0"><i class="fas fa-users me-2"></i>Colaboradores</h2>
+        <a href="${pageContext.request.contextPath}/view/admin/ColaboCadastro.jsp" class="btn btn-primary btn-sm">
+            <i class="fas fa-plus-circle me-1"></i> Novo Funcionário
+        </a>
     </div>
 
     <div id="alerta" class="alert d-none" role="alert"></div>
@@ -38,12 +41,6 @@
                 <option value="Ativo">Ativo</option>
                 <option value="Inativo">Inativo</option>
             </select>
-        </div>
-        <div class="col-md-auto ms-auto">
-            <a href="${pageContext.request.contextPath}/view/admin/ColaboCadastro.jsp"
-               class="btn btn-primary">
-                <i class="fas fa-plus-circle me-1"></i> Novo Funcionário
-            </a>
         </div>
     </div>
 
@@ -214,7 +211,7 @@
                 <button type="button" class="btn btn-warning" id="btnConfirmarSituacao">
                     <i class="fas fa-check me-1"></i> Confirmar
                 </button>
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="fas fa-times me-1"></i>Cancelar</button>
             </div>
         </div>
     </div>

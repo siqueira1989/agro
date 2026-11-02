@@ -16,8 +16,8 @@
             <h2 class="m-0"><i class="fas fa-pen-to-square me-2"></i>Despesas/Custos</h2>
             <small class="opacity-75">Cadastro dos itens de custo usados no Diário de Campo e na Safra</small>
         </div>
-        <button id="btnCadastro" type="button" class="btn btn-primary btn-sm fw-semibold" data-bs-toggle="modal" data-bs-target="#modalCadastro">
-            <i class="fas fa-plus me-1"></i> Novo Despesa/Custo
+        <button id="btnCadastro" type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalCadastro">
+            <i class="fas fa-plus-circle me-1"></i> Novo Despesa/Custo
         </button>
     </div>
 
@@ -167,7 +167,7 @@
             </div>
           </div>
           <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="fas fa-times me-1"></i>Cancelar</button>
             <button type="submit" class="btn btn-primary"><i class="fas fa-check me-1"></i>Salvar</button>
           </div>
         </form>
@@ -234,7 +234,7 @@
             </div>
           </div>
           <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="fas fa-times me-1"></i>Cancelar</button>
             <button type="submit" class="btn btn-info text-white"><i class="fas fa-check me-1"></i>Atualizar</button>
           </div>
         </form>
@@ -256,7 +256,7 @@
         <input type="hidden" id="exclusaoId" name="id">
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="fas fa-times me-1"></i>Cancelar</button>
         <button type="button" class="btn btn-danger" onclick="excluirDespesasCustos()">Excluir</button>
       </div>
     </div>

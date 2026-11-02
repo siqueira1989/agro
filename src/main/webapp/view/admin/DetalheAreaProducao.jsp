@@ -81,7 +81,7 @@
           </ul>
         </div>
         <button class="btn btn-outline-success btn-sm" id="btnAgendarDiario"><i class="fas fa-calendar-plus me-1"></i>Agendar</button>
-        <button class="btn btn-success btn-sm" id="btnNovoDiario"><i class="fas fa-plus me-1"></i>Novo Diário</button>
+        <button class="btn btn-primary btn-sm" id="btnNovoDiario"><i class="fas fa-plus-circle me-1"></i>Novo Diário</button>
       </div>
     </div>
     <div class="card-body p-0">
@@ -224,7 +224,7 @@
     <div class="modal-footer justify-content-between">
       <div class="fw-bold">Custo estimado: <span id="dcTotalPreview" class="text-success">R$ 0,00</span></div>
       <div>
-        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-secondary" data-bs-dismiss="modal"><i class="fas fa-times me-1"></i>Cancelar</button>
         <button class="btn btn-success" id="btnSalvarDiario"><i class="fas fa-save me-1"></i>Salvar Diário</button>
       </div>
     </div>
@@ -257,7 +257,7 @@
       <small class="text-muted d-block mt-2">Agendamento não calcula custo — é só previsão. Depois, use "Iniciar execução" na lista para registrar funcionários, máquinas e insumos.</small>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+      <button class="btn btn-secondary" data-bs-dismiss="modal"><i class="fas fa-times me-1"></i>Cancelar</button>
       <button class="btn btn-warning" id="btnSalvarAgendar"><i class="fas fa-save me-1"></i>Agendar</button>
     </div>
   </div></div>

@@ -140,8 +140,8 @@
                     <h6 class="text-success fw-bold mb-0">
                         <i class="fas fa-fingerprint me-2"></i>Registro de Ponto
                     </h6>
-                    <button class="btn btn-success btn-sm" id="btnNovoPonto" data-bs-toggle="modal" data-bs-target="#modalPonto">
-                        <i class="fas fa-plus me-1"></i>Lançar Ponto
+                    <button class="btn btn-primary btn-sm" id="btnNovoPonto" data-bs-toggle="modal" data-bs-target="#modalPonto">
+                        <i class="fas fa-plus-circle me-1"></i>Lançar Ponto
                     </button>
                 </div>
                 <div class="card-body p-0">
@@ -174,8 +174,8 @@
                     <h6 class="text-danger fw-bold mb-0">
                         <i class="fas fa-calendar-times me-2"></i>Faltas
                     </h6>
-                    <button class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#modalFalta">
-                        <i class="fas fa-plus me-1"></i>Registrar Falta
+                    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalFalta">
+                        <i class="fas fa-plus-circle me-1"></i>Registrar Falta
                     </button>
                 </div>
                 <div class="card-body p-0">
@@ -207,8 +207,8 @@
                     <h6 class="text-warning fw-bold mb-0">
                         <i class="fas fa-hand-holding-usd me-2"></i>Vales
                     </h6>
-                    <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#modalVale">
-                        <i class="fas fa-plus me-1"></i>Novo Vale
+                    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalVale">
+                        <i class="fas fa-plus-circle me-1"></i>Novo Vale
                     </button>
                 </div>
                 <div class="card-body p-0">
@@ -290,7 +290,7 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button class="btn btn-secondary" data-bs-dismiss="modal"><i class="fas fa-times me-1"></i>Cancelar</button>
                 <button class="btn btn-success" id="btnSalvarPonto">
                     <i class="fas fa-save me-1"></i>Salvar
                 </button>
@@ -326,8 +326,8 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button class="btn btn-danger" id="btnSalvarFalta">
+                <button class="btn btn-secondary" data-bs-dismiss="modal"><i class="fas fa-times me-1"></i>Cancelar</button>
+                <button class="btn btn-success" id="btnSalvarFalta">
                     <i class="fas fa-save me-1"></i>Salvar
                 </button>
             </div>
@@ -369,8 +369,8 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button class="btn btn-warning fw-bold" id="btnSalvarVale">
+                <button class="btn btn-secondary" data-bs-dismiss="modal"><i class="fas fa-times me-1"></i>Cancelar</button>
+                <button class="btn btn-success fw-bold" id="btnSalvarVale">
                     <i class="fas fa-save me-1"></i>Salvar
                 </button>
             </div>
@@ -413,7 +413,7 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button class="btn btn-secondary" data-bs-dismiss="modal"><i class="fas fa-times me-1"></i>Cancelar</button>
                 <button class="btn btn-primary" id="btnSalvarSalario">
                     <i class="fas fa-save me-1"></i>Salvar
                 </button>
@@ -426,7 +426,7 @@
         <div class="card shadow-sm">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
                 <h6 class="text-success fw-bold mb-0"><i class="fas fa-money-check-dollar me-2"></i>Pagamentos</h6>
-                <button class="btn btn-success btn-sm" id="btnGerarPagamento"><i class="fas fa-plus me-1"></i>Gerar Pagamento</button>
+                <button class="btn btn-primary btn-sm" id="btnGerarPagamento"><i class="fas fa-plus-circle me-1"></i>Gerar Pagamento</button>
             </div>
             <div class="card-body p-0"><div class="table-responsive">
                 <table class="table table-sm table-hover mb-0">

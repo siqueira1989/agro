@@ -85,8 +85,8 @@
             <div class="card shadow-sm mb-3">
                 <div class="card-header bg-white d-flex justify-content-between align-items-center">
                     <h6 class="text-info fw-bold mb-0"><i class="fas fa-box me-2"></i>Caixas Produzidas</h6>
-                    <button class="btn btn-info text-white btn-sm" id="btnNovaCaixa" data-bs-toggle="modal" data-bs-target="#modalCaixa">
-                        <i class="fas fa-plus me-1"></i>Registrar Caixas
+                    <button class="btn btn-primary btn-sm" id="btnNovaCaixa" data-bs-toggle="modal" data-bs-target="#modalCaixa">
+                        <i class="fas fa-plus-circle me-1"></i>Registrar Caixas
                     </button>
                 </div>
                 <div class="card-body p-0">
@@ -131,8 +131,8 @@
             <div class="card shadow-sm mb-3">
                 <div class="card-header bg-white d-flex justify-content-between align-items-center">
                     <h6 class="text-warning fw-bold mb-0"><i class="fas fa-hand-holding-usd me-2"></i>Vales</h6>
-                    <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#modalVale">
-                        <i class="fas fa-plus me-1"></i>Novo Vale
+                    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalVale">
+                        <i class="fas fa-plus-circle me-1"></i>Novo Vale
                     </button>
                 </div>
                 <div class="card-body p-0">
@@ -173,8 +173,8 @@
             </div>
         </div>
         <div class="modal-footer">
-            <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-            <button class="btn btn-info text-white" id="btnSalvarCaixa"><i class="fas fa-save me-1"></i>Salvar</button>
+            <button class="btn btn-secondary" data-bs-dismiss="modal"><i class="fas fa-times me-1"></i>Cancelar</button>
+            <button class="btn btn-success" id="btnSalvarCaixa"><i class="fas fa-save me-1"></i>Salvar</button>
         </div>
     </div></div>
 </div>
@@ -224,8 +224,8 @@
             <div class="mb-2"><label class="form-label">Descrição</label><input type="text" class="form-control" id="valeDescricao" maxlength="200"></div>
         </div>
         <div class="modal-footer">
-            <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-            <button class="btn btn-warning" id="btnSalvarVale"><i class="fas fa-save me-1"></i>Salvar</button>
+            <button class="btn btn-secondary" data-bs-dismiss="modal"><i class="fas fa-times me-1"></i>Cancelar</button>
+            <button class="btn btn-success" id="btnSalvarVale"><i class="fas fa-save me-1"></i>Salvar</button>
         </div>
     </div></div>
 </div>
@@ -234,7 +234,7 @@
         <div class="card shadow-sm">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
                 <h6 class="text-success fw-bold mb-0"><i class="fas fa-money-check-dollar me-2"></i>Pagamentos</h6>
-                <button class="btn btn-success btn-sm" id="btnGerarPagamento"><i class="fas fa-plus me-1"></i>Gerar Pagamento</button>
+                <button class="btn btn-primary btn-sm" id="btnGerarPagamento"><i class="fas fa-plus-circle me-1"></i>Gerar Pagamento</button>
             </div>
             <div class="card-body p-0"><div class="table-responsive">
                 <table class="table table-sm table-hover mb-0">

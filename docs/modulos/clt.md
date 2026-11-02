@@ -29,3 +29,4 @@
 - [ ] —
 
 ## Histórico
+- 2026-11-02 — Correção (teste geral do Gerente): `renderHeaderCLT` (main.js) usava a variável inexistente `vinculoAtivo` na última linha; o `ReferenceError` interrompia o carregamento do perfil (cards, ponto, faltas, vales, fechamento e pagamentos não renderizavam). Trocado por `temAtivo` (vínculo sem desligamento).

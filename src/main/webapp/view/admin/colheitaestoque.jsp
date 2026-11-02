@@ -14,7 +14,7 @@
     <h2 class="m-0"><i class="fas fa-boxes-stacked me-2"></i>Colheita e Estoque</h2>
     <div class="d-flex gap-2">
       <button class="btn btn-light btn-sm" id="btnEmbalagens"><i class="fas fa-box me-1"></i>Embalagens</button>
-      <button class="btn btn-warning btn-sm" id="btnCadastrarColheita"><i class="fas fa-basket-shopping me-1"></i>Cadastrar Colheita</button>
+      <button class="btn btn-primary btn-sm" id="btnCadastrarColheita"><i class="fas fa-plus-circle me-1"></i>Cadastrar Colheita</button>
     </div>
   </div>
   <div id="alertaColheita" class="alert d-none" role="alert"></div>
@@ -33,7 +33,7 @@
         <small class="text-muted d-block mt-2">O cadastro da colheita (funcionários, regime, máquinas) é feito no Diário de Campo da área escolhida.</small>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-secondary" data-bs-dismiss="modal"><i class="fas fa-times me-1"></i>Cancelar</button>
         <button class="btn btn-warning" id="btnIrParaColheita">Continuar</button>
       </div>
     </div></div>
@@ -229,7 +229,7 @@
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-secondary" data-bs-dismiss="modal"><i class="fas fa-times me-1"></i>Cancelar</button>
         <button class="btn btn-primary" id="cpConfirmar"><i class="fas fa-check me-1"></i>Confirmar processamento</button>
       </div>
     </div></div>

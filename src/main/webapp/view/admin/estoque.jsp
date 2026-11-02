@@ -49,7 +49,7 @@
         <div class="d-flex gap-2">
             <button class="btn btn-info text-white btn-sm" id="btnEntrada"><i class="fas fa-arrow-down me-1"></i>Entrada</button>
             <button class="btn btn-warning btn-sm" id="btnSaida"><i class="fas fa-arrow-up me-1"></i>Saída</button>
-            <button class="btn btn-success btn-sm" id="btnNovoInsumo"><i class="fas fa-plus me-1"></i>Novo Insumo</button>
+            <button class="btn btn-primary btn-sm" id="btnNovoInsumo"><i class="fas fa-plus-circle me-1"></i>Novo Insumo</button>
         </div>
     </div>
 
@@ -136,7 +136,7 @@
             <div class="mt-2 small text-muted">Quantidade e preço médio são geridos pelas movimentações (Entrada/Saída). Se o insumo tem peso de saco cadastrado, a tela de Entrada permite lançar em nº de sacos.</div>
         </div>
         <div class="modal-footer">
-            <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button class="btn btn-secondary" data-bs-dismiss="modal"><i class="fas fa-times me-1"></i>Cancelar</button>
             <button class="btn btn-success" id="btnSalvarInsumo"><i class="fas fa-save me-1"></i>Salvar</button>
         </div>
     </div></div>
@@ -192,7 +192,7 @@
             </div>
         </div>
         <div class="modal-footer">
-            <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button class="btn btn-secondary" data-bs-dismiss="modal"><i class="fas fa-times me-1"></i>Cancelar</button>
             <button class="btn btn-info text-white" id="btnSalvarEntrada"><i class="fas fa-save me-1"></i>Registrar Entrada</button>
         </div>
     </div></div>
@@ -228,7 +228,7 @@
             </div>
         </div>
         <div class="modal-footer">
-            <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button class="btn btn-secondary" data-bs-dismiss="modal"><i class="fas fa-times me-1"></i>Cancelar</button>
             <button class="btn btn-warning" id="btnSalvarSaida"><i class="fas fa-save me-1"></i>Registrar Saída</button>
         </div>
     </div></div>

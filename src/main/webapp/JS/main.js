@@ -3618,7 +3618,7 @@ function renderHeaderCLT(data) {
 
     window.__idCLT = f.idPessoa;
     window.__idVinculo = v ? v.idVinculo : null;
-    window.__vinculoAtivo = vinculoAtivo;
+    window.__vinculoAtivo = temAtivo;
 }
 
 function renderCardsCLT(data) {

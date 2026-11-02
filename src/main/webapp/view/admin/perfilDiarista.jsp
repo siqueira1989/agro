@@ -102,8 +102,8 @@
                     <h6 class="text-success fw-bold mb-0">
                         <i class="fas fa-calendar-check me-2"></i>Dias Trabalhados
                     </h6>
-                    <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#modalPresenca">
-                        <i class="fas fa-plus me-1"></i>Marcar Dia
+                    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalPresenca">
+                        <i class="fas fa-plus-circle me-1"></i>Marcar Dia
                     </button>
                 </div>
                 <div class="card-body p-0">
@@ -126,8 +126,8 @@
             <div class="card shadow-sm mb-3">
                 <div class="card-header bg-white d-flex justify-content-between align-items-center">
                     <h6 class="text-warning fw-bold mb-0"><i class="fas fa-hand-holding-usd me-2"></i>Vales</h6>
-                    <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#modalVale">
-                        <i class="fas fa-plus me-1"></i>Novo Vale
+                    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalVale">
+                        <i class="fas fa-plus-circle me-1"></i>Novo Vale
                     </button>
                 </div>
                 <div class="card-body p-0">
@@ -169,8 +169,8 @@
             <input type="number" class="form-control" id="editValorDia" min="0" step="0.01">
         </div>
         <div class="modal-footer">
-            <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-            <button class="btn btn-primary" id="btnSalvarDiaria"><i class="fas fa-save me-1"></i>Salvar</button>
+            <button class="btn btn-secondary" data-bs-dismiss="modal"><i class="fas fa-times me-1"></i>Cancelar</button>
+            <button class="btn btn-success" id="btnSalvarDiaria"><i class="fas fa-save me-1"></i>Salvar</button>
         </div>
     </div></div>
 </div>
@@ -188,7 +188,7 @@
             <input type="date" class="form-control" id="presencaData">
         </div>
         <div class="modal-footer">
-            <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button class="btn btn-secondary" data-bs-dismiss="modal"><i class="fas fa-times me-1"></i>Cancelar</button>
             <button class="btn btn-success" id="btnSalvarPresenca"><i class="fas fa-save me-1"></i>Salvar</button>
         </div>
     </div></div>
@@ -226,8 +226,8 @@
             </div>
         </div>
         <div class="modal-footer">
-            <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-            <button class="btn btn-warning" id="btnSalvarVale"><i class="fas fa-save me-1"></i>Salvar</button>
+            <button class="btn btn-secondary" data-bs-dismiss="modal"><i class="fas fa-times me-1"></i>Cancelar</button>
+            <button class="btn btn-success" id="btnSalvarVale"><i class="fas fa-save me-1"></i>Salvar</button>
         </div>
     </div></div>
 </div>
@@ -236,7 +236,7 @@
         <div class="card shadow-sm">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
                 <h6 class="text-success fw-bold mb-0"><i class="fas fa-money-check-dollar me-2"></i>Pagamentos</h6>
-                <button class="btn btn-success btn-sm" id="btnGerarPagamento"><i class="fas fa-plus me-1"></i>Gerar Pagamento</button>
+                <button class="btn btn-primary btn-sm" id="btnGerarPagamento"><i class="fas fa-plus-circle me-1"></i>Gerar Pagamento</button>
             </div>
             <div class="card-body p-0"><div class="table-responsive">
                 <table class="table table-sm table-hover mb-0">

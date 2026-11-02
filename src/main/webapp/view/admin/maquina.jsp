@@ -12,7 +12,7 @@
 <div class="container-fluid content mt-3">
   <div class="bg-success text-white p-3 rounded mb-3 d-flex justify-content-between align-items-center">
     <h2 class="m-0"><i class="fas fa-tractor me-2"></i>Maquinário</h2>
-    <button class="btn btn-primary btn-sm" id="btnNovoMaquina"><i class="fas fa-plus me-1"></i>Novo Maquinário</button>
+    <button class="btn btn-primary btn-sm" id="btnNovoMaquina"><i class="fas fa-plus-circle me-1"></i>Novo Maquinário</button>
   </div>
   <div id="alerta" class="alert d-none" role="alert"></div>
 
@@ -71,7 +71,7 @@
     </div>
   </div>
   <div class="modal-footer">
-    <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+    <button class="btn btn-secondary" data-bs-dismiss="modal"><i class="fas fa-times me-1"></i>Cancelar</button>
     <button class="btn btn-success" id="btnSalvarMaquina"><i class="fas fa-save me-1"></i>Salvar</button>
   </div>
 </div></div></div>

@@ -12,8 +12,8 @@
   <div class="bg-success text-white p-3 rounded mb-4 d-flex justify-content-between align-items-center">
     <h2 class="m-0"><i class="fas fa-map-marked-alt me-2"></i>Áreas de Produção</h2>
     <div>
-      <a href="${pageContext.request.contextPath}/view/admin/CadastroAreaProducao.jsp" class="btn btn-light btn-sm">
-        <i class="fas fa-plus me-1"></i>Nova Área
+      <a href="${pageContext.request.contextPath}/view/admin/CadastroAreaProducao.jsp" class="btn btn-primary btn-sm">
+        <i class="fas fa-plus-circle me-1"></i>Nova Área
       </a>
     </div>
   </div>
@@ -50,7 +50,7 @@
         <p id="mensagemDesativarArea" class="mb-0">Alterar a situação desta área?</p>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="fas fa-times me-1"></i>Cancelar</button>
         <button type="button" class="btn btn-danger" id="btnConfirmarDesativarArea">Confirmar</button>
       </div>
     </div>
