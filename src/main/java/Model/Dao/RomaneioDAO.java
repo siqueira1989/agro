@@ -192,7 +192,6 @@ public class RomaneioDAO {
                 m.put("idEmbalagem", e.getKey());
                 m.put("descricao", emb.getDescricao());
                 m.put("pesoKg", emb.getPesoKg());
-                m.put("precoCompra", emb.getPrecoCompra());
                 m.put("embaladas", e.getValue());
                 m.put("outrosRomaneios", outros.getOrDefault(e.getKey(), BigDecimal.ZERO));
                 embs.add(m);
@@ -295,7 +294,7 @@ public class RomaneioDAO {
 
     /**
      * Cria (idRomaneio = 0) ou atualiza o romaneio com itens e despesas, recalculando tudo no servidor:
-     * itens (caixas × preço), linha automática de embalagem, despesas por forma de cálculo, bruto,
+     * itens (caixas × preço), despesas por forma de cálculo, bruto,
      * líquido e situação. Devolve o romaneio gravado.
      */
     public Romaneio salvar(Romaneio in) throws SQLException {
@@ -355,10 +354,8 @@ public class RomaneioDAO {
                     bruto = bruto.add(i.getValor());
                 }
                 EmbalagemDAO embDAO = new EmbalagemDAO();
-                Map<Integer, Model.Model.Embalagem> cadEmb = new HashMap<>();
                 for (Map.Entry<Integer, BigDecimal> e : deste.entrySet()) {
                     Model.Model.Embalagem emb = embDAO.buscar(c, e.getKey());
-                    cadEmb.put(e.getKey(), emb);
                     BigDecimal saldo = embaladas.get(e.getKey()).subtract(outros.getOrDefault(e.getKey(), BigDecimal.ZERO));
                     if (e.getValue().compareTo(saldo) > 0) {
                         throw new IllegalArgumentException("A embalagem " + emb.getDescricao() + " tem só " + fmt(saldo.max(BigDecimal.ZERO))
@@ -366,19 +363,11 @@ public class RomaneioDAO {
                     }
                 }
 
-                // Despesas: recalculadas pela forma; a linha EMBALAGEM é sempre gerada aqui.
+                // Despesas: recalculadas pela forma. Desde 02/11 o custo da embalagem é custo de PRODUÇÃO
+                // (insumo com estoque, lançado no diário de Processamento): a antiga linha automática
+                // EMBALAGEM não é mais gerada e, se vier de um romaneio antigo, é descartada aqui.
                 List<RomaneioDespesa> despesas = new ArrayList<>();
-                BigDecimal custoEmb = BigDecimal.ZERO;
-                for (Map.Entry<Integer, BigDecimal> e : deste.entrySet()) {
-                    custoEmb = custoEmb.add(e.getValue().multiply(cadEmb.get(e.getKey()).getPrecoCompra()));
-                }
-                RomaneioDespesa de = new RomaneioDespesa();
-                de.setDescricao("Custo de embalagem"); de.setFormaCalculo(RomaneioDespesa.EMBALAGEM);
-                de.setQuantidade(totalCaixas);
-                de.setValor(custoEmb.setScale(2, RoundingMode.HALF_UP));
-                de.setValorUnitario(totalCaixas.signum() == 0 ? BigDecimal.ZERO : custoEmb.divide(totalCaixas, 4, RoundingMode.HALF_UP));
-                despesas.add(de);
-                BigDecimal totalDesp = de.getValor();
+                BigDecimal totalDesp = BigDecimal.ZERO;
                 for (RomaneioDespesa d : in.getDespesas()) {
                     if (RomaneioDespesa.EMBALAGEM.equals(d.getFormaCalculo())) continue;
                     String desc = d.getDescricao() == null ? "" : d.getDescricao().trim();

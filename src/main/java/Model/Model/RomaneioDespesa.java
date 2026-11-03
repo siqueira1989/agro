@@ -4,8 +4,8 @@ import java.math.BigDecimal;
 
 /**
  * Despesa de venda do romaneio (snapshot do momento). Forma: FIXO (valor digitado), PERCENTUAL_VENDA
- * (percentual × venda bruta), POR_CAIXA (quantidade × valor unitário) ou EMBALAGEM (linha automática,
- * Σ caixas × preço de compra da embalagem, sem iddespesascusto).
+ * (percentual × venda bruta) ou POR_CAIXA (quantidade × valor unitário). EMBALAGEM é legado: a linha
+ * automática de custo de embalagem deixou de ser gerada em 02/11 (virou custo de produção) e é descartada ao salvar.
  */
 public class RomaneioDespesa {
     public static final String FIXO = "FIXO", PERCENTUAL_VENDA = "PERCENTUAL_VENDA", POR_CAIXA = "POR_CAIXA", EMBALAGEM = "EMBALAGEM";

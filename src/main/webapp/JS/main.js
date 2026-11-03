@@ -7448,7 +7448,7 @@ var RM_STATUS = {
     FINALIZADO: { rot: 'Finalizado', cls: 'bg-success' }, CANCELADO: { rot: 'Cancelado', cls: 'bg-secondary' }
 };
 var RM_FORMAS_PAG = { DINHEIRO: 'Dinheiro', PIX: 'Pix', CHEQUE_PROPRIO: 'Cheque próprio', CHEQUE_TERCEIRO: 'Cheque de terceiros' };
-var RM_FORMAS_DESP = { FIXO: 'Valor fixo', PERCENTUAL_VENDA: '% da venda bruta', POR_CAIXA: 'R$ por caixa', EMBALAGEM: 'Caixas × preço de compra' };
+var RM_FORMAS_DESP = { FIXO: 'Valor fixo', PERCENTUAL_VENDA: '% da venda bruta', POR_CAIXA: 'R$ por caixa' };
 var rmLista = {};          // idRomaneio → romaneio da última listagem
 var rpPendentes = [];      // romaneios PENDENTES do parceiro no modal de pagamento
 
@@ -7803,10 +7803,9 @@ function crDespesaDoCadastro(d) {
 }
 
 function crRenderDespesas() {
+    // Sem a linha "Custo de embalagem": desde 02/11 é custo de produção (diário de Processamento).
     var $b = $('#crDespesasBody').empty();
-    $b.append('<tr class="table-light"><td>Custo de embalagem <span class="badge bg-light text-dark border">automático</span></td>' +
-        '<td class="small">' + RM_FORMAS_DESP.EMBALAGEM + '</td><td class="text-end small text-muted" id="crDpEmbParam">—</td>' +
-        '<td class="text-end" id="crDpEmbValor">R$ 0,00</td><td></td></tr>');
+    if (!crDespesas.length) $b.append('<tr><td colspan="5" class="text-center text-muted small py-2">Nenhuma despesa de venda.</td></tr>');
     crDespesas.forEach(function (d, i) {
         var param = '';
         if (d.formaCalculo === 'PERCENTUAL_VENDA')
@@ -7851,10 +7850,9 @@ function crRecalcular() {
     $('#crTotalBruto').text(rmMoeda(bruto));
 
     // Saldo por embalagem (embaladas − outros romaneios − este).
-    var $s = $('#crSaldoBody').empty(), excesso = false, todosZero = embs.length > 0, semSaldoAntes = embs.length > 0, custoEmb = 0;
+    var $s = $('#crSaldoBody').empty(), excesso = false, todosZero = embs.length > 0, semSaldoAntes = embs.length > 0;
     embs.forEach(function (e) {
         var deste = porEmb[e.idEmbalagem] || 0, disp = Number(e.embaladas || 0) - Number(e.outrosRomaneios || 0), saldo = rmArred(disp - deste);
-        custoEmb += deste * Number(e.precoCompra || 0);
         if (saldo < 0) excesso = true;
         if (saldo !== 0) todosZero = false;
         if (disp > 0) semSaldoAntes = false;
@@ -7869,10 +7867,7 @@ function crRecalcular() {
     else $info.addClass('text-muted').text('O saldo continua disponível para outros romaneios do lote.');
 
     // Despesas.
-    custoEmb = rmArred(custoEmb);
-    $('#crDpEmbParam').text(rmQtd(totalCx) + ' cx');
-    $('#crDpEmbValor').text(rmMoeda(custoEmb));
-    var totalDesp = custoEmb;
+    var totalDesp = 0;
     crDespesas.forEach(function (d, i) {
         var v = 0;
         if (d.formaCalculo === 'PERCENTUAL_VENDA') v = rmArred(bruto * Number(d.percentual || 0) / 100);
