@@ -340,6 +340,29 @@ public class DiarioCampoDAO {
         }
     }
 
+    /**
+     * Linha de insumo JÁ BAIXADA, na transação do chamador (não faz commit/rollback): a saída de
+     * estoque foi feita por quem chama (ex.: Processar da Colheita consome as embalagens — V34).
+     * Grava quantidade_direta = quantidade, custo_unitario = preço médio no momento da baixa e
+     * baixado = true, para o {@link #finalizar(int)} não baixar de novo; depois recalcula os custos
+     * do diário (custo_insumos/custo_total). Cancelar o diário não estorna o estoque (igual às
+     * demais baixas: estorno é decisão explícita, não mudança de status).
+     */
+    public void inserirInsumoBaixado(Connection c, int idDiario, int idInsumo, BigDecimal quantidade,
+                                     String unidade, BigDecimal custoUnitario) throws SQLException {
+        BigDecimal qtd = quantidade.setScale(3, RoundingMode.HALF_UP);
+        BigDecimal unit = nz(custoUnitario).setScale(2, RoundingMode.HALF_UP);
+        try (PreparedStatement st = c.prepareStatement(
+                "INSERT INTO diario_insumo (iddiario, id_insumo, quantidade, unidade, quantidade_direta, "
+              + "custo_unitario, custo, baixado) VALUES (?,?,?,?,?,?,?,true)")) {
+            st.setInt(1, idDiario); st.setInt(2, idInsumo); st.setBigDecimal(3, qtd); st.setString(4, unidade);
+            st.setBigDecimal(5, qtd); st.setBigDecimal(6, unit);
+            st.setBigDecimal(7, qtd.multiply(unit).setScale(2, RoundingMode.HALF_UP));
+            st.executeUpdate();
+        }
+        recalcularCustos(c, idDiario);
+    }
+
     /** Pesos de saco aceitos para adubo (kg). */
     public static final java.util.Set<Integer> PESOS_SACO_KG = java.util.Set.of(5, 10, 25, 50);
 

@@ -85,6 +85,10 @@
         <servlet-class>Controller.ControllerColheita</servlet-class>
     </servlet>
     <servlet>
+        <servlet-name>ControllerEmbalagem</servlet-name>
+        <servlet-class>Controller.ControllerEmbalagem</servlet-class>
+    </servlet>
+    <servlet>
         <servlet-name>ControllerRomaneio</servlet-name>
         <servlet-class>Controller.ControllerRomaneio</servlet-class>
     </servlet>
@@ -171,6 +175,10 @@
     <servlet-mapping>
         <servlet-name>ControllerColheita</servlet-name>
         <url-pattern>/ControllerColheita</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>ControllerEmbalagem</servlet-name>
+        <url-pattern>/ControllerEmbalagem</url-pattern>
     </servlet-mapping>
     <servlet-mapping>
         <servlet-name>ControllerRomaneio</servlet-name>

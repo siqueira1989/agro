@@ -127,6 +127,18 @@ public class ControllerInsumo extends HttpServlet {
         if (!UnidadeMedida.pertence(unidade, grandeza)) {
             writeJson(resp, 400, false, "Unidade não corresponde à grandeza informada."); return;
         }
+        // V34: insumo EMBALAGEM nasce só pela página Embalagens (EmbalagemDAO liga o insumo à embalagem).
+        // Aqui só se edita um que já existe, sem trocar a categoria.
+        if (CategoriaInsumo.EMBALAGEM.name().equalsIgnoreCase(categoria) && !update) {
+            writeJson(resp, 400, false, "Embalagens são cadastradas na página Configuração → Embalagens."); return;
+        }
+        if (update) {
+            Insumo antes = insumoDAO.buscarPorId(getInt(jo, "idInsumo"));
+            if (antes != null && (CategoriaInsumo.EMBALAGEM.name().equals(antes.getCategoria())
+                    != CategoriaInsumo.EMBALAGEM.name().equalsIgnoreCase(categoria))) {
+                writeJson(resp, 400, false, "A categoria Embalagem não pode ser trocada: a embalagem é gerida na página Embalagens."); return;
+            }
+        }
 
         Insumo i = new Insumo();
         i.setNome(nome.trim());

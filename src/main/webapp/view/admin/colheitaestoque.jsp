@@ -13,7 +13,6 @@
   <div class="bg-success text-white p-3 rounded mb-3 d-flex justify-content-between align-items-center">
     <h2 class="m-0"><i class="fas fa-boxes-stacked me-2"></i>Colheita e Estoque</h2>
     <div class="d-flex gap-2">
-      <button class="btn btn-light btn-sm" id="btnEmbalagens"><i class="fas fa-box me-1"></i>Embalagens</button>
       <button class="btn btn-primary btn-sm" id="btnCadastrarColheita"><i class="fas fa-plus-circle me-1"></i>Cadastrar Colheita</button>
     </div>
   </div>
@@ -35,61 +34,6 @@
       <div class="modal-footer">
         <button class="btn btn-secondary" data-bs-dismiss="modal"><i class="fas fa-times me-1"></i>Cancelar</button>
         <button class="btn btn-warning" id="btnIrParaColheita">Continuar</button>
-      </div>
-    </div></div>
-  </div>
-
-  <!-- Cadastro de embalagens (V31): por alimento + área, preço de compra e preço pago ao embalador. -->
-  <div class="modal fade" id="modalEmbalagens" tabindex="-1">
-    <div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content">
-      <div class="modal-header bg-success text-white">
-        <h5 class="modal-title"><i class="fas fa-box me-2"></i>Embalagens</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body bg-light">
-        <div id="emAlerta" class="alert d-none" role="alert"></div>
-        <div class="card shadow-sm border-0 mb-3"><div class="card-body py-2">
-          <div class="small text-muted text-uppercase fw-semibold mb-1" id="emFormTitulo"><i class="fas fa-plus me-1"></i>Nova embalagem</div>
-          <input type="hidden" id="emId" value="0">
-          <div class="row g-2 align-items-end">
-            <div class="col-6 col-md-3"><label class="form-label small mb-0" for="emAlimento">Alimento *</label>
-              <select class="form-select form-select-sm" id="emAlimento"></select></div>
-            <div class="col-6 col-md-3"><label class="form-label small mb-0" for="emArea">Área de produção *</label>
-              <select class="form-select form-select-sm" id="emArea"></select></div>
-            <div class="col-8 col-md-4"><label class="form-label small mb-0" for="emDescricao">Descrição *</label>
-              <input type="text" class="form-control form-control-sm" id="emDescricao" maxlength="80" placeholder="Ex.: Papelão 7kg"></div>
-            <div class="col-4 col-md-2"><label class="form-label small mb-0" for="emPeso">Peso (kg) *</label>
-              <input type="number" class="form-control form-control-sm" id="emPeso" min="0" step="0.1"></div>
-            <div class="col-6 col-md-3"><label class="form-label small mb-0" for="emCodigo">Código</label>
-              <input type="text" class="form-control form-control-sm text-uppercase" id="emCodigo" maxlength="30" placeholder="gerado da descrição"></div>
-            <div class="col-6 col-md-3"><label class="form-label small mb-0" for="emCompra">Preço de compra (R$) *</label>
-              <input type="number" class="form-control form-control-sm" id="emCompra" min="0" step="0.01"></div>
-            <div class="col-6 col-md-3"><label class="form-label small mb-0" for="emEmbalador">Pago ao embalador (R$/cx) *</label>
-              <input type="number" class="form-control form-control-sm" id="emEmbalador" min="0" step="0.01"></div>
-            <div class="col-6 col-md-3 d-flex gap-2 justify-content-end">
-              <button type="button" class="btn btn-sm btn-outline-secondary" id="emLimpar">Limpar</button>
-              <button type="button" class="btn btn-sm btn-success" id="emSalvar"><i class="fas fa-check me-1"></i>Salvar</button>
-            </div>
-          </div>
-        </div></div>
-        <div class="card shadow-sm border-0"><div class="card-body p-2">
-          <div class="row g-2 mb-2">
-            <div class="col-6 col-md-3"><select class="form-select form-select-sm" id="emFiltroAlimento"></select></div>
-            <div class="col-6 col-md-3"><select class="form-select form-select-sm" id="emFiltroArea"></select></div>
-            <div class="col-6 col-md-3"><select class="form-select form-select-sm" id="emFiltroAtivo">
-              <option value="true">Ativas</option><option value="false">Desativadas</option><option value="">Todas</option>
-            </select></div>
-          </div>
-          <div class="table-responsive">
-            <table class="table table-sm table-striped align-middle mb-0">
-              <thead class="table-light small"><tr>
-                <th>Descrição</th><th>Código</th><th class="text-end">Peso</th><th>Alimento</th><th>Área</th>
-                <th class="text-end">Compra</th><th class="text-end">Embalador</th><th>Situação</th><th class="text-end">Ações</th>
-              </tr></thead>
-              <tbody id="emTabela"></tbody>
-            </table>
-          </div>
-        </div></div>
       </div>
     </div></div>
   </div>
@@ -160,17 +104,10 @@
                   <label class="form-label small mb-0" for="cpEmbExistente">Embalagem cadastrada</label>
                   <select class="form-select form-select-sm" id="cpEmbExistente"></select>
                 </div>
-                <div class="col-md-8 d-none" id="cpEmbNovaCampos">
-                  <div class="row g-2">
-                    <div class="col-6 col-md-4"><label class="form-label small mb-0" for="cpEmbDescricao">Descrição *</label>
-                      <input type="text" class="form-control form-control-sm" id="cpEmbDescricao" maxlength="80" placeholder="Ex.: Papelão 7kg"></div>
-                    <div class="col-6 col-md-2"><label class="form-label small mb-0" for="cpEmbPeso">Peso (kg) *</label>
-                      <input type="number" class="form-control form-control-sm" id="cpEmbPeso" min="0" step="0.1"></div>
-                    <div class="col-6 col-md-3"><label class="form-label small mb-0" for="cpEmbCompra">Preço de compra *</label>
-                      <input type="number" class="form-control form-control-sm" id="cpEmbCompra" min="0" step="0.01"></div>
-                    <div class="col-6 col-md-3"><label class="form-label small mb-0" for="cpEmbEmbalador">Pago ao embalador *</label>
-                      <input type="number" class="form-control form-control-sm" id="cpEmbEmbalador" min="0" step="0.01"></div>
-                  </div>
+                <div class="col-md-8 small text-muted">
+                  Para cadastrar uma embalagem nova ou registrar a compra (entrada de estoque), use a página
+                  <a href="${pageContext.request.contextPath}/view/admin/embalagem.jsp" target="_blank">Embalagens</a>
+                  e abra este modal de novo.
                 </div>
                 <div class="col-12 d-flex gap-2 justify-content-end">
                   <button type="button" class="btn btn-sm btn-outline-secondary" id="cpEmbCancelar">Cancelar</button>

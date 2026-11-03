@@ -195,10 +195,66 @@ public class ColheitaDAO {
                     }
                     st.executeBatch();
                 }
+                consumirEmbalagens(c, l, idDiario, data, embalagens, cadastro);
                 c.commit();
                 return idProc;
             } catch (SQLException | RuntimeException e) { c.rollback(); throw e; }
             finally { c.setAutoCommit(true); }
+        }
+    }
+
+    /**
+     * Consumo das embalagens (V34): para cada embalagem usada, SAÍDA do estoque do insumo ligado (soma
+     * das caixas da grade; bloqueia saldo insuficiente) e a linha de insumo já baixada no diário de
+     * Processamento (custo = caixas × preço médio no momento), que entra em custo_insumos e, quando o
+     * diário for finalizado, no custo da Safra. Mesma transação da baixa do lote.
+     */
+    private void consumirEmbalagens(Connection c, ColheitaLote l, int idDiario, LocalDate data,
+                                    List<LinhaEmbalagem> embalagens, Map<Integer, Embalagem> cadastro) throws SQLException {
+        Map<Integer, BigDecimal> caixas = caixasPorEmbalagem(embalagens);
+        EstoqueMovimentoDAO estoque = new EstoqueMovimentoDAO();
+        DiarioCampoDAO diario = new DiarioCampoDAO();
+        String obs = "Processamento do lote " + (l.getNumeroDiario() != null ? l.getNumeroDiario() : "#" + l.getIdLote());
+        for (Map.Entry<Integer, BigDecimal> en : caixas.entrySet()) {
+            Embalagem emb = cadastro.get(en.getKey());
+            try {
+                estoque.registrarSaida(c, emb.getIdInsumo(), en.getValue(), data, obs);
+            } catch (EstoqueInsuficienteException ex) {
+                // Outro processamento/saída consumiu o saldo depois da validação.
+                throw new IllegalArgumentException(msgSaldo(emb, saldoInsumo(c, emb.getIdInsumo()), en.getValue()));
+            }
+            diario.inserirInsumoBaixado(c, idDiario, emb.getIdInsumo(), en.getValue(), "CX", precoMedio(c, emb.getIdInsumo()));
+        }
+    }
+
+    private static Map<Integer, BigDecimal> caixasPorEmbalagem(List<LinhaEmbalagem> embalagens) {
+        Map<Integer, BigDecimal> m = new LinkedHashMap<>();
+        for (LinhaEmbalagem e : embalagens) m.merge(e.idEmbalagem, e.caixas, BigDecimal::add);
+        return m;
+    }
+
+    private static String msgSaldo(Embalagem emb, BigDecimal saldo, BigDecimal necessario) {
+        BigDecimal falta = necessario.subtract(saldo);
+        return "Estoque insuficiente da embalagem " + emb.getDescricao() + ": disponível " + qtdTxt(saldo)
+             + " cx, necessário " + qtdTxt(necessario) + " cx (faltam " + qtdTxt(falta) + " cx). "
+             + "Registre a compra (Entrada) na página Embalagens antes de processar.";
+    }
+
+    private static String qtdTxt(BigDecimal v) {
+        return v == null ? "0" : v.stripTrailingZeros().toPlainString().replace('.', ',');
+    }
+
+    private static BigDecimal saldoInsumo(Connection c, int idInsumo) throws SQLException {
+        try (PreparedStatement st = c.prepareStatement("SELECT quantidade_disponivel FROM insumo WHERE idinsumo=?")) {
+            st.setInt(1, idInsumo);
+            try (ResultSet rs = st.executeQuery()) { return rs.next() ? rs.getBigDecimal(1) : BigDecimal.ZERO; }
+        }
+    }
+
+    private static BigDecimal precoMedio(Connection c, int idInsumo) throws SQLException {
+        try (PreparedStatement st = c.prepareStatement("SELECT preco_medio FROM insumo WHERE idinsumo=?")) {
+            st.setInt(1, idInsumo);
+            try (ResultSet rs = st.executeQuery()) { return rs.next() ? rs.getBigDecimal(1) : BigDecimal.ZERO; }
         }
     }
 
@@ -243,17 +299,19 @@ public class ColheitaDAO {
     /**
      * Caixas embaladas de um lote por embalagem (soma de todos os processamentos) — contrato lido
      * pelo Romaneio. Registros anteriores à V31 (sem idembalagem) saem agrupados pelo código, com
-     * idEmbalagem null. Ordem: peso, descrição.
+     * idEmbalagem null. precoCompra = preço médio ATUAL do insumo da embalagem (V34; só informativo —
+     * o custo real da embalagem foi lançado no diário de Processamento). Ordem: peso, descrição.
      */
     public List<Map<String, Object>> caixasEmbaladas(int idLote) throws SQLException {
         String sql = "SELECT pe.idembalagem, COALESCE(e.codigo, pe.tipo_caixa) AS codigo, "
-                + "COALESCE(e.descricao, pe.tipo_caixa) AS descricao, e.peso_kg, e.preco_compra, "
+                + "COALESCE(e.descricao, pe.tipo_caixa) AS descricao, e.peso_kg, i.preco_medio AS preco_compra, "
                 + "SUM(pe.quantidade_caixas) AS caixas, SUM(pe.valor) AS valor_embalador "
                 + "FROM colheita_processamento p "
                 + "JOIN colheita_processamento_embalagem pe ON pe.idprocessamento = p.idprocessamento "
                 + "LEFT JOIN embalagem e ON e.idembalagem = pe.idembalagem "
+                + "LEFT JOIN insumo i ON i.idinsumo = e.id_insumo "
                 + "WHERE p.idlote=? GROUP BY pe.idembalagem, COALESCE(e.codigo, pe.tipo_caixa), "
-                + "COALESCE(e.descricao, pe.tipo_caixa), e.peso_kg, e.preco_compra "
+                + "COALESCE(e.descricao, pe.tipo_caixa), e.peso_kg, i.preco_medio "
                 + "ORDER BY e.peso_kg NULLS LAST, 3";
         List<Map<String, Object>> out = new ArrayList<>();
         try (Connection c = new PostgresConnection().getConnection();
@@ -322,13 +380,23 @@ public class ColheitaDAO {
                 if (!emb.getIdAlimento().equals(l.getIdCultura()) || !emb.getIdArea().equals(l.getIdArea())) {
                     throw new IllegalArgumentException("A embalagem " + emb.getDescricao() + " não é do alimento/área do lote.");
                 }
+                if (emb.getIdInsumo() == null) {
+                    throw new IllegalArgumentException("A embalagem " + emb.getDescricao() + " ainda não tem estoque: "
+                            + "abra-a na página Embalagens, salve e registre a compra (Entrada).");
+                }
                 cadastro.put(e.idEmbalagem, emb);
             }
             if (e.preco == null || e.preco.compareTo(emb.getPrecoEmbalador()) != 0) {
                 throw new IllegalArgumentException("O preço do embalador da embalagem " + emb.getDescricao()
-                        + " mudou para R$ " + emb.getPrecoEmbalador().setScale(2, RoundingMode.HALF_UP)
+                        + " mudou para R$ " + emb.getPrecoEmbalador().setScale(2, RoundingMode.HALF_UP).toPlainString().replace('.', ',')
                         + ". Feche e abra o modal de novo.");
             }
+        }
+        // Estoque das embalagens (V34): soma das caixas de cada coluna da grade ≤ saldo do insumo.
+        for (Map.Entry<Integer, BigDecimal> en : caixasPorEmbalagem(embalagens).entrySet()) {
+            Embalagem emb = cadastro.get(en.getKey());
+            BigDecimal saldoEmb = emb.getSaldo() != null ? emb.getSaldo() : BigDecimal.ZERO;
+            if (en.getValue().compareTo(saldoEmb) > 0) throw new IllegalArgumentException(msgSaldo(emb, saldoEmb, en.getValue()));
         }
         return cadastro;
     }

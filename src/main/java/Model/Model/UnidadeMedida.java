@@ -4,7 +4,7 @@ package Model.Model;
  * Unidades de medida para insumos, agrupadas por grandeza:
  *   - MASSA:      G (grama), KG (quilograma), T (tonelada)
  *   - CAPACIDADE: ML (mililitro), L (litro)
- *   - UNIDADE:    UN (unidade)
+ *   - UNIDADE:    UN (unidade), CX (caixa — embalagens, V34)
  */
 public enum UnidadeMedida {
 
@@ -13,7 +13,8 @@ public enum UnidadeMedida {
     T  ("Tonelada",    "MASSA"),
     ML ("Mililitro",   "CAPACIDADE"),
     L  ("Litro",       "CAPACIDADE"),
-    UN ("Unidade",     "UNIDADE");
+    UN ("Unidade",     "UNIDADE"),
+    CX ("Caixa",       "UNIDADE");
 
     private final String rotulo;
     private final String grandeza;

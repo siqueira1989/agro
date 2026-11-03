@@ -44,6 +44,7 @@
                 <option value="">Todas</option>
                 <option value="DEFENSIVO">Defensivos</option>
                 <option value="ADUBO">Adubos</option>
+                <option value="EMBALAGEM">Embalagens</option>
             </select>
         </div>
         <div class="d-flex gap-2">
@@ -92,6 +93,7 @@
                     <select class="form-select" id="insCategoria">
                         <option value="DEFENSIVO">Defensivo</option>
                         <option value="ADUBO">Adubo</option>
+                        <option value="EMBALAGEM">Embalagem (cadastro na página Embalagens)</option>
                     </select>
                 </div>
                 <div class="col-md-3">
