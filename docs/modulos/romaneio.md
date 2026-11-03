@@ -19,7 +19,7 @@
 ## Banco: V33 (`V33__romaneio.sql`)
 - `romaneio`: `idromaneio`, `numero` UNIQUE (`AAAA-NNNNNN`, sequência por ano do `data_emissao`, gerada com `pg_advisory_xact_lock`), `idlote` → `colheita_lote`, `id_area`, `id_quadra`, `id_alimento`, `id_safra` (resolvida por `SafraDAO.resolverSafra(talhão, data da colheita do lote)`; sem safra o salvamento é recusado), `id_parceiro` (sem FK, por causa da herança de pessoa), `data_emissao`, `motorista`, `placa` (maiúsculas, sem espaços), `status` CHECK (`ABERTO|PENDENTE|FINALIZADO|CANCELADO`), `total_caixas`, `valor_bruto`, `total_despesas`, `valor_liquido`, `valor_pago` (padrão 0), `observacao`, `criado_em`, `atualizado_em`.
 - `romaneio_item`: `idromaneio` (cascade), `idclassificacao`, `idembalagem`, `caixas` > 0, `preco_unitario` (NULL até informar), `valor`. UNIQUE (romaneio, classificação, embalagem).
-- `romaneio_despesa`: `iddespesascusto` (NULL na linha automática), `descricao`, `forma_calculo` (`FIXO|PERCENTUAL_VENDA|POR_CAIXA|EMBALAGEM`), `percentual`, `quantidade`, `valor_unitario`, `valor`. É snapshot: mudar o cadastro de despesas não altera romaneios gravados.
+- `romaneio_despesa`: `iddespesascusto`, `descricao`, `forma_calculo` (`FIXO|PERCENTUAL_VENDA|POR_CAIXA`; `EMBALAGEM` continua no CHECK só por compatibilidade, porque a linha automática de embalagem não é mais gerada), `percentual`, `quantidade`, `valor_unitario`, `valor`. É snapshot: mudar o cadastro de despesas não altera romaneios gravados.
 - `romaneio_pagamento`: `id_parceiro`, `data_pagamento`, `forma` (`DINHEIRO|PIX|CHEQUE_PROPRIO|CHEQUE_TERCEIRO`), `valor` > 0, `banco`, `numero_cheque`, `emitente`, `bom_para`, `observacao`, `criado_em`.
 - `romaneio_pagamento_item`: `idpagamento` (cascade), `idromaneio`, `valor` > 0.
 
@@ -32,12 +32,13 @@ Observação: romaneios ABERTO entram com a venda parcial, porque os itens sem p
 2. **Caixas:** por embalagem, a soma dos itens dos romaneios não cancelados do lote não pode passar das caixas embaladas. O lote é travado com `FOR UPDATE` no `salvar`, e na edição o próprio romaneio é descontado. A tela mostra Embaladas / Outros romaneios / Este / Saldo ao vivo e avisa quando o lote fica totalmente romaneado.
 3. **Itens:** a classificação precisa ser do alimento do lote (`alimentoclassificacao`) e a embalagem precisa ter caixas no lote. A data de emissão não pode ser anterior à colheita.
 4. **Valores (servidor):** item = caixas × preço (2 casas). Bruto = Σ itens. Despesas:
-   - linha automática **Custo de embalagem** = Σ caixas × `embalagem.preco_compra` (sempre regerada);
    - `PERCENTUAL_VENDA` = bruto × % / 100;
    - `POR_CAIXA` = total de caixas × R$/cx;
    - `FIXO` = valor digitado.
 
    Líquido = bruto − despesas. As despesas iniciais vêm de `DespesasCustosDAO.listarRomaneio` (Comissão 18%, Frete por embalagem, Vale). O usuário ajusta %, R$/cx ou o valor, remove linhas ou inclui outra despesa do cadastro (`listAll`, categoria GERAL).
+
+   **Embalagem não é despesa de venda** (decisão do usuário, 02/11): a embalagem virou insumo com estoque, e o custo dela é **custo de produção**, lançado no diário de Processamento pelo preço médio do estoque (Módulo Colheita) e somado na Safra. O Romaneio não gera mais a linha "Custo de embalagem"; se um romaneio antigo tiver uma linha `EMBALAGEM`, ela é descartada no próximo salvar (recálculo).
 5. **Situação:** ABERTO (algum item sem preço) → PENDENTE (todos com preço). Com todos os preços, o líquido precisa ser > 0. FINALIZADO quando `valor_pago ≥ valor_liquido`. FINALIZADO e CANCELADO não podem ser editados (abrem só para leitura).
 6. **Edição com pagamento:** todos os itens precisam continuar com preço, o líquido não pode ficar menor que o já pago e o parceiro não pode ser trocado. Se o líquido ficar igual ao pago, o romaneio vira FINALIZADO.
 7. **Pagamento em grupo** (`pagar`): parceiro, data, forma e valor. Cheque exige banco e número; cheque de terceiro exige o emitente; "bom para" ≥ data. A tela distribui o valor do romaneio mais antigo para o mais novo, até o saldo de cada um, e as partes são editáveis. No servidor: cada parte > 0 e ≤ saldo, o romaneio precisa ser do parceiro e estar PENDENTE, e Σ partes = valor.
@@ -45,7 +46,7 @@ Observação: romaneios ABERTO entram com a venda parcial, porque os itens sem p
 9. **Cancelar:** só ABERTO/PENDENTE sem pagamento. Libera as caixas do lote.
 
 ## Dependências
-- **Colheita e Estoque:** lê `colheita_lote`, `colheita_processamento(_embalagem)` (soma por `idembalagem`, a mesma regra de `?caixasembaladas=`) e `embalagem` (`EmbalagemDAO.buscar`: descrição, peso, `preco_compra`). Contrato de URL: `cadastroRomaneio.jsp?lote=<idLote>` (redirecionamento do "Finalizar lote", onda C).
+- **Colheita e Estoque:** lê `colheita_lote`, `colheita_processamento(_embalagem)` (soma por `idembalagem`, a mesma regra de `?caixasembaladas=`) e `embalagem` (`EmbalagemDAO.buscar`: só descrição e peso; desde 02/11 o Romaneio **não lê** `preco_compra`). Contrato de URL: `cadastroRomaneio.jsp?lote=<idLote>` (redirecionamento do "Finalizar lote", onda C).
 - **Despesas e Custos:** `DespesasCustosDAO.listarRomaneio(Connection)` e `listAll()` (campos `iddespesascusto`, `despesascusto`, `valordespesascustos`, `formaCalculo`, `categoria`).
 - **Safra:** `SafraDAO.resolverSafra` (leitura). A Safra **consome** `romaneio` (contrato acima).
 - **Parceiro:** lê `parceiro` (`tipo_parceiro = 'PARCEIRO'`, `situacaopessoa`, `nomepessoa`).
@@ -54,11 +55,14 @@ Observação: romaneios ABERTO entram com a venda parcial, porque os itens sem p
 ## Pendências
 - [x] Conferência visual feita pelo Gerente Geral em 02/11 no teste integrado (navegador do app, tela visível): lista e cards, "Romaneio Cad.", MR1 com grade classificação × embalagem, despesas, caixas embaladas e resumo. Tudo ok.
 - [ ] Estorno é exclusão (sem trilha de auditoria). Se o usuário quiser histórico de estornos, acrescentar `estornado_em`/motivo em vez de apagar.
-- [ ] Ao reeditar, o custo de embalagem usa o `preco_compra` **atual** do cadastro (é recalculado a cada salvar). Os demais parâmetros ficam como gravados no romaneio.
 - [ ] Processamentos anteriores à V31 (sem `idembalagem`) não entram no saldo do romaneio.
 - [ ] Impressão/PDF do romaneio (não pedido ainda).
 
 ## Histórico
+- 2026-11-02: **"Custo de embalagem" sai das despesas de venda** (pedido do Gerente, decisão do usuário). A embalagem passa a ser custo de produção (estoque → diário de Processamento → Safra); no Romaneio contaria duas vezes.
+  - `RomaneioDAO.salvar` não gera mais a linha `EMBALAGEM` e descarta as que vierem; o `contexto` não devolve mais `precoCompra` nas embalagens.
+  - `main.js` (`crRenderDespesas`/`crRecalcular`) sem a linha automática. O quadro "Caixas embaladas do lote" foi mantido.
+  - Não havia romaneios na base. Sem build nem restart: o Java entra no build único da Colheita. O `main.js` foi copiado para o target e conferido no Chrome (`?lote=3`): só Comissão, Frete e Vale; total de despesas e líquido corretos; sintaxe OK.
 - 2026-11-02: **criação do módulo (pacote Romaneio, onda B).**
   - V33 com as 5 tabelas; `ControllerRomaneio`, `RomaneioDAO`, 4 beans; telas `romaneio.jsp` (3 cards: total, pendentes com o valor a receber, finalizados com o recebido; filtro por situação; ações Editar/Ver, Pagamentos, Cancelar) e `cadastroRomaneio.jsp` (MR1: dados do lote, venda, grade classificação × embalagem com caixas e preço, despesas de venda, saldo por embalagem e resumo com a situação prevista). Seção `MÓDULO ROMANEIO` no `main.js`, com textos do banco escapados (`rmEsc`). Registrado em `web.xml`, `menu.jsp` e no índice.
   - Build único com `mvnw.cmd clean package`; a V33 foi aplicada pelo SchemaMigrator no startup.
