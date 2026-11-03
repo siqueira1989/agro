@@ -70,3 +70,8 @@ Tipo de atividade "Processamento" (V29). Atividades com regime por caixa = Colhe
   preço já cadastrado nunca é sobrescrito pelo Diário. `inserirCompleto`/`adicionarExecucao` passaram a dar rollback
   também em `RuntimeException` (o registro pode lançar `IllegalArgumentException`). Processamento: nada (onda 3).
 - 2026-11-02: padronização visual do botão de novo registro (Gerente)
+- 2026-11-02 — **Módulo Embalagem (V34), autorizado pelo Gerente:** novo método `DiarioCampoDAO.inserirInsumoBaixado(Connection c, int idDiario, int idInsumo, BigDecimal quantidade, String unidade, BigDecimal custoUnitario)`, usado só pelo Processar da Colheita, na transação dela: grava uma linha `diario_insumo` já baixada (`quantidade` = `quantidade_direta` = caixas, `custo_unitario` = preço médio no momento da baixa, `custo`, `baixado=true`) e chama `recalcularCustos(c, id)` (entra em `custo_insumos`/`custo_total`). A saída do estoque é feita por quem chama (`EstoqueMovimentoDAO.registrarSaida(Connection…)`).
+  - **Finalizar:** a linha tem `baixado=true`, então o `finalizar` não baixa de novo (só recalcula o custo).
+  - **Editar (`atualizarCompleto`):** linhas baixadas são preservadas (regra P1-7).
+  - **Cancelar:** muda só o status; o estoque das embalagens não é estornado (igual às demais baixas). A Safra soma só diários CONCLUIDA, então um diário cancelado não entra no custo da Safra.
+  - **Atenção:** `recalcularCustos` reprecifica também linhas `baixado=true` pelo preço médio corrente; se houver compra de embalagem entre o Processar e o Finalizar, o custo da linha muda. Ver Pendências do módulo Embalagem.

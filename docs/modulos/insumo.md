@@ -29,3 +29,4 @@
 ## Histórico
 - 2026-10-22 — Adubo (grandeza Massa): o campo livre "Peso do saco" vira o seletor "A granel / Saco 5, 10, 25 ou 50 kg" (`#insSacoAdubo`). O valor é em kg e é convertido para a unidade do insumo ao salvar (saco de 50 kg num adubo em T → `peso_embalagem` 0,05). Adubo a granel usa a unidade Tonelada. Defensivo continua com o campo livre. Sem mudança de banco no `insumo`.
 - 2026-11-02: padronização visual do botão de novo registro (Gerente)
+- 2026-11-02 — **Categoria EMBALAGEM (V34, módulo Embalagem):** `CategoriaInsumo.EMBALAGEM` e unidade `CX` (grandeza UNIDADE) em `UnidadeMedida`. Filtro "Embalagens" e rótulo no `estoque.jsp`/`main.js` (`badgeCategoriaInsumo`, `UNIDADES_POR_GRANDEZA`). Insumo EMBALAGEM é criado só pela página Embalagens (`EmbalagemDAO`); `ControllerInsumo` recusa criar EMBALAGEM e trocar a categoria de/para EMBALAGEM. Entradas e saídas no Estoque funcionam igual.

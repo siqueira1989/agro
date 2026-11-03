@@ -43,11 +43,13 @@ Dê à conversa o nome do módulo (ex.: "Módulo Classificação") para achá-la
 | 18 | Pagamento | `pagamento` | ControllerPagamento | RH (modal nos perfis) |
 | 19 | Ponto Eletrônico | `ponto-eletronico` | ControllerPontoEletronico | RH |
 | 20 | Romaneio | `romaneio` | ControllerRomaneio | Produção |
+| 21 | Embalagem | `embalagem` | ControllerEmbalagem | Configuração |
 | — | Núcleo (login, menu, relatórios, utilitários, build) | `nucleo` | Login, Logout, RelatorioExport | — |
 
 ## Pares que se tocam (coordenar entre conversas)
 
 - **Insumo ↔ Estoque**: mesma tela (`estoque.jsp`) e mesma seção do JS.
+- **Embalagem ↔ Insumo/Estoque ↔ Colheita**: cada embalagem é um insumo EMBALAGEM; o Processar da Colheita dá baixa nele.
 - **Área de Produção ↔ Diário de Campo**: mesma página (`DetalheAreaProducao.jsp`).
 - **CLT ↔ Ponto Eletrônico**: mesmas tabelas de ponto, falta, vale e fechamento.
 - **Pagamento ↔ 4 perfis**: o modal é incluído em CLT, Diarista, Empreita e Produção.
