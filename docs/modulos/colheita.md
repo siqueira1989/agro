@@ -2,20 +2,20 @@
 
 **Objetivo:** lotes de colheita gerados a partir do Diário de Campo, com saldo em estoque, baixa parcial/total (`processar`), encerramento (`finalizar`) e indicadores por status.
 O **Processar** abre um modal que registra a etapa de Processamento: grade de embaladores × embalagens (pagos por caixa), demais funcionários por horas e um diário de Processamento no talhão do lote.
-Desde a onda A do pacote Romaneio (02/11), o módulo também tem o **cadastro de embalagens** (V31), por alimento e área, com o preço pago ao embalador e o preço de compra.
-**Menu:** Produção → Colheita e Estoque (botão "Embalagens" no topo da página).
+O **cadastro de embalagens** saiu daqui em 02/11 e virou o **módulo Embalagem** (`docs/modulos/embalagem.md`, Configuração → Embalagens): cada embalagem é um insumo com estoque. A Colheita **consome** esse módulo: o Processar mostra o saldo de cada embalagem, bloqueia caixas acima do saldo e, ao confirmar, dá baixa no estoque e lança o custo no diário de Processamento.
+**Menu:** Produção → Colheita e Estoque.
 
 ## Escopo
 | Camada | Arquivo |
 |---|---|
-| Controller | `Controller/ControllerColheita.java` — URL `/ControllerColheita` (lotes, processamento e embalagens) |
-| DAO | `Model/Dao/ColheitaDAO.java`, `Model/Dao/EmbalagemDAO.java` |
-| Model | `ColheitaLote.java`, `Embalagem.java` |
-| View | `view/admin/colheitaestoque.jsp` (inclui `#modalProcessar` e `#modalEmbalagens`) |
-| JS | `main.js` → seção `MÓDULO COLHEITA E ESTOQUE` (funções `ce*` da lista, `cp*` do modal Processar, `em*` do cadastro de embalagens) |
+| Controller | `Controller/ControllerColheita.java` — URL `/ControllerColheita` (lotes, processamento; GET das embalagens para a grade) |
+| DAO | `Model/Dao/ColheitaDAO.java` (usa `EmbalagemDAO`, `EstoqueMovimentoDAO` e `DiarioCampoDAO.inserirInsumoBaixado`) |
+| Model | `ColheitaLote.java` (o bean `Embalagem` é do módulo Embalagem) |
+| View | `view/admin/colheitaestoque.jsp` (inclui `#modalProcessar`) |
+| JS | `main.js` → seção `MÓDULO COLHEITA E ESTOQUE` (funções `ce*` da lista, `cp*` do modal Processar) |
 
-**Ações (POST JSON):** `processar` (legado: só quantidade, sem diário; a tela não usa mais), `validarprocessamento`, `processarcomdiario`, `finalizar`, `salvarembalagem`, `ativarembalagem`.
-**GET:** lista (`?status=`), `?indicadores=1`, `?processamentos=<idLote>`, `?caixasembaladas=<idLote>`, `?embalagens=1[&idAlimento=&idArea=&ativo=true|false]`.
+**Ações (POST JSON):** `processar` (legado: só quantidade, sem diário; a tela não usa mais), `validarprocessamento`, `processarcomdiario`, `finalizar`. (`salvarembalagem`/`ativarembalagem` foram para `/ControllerEmbalagem` — `salvar`/`ativar`.)
+**GET:** lista (`?status=`), `?indicadores=1`, `?processamentos=<idLote>`, `?caixasembaladas=<idLote>`, `?embalagens=1[&idAlimento=&idArea=&ativo=true|false]` (com `saldo`, `precoCompra` = preço médio, `idInsumo`).
 
 ## Banco
 - `colheita_lote` (V24 — regime de produção); lê `diario_campo`, `areaproducao`, `quadra`, `alimento`.
@@ -26,27 +26,13 @@ Desde a onda A do pacote Romaneio (02/11), o módulo também tem o **cadastro de
   - `iddespesascusto` só existe nos registros da onda 3 (categoria EMBALAGEM de Despesas). Desde a V31 fica NULL; o Processar não usa mais Despesas.
 - **V31** (`V31__embalagem.sql`): ver o contrato abaixo. Acrescenta `colheita_processamento_embalagem.idembalagem` (FK, NULL nos registros antigos). Não houve migração de dados (não havia EMBALAGEM em `despesascusto`).
 
-### Contrato V31 — tabela `embalagem` (lida pelo Romaneio)
-| Coluna | Regra |
-|---|---|
-| `idembalagem` | SERIAL PK |
-| `codigo` | `[A-Z0-9_]{1,30}`, gerado da descrição por `DespesasCustosDAO.normalizarTipoCaixa` quando vazio ("Papelão 7kg" → `PAPELAO_7KG`) |
-| `descricao` | obrigatória, até 80 caracteres (rótulo exibido) |
-| `peso_kg` | NUMERIC(8,3) > 0, obrigatório |
-| `id_alimento` → `alimento(idproduto)`, `id_area_producao` → `areaproducao(idareaproducao)` | obrigatórios |
-| `preco_compra` | > 0. Custo da embalagem para a empresa (**Romaneio**) |
-| `preco_embalador` | > 0. Valor pago por caixa ao embalador (**Processar** → diário PRODUCAO) |
-| `ativo` | sem exclusão; desativar tira a embalagem da grade do Processar |
-| `criado_em`, `atualizado_em` | |
-- UNIQUE `uk_embalagem (codigo, id_alimento, id_area_producao)`.
-- DAO `EmbalagemDAO`: `listar([Connection,] idAlimento?, idArea?, ativo?)`, `buscar(Connection, id)`, `salvar([Connection,] Embalagem)` (insere ou atualiza e devolve o registro), `definirAtivo(id, ativo)`. Regras ⇒ `IllegalArgumentException` com mensagem para o usuário.
-- JSON (Gson, bean `Embalagem`): `{idEmbalagem, codigo, descricao, pesoKg, idAlimento, nomeAlimento, idArea, nomeArea, siglaArea, precoCompra, precoEmbalador, ativo}`.
-- `POST acao=salvarembalagem {idEmbalagem? (0/ausente = novo), codigo?, descricao, pesoKg, idAlimento, idArea, precoCompra, precoEmbalador, ativo?, target?}` → `{ok, msg, target, embalagem}`. Erros: HTTP 400 `{ok:false, msg}` (ex.: "Já existe a embalagem PAPELAO_7KG para este alimento e área.").
-- `POST acao=ativarembalagem {idEmbalagem, ativo}` → `{ok, msg}`.
+### Tabela `embalagem` — contrato no módulo Embalagem
+O contrato da tabela (V31 + V34: `id_insumo`, `preco_compra` obsoleto) e do bean `Embalagem` está em `docs/modulos/embalagem.md`.
+JSON (Gson, bean `Embalagem`): `{idEmbalagem, codigo, descricao, pesoKg, idAlimento, nomeAlimento, idArea, nomeArea, siglaArea, precoEmbalador, ativo, idInsumo, precoCompra (= preço médio do insumo), saldo, estoqueMinimo, idFornecedor, fornecedorNome, abaixoMinimo}`.
 
 ### Caixas embaladas por lote e por tipo (para o Romaneio)
 - `GET /ControllerColheita?caixasembaladas=<idLote>` (`ColheitaDAO.caixasEmbaladas`) devolve as caixas somadas de todos os processamentos do lote, agrupadas por embalagem:
-  `[{idEmbalagem, codigo, descricao, pesoKg, precoCompra, caixas, valorEmbalador}]`, ordenado por peso. Registros anteriores à V31 saem agrupados pelo código, com `idEmbalagem`/`pesoKg`/`precoCompra` nulos.
+  `[{idEmbalagem, codigo, descricao, pesoKg, precoCompra, caixas, valorEmbalador}]`, ordenado por peso. Registros anteriores à V31 saem agrupados pelo código, com `idEmbalagem`/`pesoKg`/`precoCompra` nulos. Desde a V34 `precoCompra` é o preço médio **atual** do insumo da embalagem (informativo; o custo real foi lançado no diário de Processamento).
 - SQL equivalente: `SUM(pe.quantidade_caixas)` de `colheita_processamento p JOIN colheita_processamento_embalagem pe ON pe.idprocessamento=p.idprocessamento LEFT JOIN embalagem e ON e.idembalagem=pe.idembalagem WHERE p.idlote=?`, agrupado por `pe.idembalagem`.
 - Total de caixas embaladas de **um** processamento: `colheita_processamento.total_caixas` (= soma da grade). Por processamento e tipo: `colheita_processamento_embalagem` filtrado por `idprocessamento`.
 - Atenção: os processamentos contam mesmo que alguém cancele depois o diário de Processamento no Diário de Campo (a baixa do lote também não é desfeita). Ver Pendências.
@@ -56,13 +42,14 @@ Desde a onda A do pacote Romaneio (02/11), o módulo também tem o **cadastro de
    Embaladores = `tipo PRODUCAO` + `cargo` Embalador. Outros = CLT/DIARISTA/EMPREITA.
 2. **Grade de embaladores:** cada linha é um embalador (sem repetir) e cada coluna é uma embalagem ativa do alimento e da área do lote, com descrição, peso e preço do embalador. A célula recebe o nº de caixas.
    - Os totais são calculados ao vivo: por linha (caixas e R$), por coluna (rodapé "Total por embalagem") e geral.
-   - **+ Embalador** acrescenta uma linha. **+ Embalagem** abre um painel para incluir uma embalagem cadastrada que esteja fora da grade, ou para cadastrar uma nova ali mesmo (descrição, peso, preço de compra, preço do embalador). O cadastro novo usa `salvarembalagem` e a coluna entra na grade sem perder o que já foi digitado.
+   - **+ Embalador** acrescenta uma linha. **+ Embalagem** só inclui uma embalagem já cadastrada que esteja fora da grade; para cadastrar ou comprar, o painel mostra o link para a página Embalagens.
    - O preço não é editável na grade: muda-se no cadastro.
+   - Cada coluna mostra o **estoque** da embalagem (verde/vermelho); o rodapé fica vermelho com "faltam N cx no estoque" quando a soma da coluna passa do saldo, e o Confirmar recusa antes de chamar o servidor.
 3. **Outros funcionários (horas):** colunas Funcionário | Tipo | Regime | Preço | Caixas | Horas | Valor. O valor usa `dcValorFuncionario` (a mesma prévia do Diário). O responsável do diário é escolhido entre os funcionários lançados.
 4. **Confirmar**:
-   1. `POST {acao:"validarprocessamento", idlote, data, quantidade, embalagens[{idPessoa, idEmbalagem, caixas, preco}]}` só confere, sem gravar: lote aberto, data ≥ colheita, quantidade ≤ saldo, **safra** do talhão na data, e em cada célula embalagem ativa, do alimento e da área do lote, sem par embalador×embalagem repetido e com `preco` igual ao `preco_embalador` atual. Se o preço mudou com o modal aberto, recusa com "O preço do embalador da embalagem X mudou para R$ Y. Feche e abra o modal de novo.".
+   1. `POST {acao:"validarprocessamento", idlote, data, quantidade, embalagens[{idPessoa, idEmbalagem, caixas, preco}]}` só confere, sem gravar: lote aberto, data ≥ colheita, quantidade ≤ saldo, **safra** do talhão na data, e em cada célula embalagem ativa, do alimento e da área do lote, sem par embalador×embalagem repetido e com `preco` igual ao `preco_embalador` atual. Se o preço mudou com o modal aberto, recusa com "O preço do embalador da embalagem X mudou para R$ Y. Feche e abra o modal de novo.". **V34:** a embalagem precisa ter insumo (`id_insumo`) e a soma das caixas de cada embalagem ≤ saldo; senão "Estoque insuficiente da embalagem X: disponível A cx, necessário B cx (faltam C cx). Registre a compra (Entrada) na página Embalagens antes de processar." — nada é criado.
    2. `POST /ControllerDiarioCampo {acao:"create", … idTipoAtividade:<Processamento>, status:"EM_ANDAMENTO", funcionarios:[...]}`: **uma linha PRODUCAO por célula preenchida** (`quantidadeCaixas`, `precoPorCaixa` = preço do embalador, `funcaoExercida` "Embalador — <descrição>") e as linhas REGIME_SISTEMA por horas. Um erro aqui aparece no modal como "O Diário de Campo recusou o lançamento: …".
-   3. `POST {acao:"processarcomdiario", idlote, iddiario, data, quantidade, embalagens[...]}` faz **uma transação** com: `SELECT … FOR UPDATE` do lote, a mesma validação, a verificação do diário (existe, é Processamento, é do talhão do lote e ainda não tem lote), a baixa do lote e os INSERTs de `colheita_processamento` (`total_caixas` = soma da grade, `valor_embalagem` = soma caixas × preço do embalador) e de `colheita_processamento_embalagem` (idembalagem, `tipo_caixa` = código, caixas, preço do embalador). A resposta é `{ok, msg, idprocessamento}`.
+   3. `POST {acao:"processarcomdiario", idlote, iddiario, data, quantidade, embalagens[...]}` faz **uma transação** com: `SELECT … FOR UPDATE` do lote, a mesma validação, a verificação do diário (existe, é Processamento, é do talhão do lote e ainda não tem lote), a baixa do lote e os INSERTs de `colheita_processamento` (`total_caixas` = soma da grade, `valor_embalagem` = soma caixas × preço do embalador) e de `colheita_processamento_embalagem` (idembalagem, `tipo_caixa` = código, caixas, preço do embalador). **V34, na mesma transação:** para cada embalagem, SAÍDA do estoque do insumo (`EstoqueMovimentoDAO.registrarSaida(Connection…)`, obs. "Processamento do lote <nº>"; saldo insuficiente ⇒ a mesma mensagem do faltante e rollback) e `DiarioCampoDAO.inserirInsumoBaixado` no diário de Processamento (quantidade = caixas, `custo_unitario` = preço médio no momento, `baixado=true`), que entra em `custo_insumos`/`custo_total` e, quando o diário for finalizado, no custo da Safra. A resposta é `{ok, msg, idprocessamento}`.
    4. Se o passo 3 falhar, o JS manda `POST /ControllerDiarioCampo {acao:"status", iddiario, status:"CANCELADA"}` (o Diário não tem exclusão) e avisa no modal.
 - A transação do passo 3 é manual (commit/rollback com `catch (SQLException | RuntimeException)`), porque o `TransacaoUtil` só faz rollback de `SQLException`.
 
@@ -70,11 +57,11 @@ Desde a onda A do pacote Romaneio (02/11), o módulo também tem o **cadastro de
 - **Diário de Campo**: a atividade "Colheita" alimenta os lotes (`DiarioCampoDAO` também lê `colheita_lote`).
   O modal Processar **consome** do Diário: `GET ?tiposatividade=1`, `GET ?funcionarios=1&data=`, `POST acao=create` (Processamento), `POST acao=status` (CANCELADA, como compensação) e a função JS `dcValorFuncionario`. Se o Diário mudar algum desses formatos, o modal quebra.
 - **Perfil Produção** (lê `colheita_processamento_embalagem`): mostra o tipo de embalagem por linha do diário, casando preço + caixas da linha com o detalhe. Conferido com a grade em 02/11: cada célula vira uma linha do perfil com o tipo certo. Rótulo hoje vem do código formatado ("Caixa Papelão 7kg"), porque o perfil procura o nome em Despesas (`iddespesascusto`, NULL desde a V31). Renomear/remover `tipo_caixa`, `quantidade_caixas`, `preco_caixa`, `idpessoa` quebra o perfil.
-- **Romaneio** (onda B): lê a tabela `embalagem` (`preco_compra`, `peso_kg`) e as caixas embaladas por lote (`GET /ControllerColheita?caixasembaladas=<idLote>`, contrato acima).
+- **Embalagem** (módulo 21): a Colheita consome o cadastro e o estoque (`EmbalagemDAO.buscar/listar`, `saldo`, `idInsumo`) e faz a SAÍDA de estoque no Processar (`EstoqueMovimentoDAO`). Lança a linha de insumo no diário pelo `DiarioCampoDAO.inserirInsumoBaixado(Connection…)`.
+- **Romaneio** (onda B): lê a tabela `embalagem` (`peso_kg`, código, descrição) e as caixas embaladas por lote (`GET /ControllerColheita?caixasembaladas=<idLote>`, contrato acima).
   A Colheita **depende** do Romaneio no fluxo "Finalizar → Romaneio" (onda C): depois de finalizar um lote com caixas embaladas > 0, pergunta "Lote finalizado. Seguir para o cadastro do romaneio?" e redireciona para `view/admin/cadastroRomaneio.jsp?lote=<idLote>` (URL é contrato fixo; se o Romaneio mudar a URL ou o parâmetro `lote`, o botão quebra).
-- **Despesas e Custos**: o Processar não usa mais a categoria EMBALAGEM (V28). Usa só `DespesasCustosDAO.normalizarTipoCaixa` (static) para gerar o código da embalagem.
-- **Safra**: `SafraDAO.resolverSafra` (só leitura) na validação.
-- **Área de Produção** (`GET /ControllerAreaProducao`), **Alimento** (`GET /ControllerAlimento`): selects do cadastro de embalagens.
+- **Despesas e Custos**: o Processar não usa mais a categoria EMBALAGEM (V28) nem o `normalizarTipoCaixa` (o código da embalagem é do `EmbalagemDAO.normalizarCodigo` desde 02/11).
+- **Safra**: `SafraDAO.resolverSafra` (só leitura) na validação. O custo da embalagem entra na Safra quando o diário de Processamento é finalizado (a Safra soma só diários CONCLUIDA).
 - A lista de lotes (GET) tem `idArea` e `areaNome` (desde a onda 3).
 
 ## Pendências
@@ -82,7 +69,7 @@ Desde a onda A do pacote Romaneio (02/11), o módulo também tem o **cadastro de
 - [ ] **Perfil Produção** (levar à conversa do módulo): (1) mostrar `embalagem.descricao` (LEFT JOIN por `idembalagem`) em vez do código formatado; (2) com a grade, um embalador pode ter duas embalagens com o mesmo preço e o mesmo nº de caixas no mesmo diário, e aí o perfil mostra "—" (ambíguo), porque `diario_funcionario` não guarda a embalagem. Uma solução seria o Diário guardar `idembalagem` na linha, o que é mudança no Diário.
 - [ ] **Atomicidade total** (baixa + diário numa única transação de banco) depende do Diário. Hoje são duas transações com compensação. Para ter uma só, o Diário precisaria expor `inserirCompleto(Connection c, DiarioCampo d)` e as validações do `handleSalvar`/`validarRegimeCaixa` num método reutilizável.
 - [ ] Cancelar depois, no Diário, um diário de Processamento já ligado a um lote não desfaz a baixa nem as caixas embaladas (o Romaneio vai contar essas caixas). Definir a regra (bloquear o cancelamento no Diário ou estornar na Colheita).
-- [ ] Mensagem de preço alterado mostra o valor com ponto ("R$ 0.95"). Trocar para vírgula no próximo build (`ColheitaDAO.validar`).
+- [ ] Cancelar o diário de Processamento também não estorna o estoque das embalagens (V34). Mesma regra a definir acima.
 - [ ] Cards de indicadores: "Em Estoque/Processado/Finalizado" somam `quantidade_total` **por status do lote**, e não o saldo nem o processado. Comportamento anterior à onda 3; ajustar se o usuário quiser.
 - [ ] Ação legada `processar` (sem diário) continua no Controller por compatibilidade. Remover quando ninguém mais a usar.
 - [ ] Os dados de teste da onda 3 (pessoa 68, diários 93/94/95, preços em Despesas) foram apagados na limpeza do banco de 25/10 (informado pelo Gerente).
