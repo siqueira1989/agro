@@ -6996,8 +6996,8 @@ function cpRenderGrade(estado) {
     cpColunas.forEach(function (e) {
         h += '<th class="text-center" style="min-width:110px">' + ceEsc(e.descricao) +
             '<div class="fw-normal text-muted">' + cpPesoTxt(e.pesoKg) + ' · ' + ceMoeda(e.precoEmbalador) + '/cx</div>' +
-            '<div class="fw-normal small ' + (Number(e.saldo || 0) > 0 ? 'text-success' : 'text-danger') + '">Estoque: ' +
-            Number(e.saldo || 0).toLocaleString('pt-BR') + ' cx</div></th>';
+            '<span class="badge fw-normal ' + (Number(e.saldo || 0) > 0 ? 'bg-light text-success' : 'bg-danger') + '">Estoque: ' +
+            Number(e.saldo || 0).toLocaleString('pt-BR') + ' cx</span></th>';
     });
     h += '<th class="text-end" style="min-width:70px">Caixas</th><th class="text-end" style="min-width:100px">Valor</th><th style="width:32px"></th></tr>';
     $('#cpGradeHead').html(cpColunas.length ? h : '');
