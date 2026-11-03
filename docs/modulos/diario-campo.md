@@ -22,6 +22,7 @@
 ## Dependências (módulo mais acoplado do sistema)
 - **Safra** (`SafraDAO`), **Insumo/Estoque** (baixa de estoque, `EstoqueInsuficienteException`), **Maquinário** (custo/hora), **Despesas e Custos**, **Funcionário/CLT/Diarista/Empreita** (valor da diária/hora via `FolhaCalculoRuralService` e `ParametrosFolhaService`), **Colheita** (atividade "Colheita" gera lote).
 - `DetalheAreaProducao.jsp` é dividida com **Área de Produção**.
+- **Colheita/Embalagem** (V34): o Processar da Colheita chama `inserirInsumoBaixado(Connection…)` na transação dela (linha de embalagem já baixada). `recalcularCustos` mantém o `custo_unitario` das linhas `baixado=true` — mudar isso altera o custo de embalagem dos diários de Processamento e o custo de insumos de diários fechados.
 
 ## Processamento — como a Colheita cria o diário (onda 3)
 Tipo de atividade "Processamento" (V29). Atividades com regime por caixa = Colheita e Processamento
@@ -74,4 +75,6 @@ Tipo de atividade "Processamento" (V29). Atividades com regime por caixa = Colhe
   - **Finalizar:** a linha tem `baixado=true`, então o `finalizar` não baixa de novo (só recalcula o custo).
   - **Editar (`atualizarCompleto`):** linhas baixadas são preservadas (regra P1-7).
   - **Cancelar:** muda só o status; o estoque das embalagens não é estornado (igual às demais baixas). A Safra soma só diários CONCLUIDA, então um diário cancelado não entra no custo da Safra.
-  - **Atenção:** `recalcularCustos` reprecifica também linhas `baixado=true` pelo preço médio corrente; se houver compra de embalagem entre o Processar e o Finalizar, o custo da linha muda. Ver Pendências do módulo Embalagem.
+- 2026-11-02 — **`recalcularCustos`: linha já baixada mantém o custo da baixa** (aprovado pelo Gerente, decisão do usuário: o custo é o do momento da baixa, pelo preço médio de quando o insumo foi usado). Linhas `baixado=true` usam o `custo_unitario` gravado e só recalculam `custo = quantidade × custo_unitario`; linhas não baixadas continuam reprecificadas pelo preço médio corrente (inclusive no `finalizar`, que recalcula antes de baixar). `carregarInsBrutos` passou a ler também `custo_unitario`.
+  - Motivo: o diário de Processamento nasce EM_ANDAMENTO com a linha da embalagem já baixada; sem isso, uma compra entre o Processar e o Finalizar mudaria o custo dela.
+  - Efeito colateral (correção): `removerFuncionario`/`removerDespesa` e outros recálculos num diário CONCLUIDA reprecificavam os insumos já baixados pelo preço médio do dia; agora o custo de insumos de diário fechado não muda mais.

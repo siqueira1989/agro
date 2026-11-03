@@ -44,10 +44,10 @@ Insumo ligado: `categoria='EMBALAGEM'`, `grandeza='UNIDADE'`, `unidade='CX'`, `n
 - `Model/Model/CategoriaInsumo` (EMBALAGEM), `UnidadeMedida` (CX), `EstoqueMovimentoDAO`, `ControllerEstoque`, `ControllerInsumo?acao=fornecedores` (fornecedores tipo Insumo), `ControllerAlimento`, `ControllerAreaProducao`.
 
 ## Pendências
-- [ ] Custo no diário de Processamento x preço médio: o `DiarioCampoDAO.recalcularCustos` reprecifica todas as linhas de insumo pelo preço médio corrente, inclusive as `baixado=true`. Se houver compra nova entre o Processar e o Finalizar do diário, o custo da embalagem no diário muda (a baixa foi a outro preço). Proposta enviada ao Gerente: congelar `custo_unitario` das linhas baixadas (mudança no Diário).
 - [ ] Cancelar o diário de Processamento não estorna o estoque das embalagens (nem a baixa do lote). Mesma regra das demais baixas; definir estorno explícito se o usuário quiser.
 - [ ] Remover a coluna `embalagem.preco_compra` quando confirmado que ninguém mais a lê.
 
 ## Histórico
 - 2026-11-02 — **Criação do módulo** (decisões do usuário de 02/11: embalagem é insumo com estoque; custo = preço médio ponderado; custo de produção no Processamento; baixa ao confirmar o Processar; sem saldo, o Processar é bloqueado). V34 (`id_insumo`, `preco_compra` obsoleto), `ControllerEmbalagem`, `embalagem.jsp`, item no menu Configuração. O cadastro saiu da página Colheita e Estoque (botão e modal removidos; o "+ Embalagem" do Processar só inclui embalagem já cadastrada e mostra o link para esta página).
+  - Custo congelado: `DiarioCampoDAO.recalcularCustos` (aprovado pelo Gerente) mantém o `custo_unitario` das linhas `baixado=true`; uma compra entre o Processar e o Finalizar do diário não muda o custo da embalagem já usada.
   - Correção do erro reportado ("Tipo de caixa inválido" com "6,5"/"6.5"): normalização própria (`normalizarCodigo`), mensagem "Código da embalagem…", validação dos campos antes do código. A normalização da Despesas (`normalizarTipoCaixa`) não mudou. O campo "preço de compra" deixou de existir no cadastro (vem das entradas).

@@ -519,10 +519,13 @@ public class DiarioCampoDAO {
             custoMaq = custoMaq.add(custo);
         }
 
-        // Insumos (custo pelo preço médio corrente; baixa é no finalizar)
+        // Insumos (custo pelo preço médio corrente; baixa é no finalizar). Linha JÁ BAIXADA mantém o
+        // custo_unitario gravado no momento da baixa (decisão do usuário, 02/11): uma compra posterior
+        // muda o preço médio do insumo, mas não o custo do que já saiu do estoque.
         for (Object[] i : carregarInsBrutos(c, idDiario)) {
             int id = (int) i[0]; int idInsumo = (int) i[1]; BigDecimal qtd = (BigDecimal) i[2];
-            BigDecimal precoMedio = precoInsumo(c, idInsumo);
+            boolean baixado = (boolean) i[3];
+            BigDecimal precoMedio = baixado ? nz((BigDecimal) i[4]) : precoInsumo(c, idInsumo);
             BigDecimal custo = nz(qtd).multiply(precoMedio).setScale(2, RoundingMode.HALF_UP);
             try (PreparedStatement st = c.prepareStatement("UPDATE diario_insumo SET custo_unitario=?, custo=? WHERE id=?")) {
                 st.setBigDecimal(1, precoMedio); st.setBigDecimal(2, custo); st.setInt(3, id); st.executeUpdate();
@@ -1327,9 +1330,9 @@ public class DiarioCampoDAO {
     }
     private List<Object[]> carregarInsBrutos(Connection c, int idDiario) throws SQLException {
         List<Object[]> l = new ArrayList<>();
-        try (PreparedStatement st = c.prepareStatement("SELECT id, id_insumo, quantidade, baixado FROM diario_insumo WHERE iddiario=?")) {
+        try (PreparedStatement st = c.prepareStatement("SELECT id, id_insumo, quantidade, baixado, custo_unitario FROM diario_insumo WHERE iddiario=?")) {
             st.setInt(1, idDiario); ResultSet rs = st.executeQuery();
-            while (rs.next()) l.add(new Object[]{ rs.getInt(1), rs.getInt(2), rs.getBigDecimal(3), rs.getBoolean(4) });
+            while (rs.next()) l.add(new Object[]{ rs.getInt(1), rs.getInt(2), rs.getBigDecimal(3), rs.getBoolean(4), rs.getBigDecimal(5) });
         }
         return l;
     }
