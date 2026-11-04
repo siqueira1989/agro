@@ -22,6 +22,10 @@
 ## Dependências (módulo mais acoplado do sistema)
 - **Safra** (`SafraDAO`), **Insumo/Estoque** (baixa de estoque, `EstoqueInsuficienteException`), **Maquinário** (custo/hora), **Despesas e Custos**, **Funcionário/CLT/Diarista/Empreita** (valor da diária/hora via `FolhaCalculoRuralService` e `ParametrosFolhaService`), **Colheita** (atividade "Colheita" gera lote).
 - `DetalheAreaProducao.jsp` é dividida com **Área de Produção**.
+- **Ponto Eletrônico / CLT / Diarista** (04/11, **só leitura**): `ponto_eletronico` (presença = linha na data com
+  `folga_compensatoria=false`; diarista marca sem horários) e `falta_funcionario` (qualquer falta no dia exclui).
+  Usadas em `listarFuncionariosDisponiveis` (com data) e `semPresencaNoPonto` (`SQL_PRESENCA_PONTO`). Mudar o jeito
+  de gravar presença/falta nesses módulos muda quem pode ser lançado no Diário.
 - **Colheita/Embalagem** (V34): o Processar da Colheita chama `inserirInsumoBaixado(Connection…)` na transação dela (linha de embalagem já baixada). `recalcularCustos` mantém o `custo_unitario` das linhas `baixado=true` — mudar isso altera o custo de embalagem dos diários de Processamento e o custo de insumos de diários fechados.
 
 ## Processamento — como a Colheita cria o diário (onda 3)
@@ -44,10 +48,34 @@ Tipo de atividade "Processamento" (V29). Atividades com regime por caixa = Colhe
 - [ ] Relatórios/Safra não mostram ainda a dose por planta (`quantidade_por_planta_kg`); se quiserem, levar ao módulo do relatório.
 - [ ] Levar a Produção/Folha: funcionário de Produção lançado no Diário em regime PRODUCAO tem custo (valor_regime) no
   diário; conferir se o pagamento dele também sai por `lancamento_producao` (risco de pagar duas vezes a mesma caixa).
-- [ ] Não há funcionário de Produção cadastrado no banco hoje: o filtro Colhedor/Embalador foi testado só na tela
-  (opções simuladas) e pela validação do servidor; testar de novo com um cadastro real.
+- [ ] Duplicata antiga (04/11, não alterada): diário 2026-000079 (Adubação, CONCLUIDA) tem carla costa duas vezes em
+  12/10/2026 (duas linhas em regime normal). É a única no banco.
+- [ ] Sugestão à Colheita (Processar): conferir no cliente a mesma pessoa repetida entre as linhas "por horas" (hoje
+  só a grade de embaladores confere); o servidor já recusa e a Colheita mostra "O Diário de Campo recusou…".
 
 ## Histórico
+- 2026-11-04 — **Ajustes de 04/11** (Ajuste04_11_2026.docx):
+  1. **Mesma pessoa uma vez por dia na atividade.** Servidor: `ControllerDiarioCampo#validarMaoDeObra` no `create` e no
+     `addexecucao` (junta as novas com as já gravadas na data via `DiarioCampoDAO.funcionariosNaData`) → 400. Única
+     exceção: várias linhas PRODUCAO da mesma pessoa com `funcao_exercida` diferentes (a grade do Processar grava uma
+     linha por embalagem: "Embalador — <embalagem>"). Produção + Sistema da mesma pessoa (caso do print) é recusado.
+     O `update` não valida: `atualizarCompleto` não grava `diario_funcionario` (mão de obra nova só entra por
+     `addexecucao`) e as linhas históricas reenviadas têm datas misturadas. Tela: quem já está numa linha some das
+     outras (`dcPessoasUsadas` em `dcFiltrarFuncsAtividade`); no bloco de nova execução, também quem já foi lançado
+     naquela data (`tr[data-exec]`); duplicata forçada mostra aviso (`dcAvisoDuplicados`) antes de enviar.
+  2. **Presença pelo Ponto (só CLT e diarista).** `GET ?funcionarios=1&data=` só traz CLT/diarista com ponto na data e
+     sem falta no dia; Empreita/Produção como antes; sem `data` não filtra (agendamento usa `dcOptFuncSemData`).
+     Servidor recusa no `create` (exceto PLANEJADA) e no `addexecucao`: "Fulano não tem presença registrada no ponto
+     em dd/mm/aaaa…" (`DiarioCampoDAO.semPresencaNoPonto`). A nova execução carrega a lista pela data dela
+     (`dcRecarregarFuncsExec`, ao abrir e ao mudar `#exData`). Dica fixa sob as duas tabelas. Linhas antigas não mudam.
+     O Processar da Colheita usa o mesmo GET/POST, então segue a regra (inclusive o select de responsável dele).
+  3. **Pergunta ao concluir Colheita** (`dcPerguntarIrColheita`, modal criado no JS): ao salvar Colheita como Concluído
+     e ao Finalizar uma Colheita pelo detalhe. Sim → `colheitaestoque.jsp`; Não → fica com a lista atualizada. Não
+     aparece no fluxo `abrirColheita=1` (que já volta sozinho).
+  4. **`abrirColheita=1` só Colheita:** `dcTravarTipoColheita` seleciona e desabilita o tipo e esconde o "+" (também
+     no agendamento); editar destrava. Payload `origem:"colheita"` → o servidor recusa outro tipo (400).
+  Verificado no Chrome com pontos/falta de teste (04/11: carla CLT e clara diarista; 03/11: carla com falta; 05/11 sem
+  ponto) e diários de teste 120/121 + lotes 21/22 — tudo apagado no fim.
 - 2026-08-25 — execução em múltiplos dias, valor de diarista/empreita automático.
 - 2026-09-07 — despesas fixas/variáveis no diário.
 - 2026-10-22 — Adubo por forma de aplicação (V27): a linha de Adubo tem "Forma / Quantidade" (Saco 5/10/25/50 kg, Tonelada ou kg, pré-selecionada pelo cadastro do insumo), "Plantas" (padrão: plantas do talhão, segue o talhão até ser editado) e "Dose por planta". O servidor (`DiarioCampoDAO.inserirInsumo`, `totalKgAdubo`, `kgParaUnidade`) calcula o total em kg, converte para a unidade do insumo (`quantidade_direta`/`quantidade`, debitada do estoque) e grava `quantidade_por_planta_kg`. Novas colunas em `diario_insumo`: `forma_aplicacao`, `peso_saco_kg`, `qtd_informada`, `plantas_aplicadas`, `quantidade_por_planta_kg`. O Controller valida o saco (só 5/10/25/50), a qtd > 0 e as plantas > 0. Lançamentos antigos reabrem como t/kg. Adubo que não é de massa (ex.: L) segue com a quantidade direta.
