@@ -4319,10 +4319,10 @@ $(document).ready(function () {
         dcVeioDaColheita = true;   // ao salvar, volta para a página Colheita (dcSalvar)
         // Espera também safra e tipos: sem isso, se /ControllerSafra ainda não voltou, dcTemSafra
         // fica false e aparecia o pré-requisito "obrigatório ter uma Safra" mesmo com safra válida.
+        // dcAbrirNovoInterno seleciona e TRAVA o tipo em Colheita (dcTravarTipoColheita) — por esta
+        // página só se lança Colheita; o servidor também recusa outro tipo (origem: "colheita").
         $.when(dcFuncPromise, dcTalhaoPromise, dcDespPromise, dcSafraPromise, dcTiposPromise).always(function () {
             dcAbrirNovoInterno();
-            var tipoColheita = dcCacheTipos.filter(function (t) { return t.nome.toLowerCase().indexOf('colh') > -1; })[0];
-            if (tipoColheita) $('#dcTipo').val(String(tipoColheita.idTipo)).trigger('change');
         });
     }
 });
@@ -4335,6 +4335,8 @@ var dcOptTalhao = '', dcOptTipo = '', dcOptFunc = '', dcOptDesp = '';
 var dcSafraResolvida = false, dcTemSafra = false;
 var dcFuncPromise = null, dcTalhaoPromise = null, dcDespPromise = null, dcSafraPromise = null, dcTiposPromise = null;
 var dcVeioDaColheita = false;   // aberto pela página Colheita (?abrirColheita=1)
+var dcOptFuncSemData = '';      // funcionários sem filtro de data/ponto (responsável do agendamento)
+var dcOptFuncExec = '';         // funcionários com presença na data da "Registrar Nova Execução" (#exData)
 var dcPrecoCaixaRef = 0, dcPrecoCaixaChave = '';   // preço da caixa (Despesas/Custos) do alimento+área atuais
 
 function dcMoney(v) { return 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
@@ -4399,15 +4401,17 @@ function dcRecarregarFuncsPorData() {
     var url = AGRO_CTX + '/ControllerDiarioCampo?funcionarios=1' + (data ? '&data=' + data : '');
     $.getJSON(url, function (fs) {
         dcCacheFunc = fs; dcOptFunc = dcMontarOptFunc(fs);
-        // Reaplica nas linhas existentes. Preserva a pessoa já escolhida mesmo que ela não esteja
-        // na lista filtrada da data (ex.: edição), acrescentando a opção original de volta.
+        // Reaplica nas linhas existentes. Somente leitura (edição): preserva a pessoa já gravada mesmo
+        // fora da lista da data. Linha nova: quem saiu da lista (sem presença no ponto na nova data)
+        // é desmarcado — o servidor recusaria.
         $('#dcFuncBody tr').each(function () {
-            var $sel = $(this).find('.dc-fpessoa'); var v = $sel.val();
+            var $sel = $(this).find('.dc-fpessoa'); var v = $sel.find('option:selected').attr('value');
             var optAntigo = v ? $sel.find('option[value="' + v + '"]').prop('outerHTML') : '';
             $sel.html(dcOptFunc);
             if (v) {
-                if (!$sel.find('option[value="' + v + '"]').length && optAntigo) $sel.append(optAntigo);
+                if (!$sel.find('option[value="' + v + '"]').length && optAntigo && !dcFuncEditavel) $sel.append(optAntigo);
                 $sel.val(v);
+                if (!$sel.val()) { $sel.val(''); $(this).find('.dc-ftipo').val(''); }
             }
         });
         dcFiltrarFuncsAtividade();
@@ -4468,15 +4472,36 @@ function dcMontarOptFunc(fs) {
 }
 
 /**
+ * Pessoas já escolhidas em OUTRAS linhas do mesmo bloco — no bloco de nova execução, também as
+ * já gravadas no diário na data da execução (linhas históricas com data-exec = #exData).
+ */
+function dcPessoasUsadas($sel) {
+    var ehEx = $sel.hasClass('ex-fpessoa'), usados = {};
+    (ehEx ? $('#exFuncBody .ex-fpessoa') : $('#dcFuncBody .dc-fpessoa')).not($sel).each(function () {
+        var v = $(this).find('option:selected').attr('value'); if (v) usados[v] = true;
+    });
+    if (ehEx) {
+        $('#dcFuncBody tr[data-exec="' + ($('#exData').val() || '') + '"] .dc-fpessoa').each(function () {
+            var v = $(this).find('option:selected').attr('value'); if (v) usados[v] = true;
+        });
+    }
+    return usados;
+}
+
+/**
  * Esconde, nos selects editáveis de funcionário, quem não pode ser lançado na atividade atual
- * (dcFuncApto) e limpa a linha que tinha escolhido alguém que deixou de ser apto.
+ * (dcFuncApto) e quem já está em outra linha (04/11: a mesma pessoa uma vez por dia na atividade),
+ * e limpa a linha que tinha escolhido alguém que deixou de ser apto. Uma duplicata que já está
+ * escolhida não é apagada: dcSalvar/dcSalvarExecucao avisam (dcAvisoDuplicados).
  */
 function dcFiltrarFuncsAtividade() {
     $('#dcFuncBody .dc-fpessoa:not([disabled]), #exFuncBody .ex-fpessoa').each(function () {
-        var $sel = $(this);
+        var $sel = $(this), usados = dcPessoasUsadas($sel), atual = $sel.find('option:selected').attr('value');
         $sel.find('option[value!=""]').each(function () {
+            var v = $(this).attr('value');
             var apto = dcFuncApto($(this).attr('data-tipo'), $(this).attr('data-cargo'));
-            $(this).prop('hidden', !apto).prop('disabled', !apto);
+            var bloqueado = !apto || (usados[v] && v !== atual);
+            $(this).prop('hidden', bloqueado).prop('disabled', bloqueado);
         });
         // .val() devolve null quando a opção selecionada está desabilitada — checa pela própria opção.
         var $opt = $sel.find('option:selected');
@@ -4485,6 +4510,69 @@ function dcFiltrarFuncsAtividade() {
             $sel.closest('tr').find('.dc-ftipo,.ex-ftipo').val('');
         }
     });
+}
+
+/**
+ * Nomes das pessoas repetidas entre os selects dados (e, se informado, as já gravadas no dia);
+ * vazio se não houver duplicata. Mesma regra do servidor (ControllerDiarioCampo#validarMaoDeObra).
+ */
+function dcAvisoDuplicados($sels, $jaGravados) {
+    var cont = {}, nomes = {};
+    $sels.add($jaGravados || $()).each(function () {
+        var $o = $(this).find('option:selected'), v = $o.attr('value'); if (!v) return;
+        cont[v] = (cont[v] || 0) + 1; nomes[v] = $o.text().replace(/\s*\(.*\)\s*$/, '');
+    });
+    var dup = Object.keys(cont).filter(function (k) { return cont[k] > 1; }).map(function (k) { return nomes[k]; });
+    return dup.length ? dup.join(', ') + (dup.length === 1 ? ' aparece' : ' aparecem') +
+        ' mais de uma vez nesta atividade no mesmo dia. Cada funcionário só pode ser lançado uma vez por dia — remova a linha repetida.' : '';
+}
+
+/** Funcionários com presença na data da nova execução (#exData) — a lista depende do ponto daquele dia. */
+function dcRecarregarFuncsExec() {
+    var data = $('#exData').val();
+    if (!data) return;
+    $.getJSON(AGRO_CTX + '/ControllerDiarioCampo?funcionarios=1&data=' + data, function (fs) {
+        dcOptFuncExec = dcMontarOptFunc(fs);
+        $('#exFuncBody .ex-fpessoa').each(function () {
+            var v = $(this).find('option:selected').attr('value');
+            $(this).html(dcOptFuncExec);
+            if (v) $(this).val(v);
+            if (!$(this).val()) { $(this).val(''); $(this).closest('tr').find('.ex-ftipo').val(''); }
+        });
+        dcAtualizarVisibilidadeColheita();
+    });
+}
+
+/**
+ * Trava o tipo de atividade em Colheita (cadastro aberto pela página Colheita, ?abrirColheita=1):
+ * select desabilitado e sem o "+" de novo tipo. travar=false devolve ao normal (ex.: editar).
+ */
+function dcTravarTipoColheita(travar) {
+    if (travar) {
+        var t = dcCacheTipos.filter(function (x) { return x.nome.toLowerCase().indexOf('colh') > -1; })[0];
+        if (t) $('#dcTipo').val(String(t.idTipo)).trigger('change');
+    }
+    $('#dcTipo').prop('disabled', !!travar);
+    $('#btnAddTipo').toggleClass('d-none', !!travar);
+}
+
+/**
+ * Colheita concluída pela página do Diário (salvar como Concluído ou Finalizar): pergunta se vai
+ * para Colheita e Estoque. Sim → colheitaestoque.jsp; Não → fica aqui com a lista atualizada.
+ * Não é chamado no fluxo aberto pela página Colheita (que já volta sozinho para lá).
+ */
+function dcPerguntarIrColheita() {
+    var $m = $('#modalIrColheita');
+    if (!$m.length) {
+        $m = $('<div class="modal fade" id="modalIrColheita" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content">' +
+            '<div class="modal-header"><h5 class="modal-title"><i class="fas fa-circle-check me-2 text-success"></i>Colheita concluída</h5>' +
+            '<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button></div>' +
+            '<div class="modal-body">Colheita concluída. Ir para Colheita e Estoque?</div>' +
+            '<div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" id="btnIrColheitaNao">Não, ficar aqui</button>' +
+            '<a class="btn btn-success" id="btnIrColheitaSim" href="' + AGRO_CTX + '/view/admin/colheitaestoque.jsp">Sim, ir para Colheita e Estoque</a></div>' +
+            '</div></div></div>').appendTo('body');
+    }
+    $m.modal('show');
 }
 
 /**
@@ -4525,7 +4613,7 @@ function dcInit(areaId) {
     });
     dcCarregarTipos();
     dcFuncPromise = $.getJSON(AGRO_CTX + '/ControllerDiarioCampo?funcionarios=1', function (fs) {
-        dcCacheFunc = fs; dcOptFunc = dcMontarOptFunc(fs);
+        dcCacheFunc = fs; dcOptFunc = dcMontarOptFunc(fs); dcOptFuncSemData = dcOptFunc;
         $('#dcResponsavel').html(dcOptFunc);
     });
     dcDespPromise = $.getJSON(AGRO_CTX + '/ControllerDiarioCampo?despesascatalogo=1', function (ds) {
@@ -4574,6 +4662,7 @@ function dcInit(areaId) {
         $tr.find('.dc-ftipo').val(opt.data('tipo') || '');
         dcAtualizarCampoHoras($tr, dcFuncEditavel);
         dcAtualizarResponsavel();   // responsável só entre os funcionários adicionados
+        dcFiltrarFuncsAtividade();  // quem já está numa linha some das outras
     });
     $('#dcFuncBody').off('change.dc', '.dc-fregime').on('change.dc', '.dc-fregime', function () {
         dcAtualizarCampoHoras($(this).closest('tr'), dcFuncEditavel);
@@ -4590,7 +4679,7 @@ function dcInit(areaId) {
     $('#modalNovoDiario').off('click.dc', '.dc-rm').on('click.dc', '.dc-rm', function () {
         var eraFunc = $(this).closest('#dcFuncBody').length > 0;
         $(this).closest('tr').remove();
-        if (eraFunc) dcAtualizarResponsavel();
+        if (eraFunc) { dcAtualizarResponsavel(); dcFiltrarFuncsAtividade(); }
         dcRecalcPreview();
     });
     // Remove um lançamento JÁ SALVO (funcionário/despesa de uma execução anterior) — diferente do
@@ -4623,13 +4712,16 @@ function dcInit(areaId) {
         var tipo = $(this).find(':selected').data('tipo') || '';
         $tr.find('.ex-ftipo').val(tipo);
         dcAtualizarCampoHorasExec($tr);
+        dcFiltrarFuncsAtividade();  // quem já está numa linha some das outras
         dcExecRecalcPreview();
     });
+    // A lista da nova execução depende do ponto na data dela (não na data do diário).
+    $('#exData').off('change.ex').on('change.ex', dcRecarregarFuncsExec);
     $('#exFuncBody').off('change.ex', '.ex-fregime').on('change.ex', '.ex-fregime', function () {
         dcAtualizarCampoHorasExec($(this).closest('tr'));
         dcExecRecalcPreview();
     });
-    $('#dcBlocoExecucao').off('click.ex', '.ex-rm').on('click.ex', '.ex-rm', function () { $(this).closest('tr').remove(); });
+    $('#dcBlocoExecucao').off('click.ex', '.ex-rm').on('click.ex', '.ex-rm', function () { $(this).closest('tr').remove(); dcFiltrarFuncsAtividade(); });
     $('#btnAddExecDesp').off('click').on('click', function () { dcAddExecDespRow(); });
     $('#exDespBody').off('change.exd', '.ex-ditem').on('change.exd', '.ex-ditem', function () {
         dcAplicarDespesaSelecionada($(this).closest('tr'), 'ex');
@@ -4785,6 +4877,7 @@ function dcAbrirNovoInterno() {
     }
     dcResetForm();
     $('#dcModalTitulo').text('Novo Diário de Campo');
+    dcTravarTipoColheita(dcVeioDaColheita);   // pela página Colheita, só Colheita
     dcAddFuncRow();
     dcRecarregarFuncsPorData();    // funcionários ativos na data de hoje
     dcAplicarCulturaDoTalhao();    // preenche a cultura do talhão pré-selecionado + resolve safra
@@ -4810,7 +4903,14 @@ function dcAbrirAgendar() {
         $('#alertAgendar').addClass('d-none').text('');
         $('#agTalhao').html(dcOptTalhao);
         $('#agTipo').html(dcOptTipo);
-        $('#agResponsavel').html(dcOptFunc);
+        // Pela página Colheita, só Colheita (também no agendamento).
+        if (dcVeioDaColheita) {
+            var tc = dcCacheTipos.filter(function (x) { return x.nome.toLowerCase().indexOf('colh') > -1; })[0];
+            if (tc) $('#agTipo').val(String(tc.idTipo));
+        }
+        $('#agTipo').prop('disabled', dcVeioDaColheita);
+        // Agendamento não exige presença no ponto: responsável da lista sem filtro de data.
+        $('#agResponsavel').html(dcOptFuncSemData || dcOptFunc);
         $('#agData').val(new Date().toISOString().slice(0, 10));
         $('#agDescricao, #agObs').val('');
         $('#modalAgendarDiario').modal('show');
@@ -4835,6 +4935,7 @@ function dcSalvarAgendar() {
         descricao: $('#agDescricao').val(), observacoes: $('#agObs').val(),
         funcionarios: [], maquinas: [], insumos: []
     };
+    if (dcVeioDaColheita) payload.origem = 'colheita';   // servidor recusa outro tipo por esse fluxo
     $.ajax({
         url: AGRO_CTX + '/ControllerDiarioCampo', method: 'POST', contentType: 'application/json; charset=utf-8',
         data: JSON.stringify(payload),
@@ -4991,6 +5092,7 @@ function dcAddFuncRow(f) {
         '<td class="text-center">' + btnCell + '</td></tr>');
     if (f) {
         var $tr = $('#dcFuncBody tr:last'); var $sel = $tr.find('.dc-fpessoa');
+        $tr.attr('data-exec', f.dataExecucao || '');   // dia já lançado: some da lista da nova execução desse dia
         $sel.val(String(f.idPessoa));
         // Somente leitura (execução de outro dia) pode não estar na lista filtrada atual do select —
         // garante que o nome apareça mesmo assim, adicionando a opção de volta.
@@ -5443,6 +5545,11 @@ function dcSalvar() {
             .html('É obrigatório uma <strong>Safra</strong> cadastrada que inclua este talhão e cubra a data. Cadastre/ajuste a safra antes de salvar.');
         return;
     }
+    // Mesma pessoa duas vezes no mesmo dia (só no cadastro novo: na edição as linhas são históricas).
+    var dupMsg = dcFuncEditavel ? dcAvisoDuplicados($('#dcFuncBody .dc-fpessoa')) : '';
+    if (dupMsg) { $('#alertDiario').removeClass('d-none').addClass('alert-danger').text(dupMsg); return; }
+    if (dcVeioDaColheita && !editId) payload.origem = 'colheita';   // servidor recusa outro tipo por esse fluxo
+    var concluiuColheita = payload.status === 'CONCLUIDA' && dcEhColheita();
     $.ajax({
         url: AGRO_CTX + '/ControllerDiarioCampo', method: 'POST', contentType: 'application/json; charset=utf-8',
         data: JSON.stringify(payload),
@@ -5457,6 +5564,8 @@ function dcSalvar() {
                 dcCarregarLista();
                 // Atividade recém-passada para Execução: mantém o modal aberto e mostra o bloco de
                 // "Registrar Nova Execução" para já lançar a primeira equipe/dia, sem precisar reabrir.
+                // Colheita salva como Concluído: pergunta depois que o modal do diário fechar.
+                if (concluiuColheita) $('#modalNovoDiario').one('hidden.bs.modal', dcPerguntarIrColheita);
                 if (editId && payload.status === 'EM_ANDAMENTO') dcEditar(parseInt(editId));
                 else $('#modalNovoDiario').modal('hide');
             } else $('#alertDiario').removeClass('d-none').addClass('alert-danger').text(res.msg);
@@ -5489,6 +5598,7 @@ function dcIniciarExecucao(id) {
 function dcEditar(id) {
     $.getJSON(AGRO_CTX + '/ControllerDiarioCampo?id=' + id, function (d) {
         dcResetForm();
+        dcTravarTipoColheita(false);   // editar um diário existente: tipo livre (não é o cadastro da Colheita)
         dcFuncEditavel = false;
         dcDespEditavel = false;
         $('#btnAddFunc,#btnAddDesp').addClass('d-none');
@@ -5531,12 +5641,14 @@ function dcAbrirExecucaoForm() {
     $('#dcBlocoExecucao').removeClass('d-none');
     $('#exFuncBody,#exDespBody').empty();
     $('#exData').val(new Date().toISOString().slice(0, 10));
+    dcOptFuncExec = '';
     dcAddExecFuncRow();
+    dcRecarregarFuncsExec();   // lista pela presença no ponto na data da execução
 }
 
 function dcAddExecFuncRow() {
     $('#exFuncBody').append('<tr>' +
-        '<td><select class="form-select form-select-sm ex-fpessoa">' + dcOptFunc + '</select></td>' +
+        '<td><select class="form-select form-select-sm ex-fpessoa">' + (dcOptFuncExec || dcOptFunc) + '</select></td>' +
         '<td><input class="form-control form-control-sm ex-ftipo" readonly placeholder="—" style="width:90px"></td>' +
         '<td class="dc-col-regime d-none"><select class="form-select form-select-sm ex-fregime">' +
             '<option value="REGIME_SISTEMA">Sistema</option><option value="PRODUCAO">Produção (caixa)</option></select></td>' +
@@ -5607,6 +5719,9 @@ function dcSalvarExecucao() {
             valorUnitario: parseFloat($(this).find('.ex-dvalor').val()) || 0 });
     });
     if (!funcionarios.length && !despesas.length) { $('#alertDiario').removeClass('d-none').addClass('alert-danger').text('Adicione ao menos um funcionário ou uma despesa para a execução.'); return; }
+    // Mesma pessoa duas vezes no dia: entre as linhas novas e as já gravadas nesta data.
+    var dupMsg = dcAvisoDuplicados($('#exFuncBody .ex-fpessoa'), $('#dcFuncBody tr[data-exec="' + dataExec + '"] .dc-fpessoa'));
+    if (dupMsg) { $('#alertDiario').removeClass('d-none').addClass('alert-danger').text(dupMsg); return; }
     $.ajax({
         url: AGRO_CTX + '/ControllerDiarioCampo', method: 'POST', contentType: 'application/json; charset=utf-8',
         data: JSON.stringify({ acao: 'addexecucao', iddiario: iddiario, dataExecucao: dataExec, funcionarios: funcionarios, despesas: despesas }),
@@ -5651,17 +5766,23 @@ function dcVerDetalhe(id) {
         h += bloco('Despesas', d.despesas, [['Despesa', function (o) { return o.descricao || o.idDespesaCusto; }], ['Classif.', function (o) { return o.classificacao === 'VARIAVEL' ? 'Variável' : 'Fixo'; }], ['Execução', function (o) { return o.dataExecucao ? formatarData(o.dataExecucao) : ''; }], ['Qtd', function (o) { return o.quantidade; }], ['Valor unit.', function (o) { return dcMoney(o.valorUnitario); }], ['Subtotal', function (o) { return dcMoney(o.valor); }]]);
         $('#ddCorpo').html(h);
         var podeFinalizar = (d.status === 'PLANEJADA' || d.status === 'EM_ANDAMENTO');
-        $('#btnFinalizarDiario').toggleClass('d-none', !podeFinalizar).off('click').on('click', function () { dcFinalizar(d.idDiario); });
+        var ehColheita = String(d.tipoAtividadeNome || '').toLowerCase().indexOf('colh') > -1;
+        $('#btnFinalizarDiario').toggleClass('d-none', !podeFinalizar).off('click').on('click', function () { dcFinalizar(d.idDiario, ehColheita); });
         $('#modalDetalheDiario').modal('show');
     });
 }
 
-function dcFinalizar(id) {
+/** @param ehColheita se true e der certo, pergunta se vai para Colheita e Estoque (dcPerguntarIrColheita). */
+function dcFinalizar(id, ehColheita) {
     if (!confirm('Finalizar a atividade? Isso calcula os custos e dá baixa no estoque dos insumos.')) return;
     $.ajax({
         url: AGRO_CTX + '/ControllerDiarioCampo', method: 'POST', contentType: 'application/json',
         data: JSON.stringify({ acao: 'finalizar', iddiario: id }),
-        success: function (res) { $('#modalDetalheDiario').modal('hide'); mostrarAlerta(res.msg, res.ok ? 'success' : 'danger', '#alertPerfil'); dcCarregarLista(); },
+        success: function (res) {
+            // A pergunta abre depois que o modal de detalhe terminou de fechar (dois modais juntos travam o backdrop).
+            if (res.ok && ehColheita) $('#modalDetalheDiario').one('hidden.bs.modal', dcPerguntarIrColheita);
+            $('#modalDetalheDiario').modal('hide'); mostrarAlerta(res.msg, res.ok ? 'success' : 'danger', '#alertPerfil'); dcCarregarLista();
+        },
         error: function (xhr) { var m = 'Erro ao finalizar.'; try { m = JSON.parse(xhr.responseText).msg || m; } catch (e) {} mostrarAlerta(m, 'danger', '#alertPerfil'); $('#modalDetalheDiario').modal('hide'); }
     });
 }

@@ -152,7 +152,8 @@
       </div>
       <div id="dcFuncTableWrap" class="table-responsive"><table class="table table-sm align-middle mb-2">
         <thead class="table-light"><tr><th style="width:24%">Funcionário</th><th>Tipo</th><th class="dc-col-regime d-none" style="width:14%">Regime</th><th class="dc-col-regime d-none" style="width:11%">Preço</th><th class="dc-col-regime d-none" style="width:10%">Caixas</th><th style="width:13%">Horas</th><th style="width:13%"><span class="dc-col-regime d-none">Valor</span><span class="dc-col-padrao">Valor (auto)</span></th><th></th></tr></thead>
-        <tbody id="dcFuncBody"></tbody></table></div>
+        <tbody id="dcFuncBody"></tbody></table>
+        <div class="form-text mt-0 mb-2"><i class="fas fa-fingerprint me-1"></i>Só aparecem CLT e diaristas com presença no ponto nesta data (e sem falta no dia). Cada funcionário entra uma vez por dia.</div></div>
       <div id="dcFuncSoNaExecucao" class="alert alert-info py-2 small d-none">
         <i class="fas fa-circle-info me-1"></i>Estes são os lançamentos de execuções anteriores, agora somente leitura — use
         <strong>"Registrar nova execução"</strong> abaixo para adicionar colaboradores de outro dia (o custo soma tudo).
@@ -167,6 +168,7 @@
         <div class="table-responsive mt-2"><table class="table table-sm align-middle mb-2">
           <thead class="table-light"><tr><th style="width:24%">Funcionário</th><th>Tipo</th><th class="dc-col-regime d-none" style="width:14%">Regime</th><th class="dc-col-regime d-none" style="width:11%">Preço</th><th class="dc-col-regime d-none" style="width:10%">Caixas</th><th style="width:13%">Horas</th><th style="width:13%"><span class="dc-col-regime d-none">Valor</span><span class="dc-col-padrao">Valor (auto)</span></th><th></th></tr></thead>
           <tbody id="exFuncBody"></tbody></table></div>
+        <div class="form-text mt-0 mb-2"><i class="fas fa-fingerprint me-1"></i>Só aparecem CLT e diaristas com presença no ponto na data da execução (e sem falta no dia). Cada funcionário entra uma vez por dia.</div>
         <button type="button" class="btn btn-outline-primary btn-sm" id="btnAddExecFunc"><i class="fas fa-user-plus me-1"></i>Colaborador</button>
 
         <h6 class="fw-bold text-secondary mb-0 mt-3"><i class="fas fa-receipt me-1"></i>Despesas desta execução</h6>

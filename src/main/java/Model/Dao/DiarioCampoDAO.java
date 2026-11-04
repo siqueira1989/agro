@@ -1096,8 +1096,12 @@ public class DiarioCampoDAO {
                 // CLT depende do vínculo ativo na data (salário/carga horária vêm dele); diarista/empreita
                 // não dependem de vínculo — só precisam estar ativos (situacaopessoa), senão sumiam da
                 // lista quando nunca tiveram um registro em vinculo_empregaticio.
-                + (data != null ? "WHERE (c.idpessoa IS NOT NULL AND v.id_vinculo IS NOT NULL) "
-                        + "OR (c.idpessoa IS NULL AND f.situacaopessoa = true) " : "")
+                + (data != null ? "WHERE ((c.idpessoa IS NOT NULL AND v.id_vinculo IS NOT NULL) "
+                        + "OR (c.idpessoa IS NULL AND f.situacaopessoa = true)) "
+                        // 04/11: CLT e diarista só com presença no Ponto Eletrônico na data e sem falta
+                        // lançada no dia (leitura de ponto_eletronico/falta_funcionario). Empreita e
+                        // Produção seguem sem essa exigência.
+                        + "AND ((c.idpessoa IS NULL AND di.idpessoa IS NULL) OR (" + SQL_PRESENCA_PONTO + ")) " : "")
                 + "ORDER BY pe.nomepessoa";
         List<Map<String, Object>> out = new ArrayList<>();
         // Os dois "?" dos dias uteis aparecem na lista do SELECT (custo_ref e
@@ -1108,7 +1112,10 @@ public class DiarioCampoDAO {
              PreparedStatement st = c.prepareStatement(sql)) {
             st.setBigDecimal(1, BigDecimal.valueOf(Math.max(diasUteis, 1)));
             st.setBigDecimal(2, BigDecimal.valueOf(Math.max(diasUteis, 1)));
-            if (data != null) { st.setDate(3, Date.valueOf(data)); st.setDate(4, Date.valueOf(data)); }
+            if (data != null) {
+                st.setDate(3, Date.valueOf(data)); st.setDate(4, Date.valueOf(data));
+                st.setDate(5, Date.valueOf(data)); st.setDate(6, Date.valueOf(data));
+            }
             try (ResultSet rs = st.executeQuery()) {
                 while (rs.next()) {
                     Map<String, Object> m = new LinkedHashMap<>();
@@ -1138,6 +1145,74 @@ public class DiarioCampoDAO {
                 m.put("classificacao", rs.getString("classificacao"));
                 m.put("valorRef", rs.getBigDecimal("valordespesascustos"));
                 out.add(m);
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Presença no Ponto Eletrônico de {@code f.idpessoa} na data (2 parâmetros: data, data): marcação
+     * em ponto_eletronico (CLT com horários; diarista = linha sem horários, ControllerDiarista#marcarpresenca)
+     * que não seja folga compensatória, e nenhuma falta lançada no dia (justificada ou não). Só leitura.
+     */
+    private static final String SQL_PRESENCA_PONTO =
+            "EXISTS (SELECT 1 FROM ponto_eletronico pt WHERE pt.idpessoa=f.idpessoa AND pt.dataregistro=? "
+          + "AND pt.folga_compensatoria=false) "
+          + "AND NOT EXISTS (SELECT 1 FROM falta_funcionario ff WHERE ff.idpessoa=f.idpessoa AND ff.datafalta=?)";
+
+    /**
+     * CLT/diaristas entre {@code idsPessoa} SEM presença no ponto na data (ou com falta no dia), com o
+     * nome — usado pelo Controller para recusar o lançamento. Empreita/Produção nunca aparecem.
+     */
+    public Map<Integer, String> semPresencaNoPonto(java.util.Collection<Integer> idsPessoa, LocalDate data) throws SQLException {
+        Map<Integer, String> out = new LinkedHashMap<>();
+        if (idsPessoa == null || idsPessoa.isEmpty() || data == null) return out;
+        String sql = "SELECT f.idpessoa, pe.nomepessoa FROM funcionario f JOIN pessoa pe ON pe.idpessoa=f.idpessoa "
+                + "LEFT JOIN funcionarioclt c ON c.idpessoa=f.idpessoa "
+                + "LEFT JOIN funcionariodiarista di ON di.idpessoa=f.idpessoa "
+                + "WHERE f.idpessoa = ANY (?) AND (c.idpessoa IS NOT NULL OR di.idpessoa IS NOT NULL) "
+                + "AND NOT (" + SQL_PRESENCA_PONTO + ") ORDER BY pe.nomepessoa";
+        try (Connection c = new PostgresConnection().getConnection();
+             PreparedStatement st = c.prepareStatement(sql)) {
+            st.setArray(1, c.createArrayOf("integer", idsPessoa.toArray()));
+            st.setDate(2, Date.valueOf(data)); st.setDate(3, Date.valueOf(data));
+            try (ResultSet rs = st.executeQuery()) {
+                while (rs.next()) out.put(rs.getInt(1), rs.getString(2));
+            }
+        }
+        return out;
+    }
+
+    /** Nome das pessoas (para mensagens de validação). */
+    public Map<Integer, String> nomesPessoas(java.util.Collection<Integer> idsPessoa) throws SQLException {
+        Map<Integer, String> out = new java.util.HashMap<>();
+        if (idsPessoa == null || idsPessoa.isEmpty()) return out;
+        try (Connection c = new PostgresConnection().getConnection();
+             PreparedStatement st = c.prepareStatement("SELECT idpessoa, nomepessoa FROM pessoa WHERE idpessoa = ANY (?)")) {
+            st.setArray(1, c.createArrayOf("integer", idsPessoa.toArray()));
+            try (ResultSet rs = st.executeQuery()) {
+                while (rs.next()) out.put(rs.getInt(1), rs.getString(2));
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Linhas de mão de obra já gravadas no diário numa data (só idPessoa, regime e função) — o
+     * Controller junta com as novas para recusar a mesma pessoa duas vezes no mesmo dia.
+     */
+    public List<DiarioFuncionario> funcionariosNaData(int idDiario, LocalDate data) throws SQLException {
+        List<DiarioFuncionario> out = new ArrayList<>();
+        try (Connection c = new PostgresConnection().getConnection();
+             PreparedStatement st = c.prepareStatement("SELECT idpessoa, regime_trabalho, funcao_exercida "
+                     + "FROM diario_funcionario WHERE iddiario=? AND data_execucao=?")) {
+            st.setInt(1, idDiario); st.setDate(2, Date.valueOf(data));
+            try (ResultSet rs = st.executeQuery()) {
+                while (rs.next()) {
+                    DiarioFuncionario f = new DiarioFuncionario();
+                    f.setIdPessoa(rs.getInt(1)); f.setRegimeTrabalho(rs.getString(2)); f.setFuncaoExercida(rs.getString(3));
+                    out.add(f);
+                }
             }
         }
         return out;

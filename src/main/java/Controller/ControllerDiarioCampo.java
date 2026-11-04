@@ -163,7 +163,19 @@ public class ControllerDiarioCampo extends HttpServlet {
                 writeJson(resp, 400, false, "Horas trabalhadas não podem ser negativas."); return;
             }
         }
+        // Cadastro aberto pela página Colheita (abrirColheita=1): só Colheita.
+        if ("colheita".equalsIgnoreCase(getStr(jo, "origem"))) {
+            String nomeTipo = tipoDAO.buscarNome(d.getIdTipoAtividade());
+            if (nomeTipo == null || !nomeTipo.toLowerCase().contains("colh")) {
+                writeJson(resp, 400, false, "Pela página Colheita só é possível lançar atividade de Colheita."); return;
+            }
+        }
         if (!validarRegimeCaixa(d.getIdTipoAtividade(), d.getFuncionarios(), resp)) return;
+        // Mão de obra (04/11): sem a mesma pessoa duas vezes no dia e CLT/diarista só com presença no
+        // ponto. Só no create: atualizarCompleto não grava diario_funcionario (mão de obra nova entra
+        // por addexecucao), e as linhas antigas que a tela reenvia no update são ignoradas pelo DAO.
+        if (!update && !validarMaoDeObra(0, d.getData() != null ? d.getData() : java.time.LocalDate.now(),
+                d.getFuncionarios(), !"PLANEJADA".equals(d.getStatus()), resp)) return;
         // Nova regra: quantidade não é digitada — é calculada no servidor (DiarioCampoDAO.inserirInsumo),
         // de uma de duas formas mutuamente exclusivas: dosePorUnidade × doseTotalAplicada (DEFENSIVO,
         // aplicação por calda) OU quantidadeDireta (ADUBO, aplicação direta — ex.: nº de sacos × peso do
@@ -281,6 +293,7 @@ public class ControllerDiarioCampo extends HttpServlet {
         DiarioCampo atual = dao.buscarPorId(id);
         if (atual == null) { writeJson(resp, 400, false, "Diário não encontrado."); return; }
         if (!validarRegimeCaixa(atual.getIdTipoAtividade(), funcionarios, resp)) return;
+        if (!validarMaoDeObra(id, dataExec, funcionarios, true, resp)) return;
         dao.adicionarExecucao(id, dataExec, funcionarios, despesas);
         writeJson(resp, 200, true, "Execução registrada com sucesso! Custo total recalculado.");
     }
@@ -424,6 +437,72 @@ public class ControllerDiarioCampo extends HttpServlet {
             if ("PRODUCAO".equals(regime)) {
                 if (f.getPrecoPorCaixa() == null || f.getPrecoPorCaixa().signum() <= 0) {
                     writeJson(resp, 400, false, "Informe o preço por caixa (maior que zero) para funcionários em regime de produção.");
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Regras de mão de obra de 04/11, para as linhas NOVAS de um create ({@code idDiario}=0) ou de
+     * um addexecucao (junta com as já gravadas no diário na mesma data):
+     * <ul>
+     * <li>A mesma pessoa não pode aparecer duas vezes no mesmo dia. Única exceção: várias linhas
+     *     PRODUCAO com funções diferentes — o Processar da Colheita grava uma linha por embalagem
+     *     do mesmo embalador ("Embalador — &lt;embalagem&gt;").</li>
+     * <li>CLT e diarista precisam de presença no Ponto Eletrônico na data, sem falta no dia
+     *     ({@code exigirPresenca}=false no agendamento PLANEJADA).</li>
+     * </ul>
+     * Data da linha = a dela (dataExecucao) ou a padrão. Escreve 400 e devolve false se falhar.
+     */
+    private boolean validarMaoDeObra(int idDiario, java.time.LocalDate dataPadrao, List<DiarioFuncionario> funcionarios,
+            boolean exigirPresenca, HttpServletResponse resp) throws Exception {
+        if (funcionarios == null || funcionarios.isEmpty()) return true;
+        Map<java.time.LocalDate, List<DiarioFuncionario>> porData = new java.util.TreeMap<>();
+        for (DiarioFuncionario f : funcionarios) {
+            java.time.LocalDate dt = f.getDataExecucao() != null ? f.getDataExecucao() : dataPadrao;
+            porData.computeIfAbsent(dt, k -> new ArrayList<>()).add(f);
+        }
+        java.time.format.DateTimeFormatter br = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy");
+        for (Map.Entry<java.time.LocalDate, List<DiarioFuncionario>> e : porData.entrySet()) {
+            java.time.LocalDate dt = e.getKey();
+            List<DiarioFuncionario> todas = new ArrayList<>(e.getValue());
+            if (idDiario > 0) todas.addAll(dao.funcionariosNaData(idDiario, dt));
+            // pessoa -> chaves das linhas: "SISTEMA" para regime normal, "P:<função>" para PRODUCAO
+            Map<Integer, List<String>> chaves = new LinkedHashMap<>();
+            for (DiarioFuncionario f : todas) {
+                String k = "PRODUCAO".equals(f.getRegimeTrabalho())
+                        ? "P:" + (f.getFuncaoExercida() == null ? "" : f.getFuncaoExercida().trim().toLowerCase())
+                        : "SISTEMA";
+                chaves.computeIfAbsent(f.getIdPessoa(), x -> new ArrayList<>()).add(k);
+            }
+            List<Integer> duplicados = new ArrayList<>();
+            for (Map.Entry<Integer, List<String>> c : chaves.entrySet()) {
+                List<String> ks = c.getValue();
+                if (ks.size() < 2) continue;
+                boolean temSistema = ks.contains("SISTEMA");
+                boolean funcoesRepetidas = new java.util.HashSet<>(ks).size() < ks.size();
+                if (temSistema || funcoesRepetidas) duplicados.add(c.getKey());
+            }
+            if (!duplicados.isEmpty()) {
+                Map<Integer, String> nomes = dao.nomesPessoas(duplicados);
+                List<String> ns = new ArrayList<>();
+                for (Integer idp : duplicados) ns.add(nomes.getOrDefault(idp, "#" + idp));
+                writeJson(resp, 400, false, String.join(", ", ns) + (ns.size() == 1 ? " aparece" : " aparecem")
+                        + " mais de uma vez neste diário em " + dt.format(br)
+                        + ". Cada funcionário só pode ser lançado uma vez por dia na atividade.");
+                return false;
+            }
+            if (exigirPresenca) {
+                java.util.Set<Integer> novos = new java.util.LinkedHashSet<>();
+                for (DiarioFuncionario f : e.getValue()) novos.add(f.getIdPessoa());
+                Map<Integer, String> sem = dao.semPresencaNoPonto(novos, dt);
+                if (!sem.isEmpty()) {
+                    List<String> ns = new ArrayList<>(sem.values());
+                    writeJson(resp, 400, false, String.join(", ", ns) + (ns.size() == 1 ? " não tem" : " não têm")
+                            + " presença registrada no ponto em " + dt.format(br)
+                            + " (ou tem falta lançada no dia). CLT e diaristas só podem ser lançados com presença no Ponto Eletrônico.");
                     return false;
                 }
             }
