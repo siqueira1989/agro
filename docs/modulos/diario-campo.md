@@ -48,7 +48,7 @@ Tipo de atividade "Processamento" (V29). Atividades com regime por caixa = Colhe
 - [ ] Relatórios/Safra não mostram ainda a dose por planta (`quantidade_por_planta_kg`); se quiserem, levar ao módulo do relatório.
 - [ ] Levar a Produção/Folha: funcionário de Produção lançado no Diário em regime PRODUCAO tem custo (valor_regime) no
   diário; conferir se o pagamento dele também sai por `lancamento_producao` (risco de pagar duas vezes a mesma caixa).
-- [ ] Duplicata antiga (04/11, não alterada): diário 2026-000079 (Adubação, CONCLUIDA) tem carla costa duas vezes em
+- [x] Duplicata antiga corrigida em 2026-11-04 pelo Gerente Geral, a pedido do usuário: no diário 2026-000079 (Adubação, CONCLUIDA), as duas linhas de carla costa em 12/10/2026 (4 h e 5 h, R$ 10,71/h) foram unidas numa única linha de 9 h (id 99, R$ 96,39; a linha 103 foi removida). Custo do diário e da safra inalterados (R$ 96,39 de mão de obra). Não há outras duplicatas no banco.
   12/10/2026 (duas linhas em regime normal). É a única no banco.
 - [ ] Sugestão à Colheita (Processar): conferir no cliente a mesma pessoa repetida entre as linhas "por horas" (hoje
   só a grade de embaladores confere); o servidor já recusa e a Colheita mostra "O Diário de Campo recusou…".
