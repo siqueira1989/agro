@@ -16,15 +16,19 @@
 
 ## Banco
 - `areaproducao`, `quadra` (V12 remove talão, V13 quadras).
+- V35: dados do produtor e endereço gravados na área (ver Dependências).
 
 ## Dependências
 - **Diário de Campo**: mesma página (`DetalheAreaProducao.jsp`).
 - **Safra**: vincula área e quadras (`safra_talhao`, V18).
-- **Colheita** e **Relatórios** (export Excel/PDF da área em `RelatorioExportServlet`, que é do núcleo).
+- **Romaneio** lê de `areaproducao` (V35, contrato fixo — não renomear): `proprietarioareaproducao` (nome do produtor), `cpf_cnpj_produtor varchar(18)`, `inscricao_estadual varchar(20)`, `logradouro varchar(120)`, `bairro varchar(60)`, `municipio varchar(60)`, `uf char(2)`, além de `cep`, `numero`, `complemento`. Todas opcionais (NULL). JSON do GET da área: `cpfCnpjProdutor`, `inscricaoEstadual`, `logradouro`, `bairro`, `municipio`, `uf`.
+- **Colheita**.
 
 ## Pendências
 - [ ] A mudança em `RelatorioExportServlet.java` (remoção do `case "areaproducao"`) só entra no próximo build Maven; até lá o servlet compilado no Tomcat ainda aceita a URL antiga.
+- [ ] Testar no navegador após o build: cadastrar/editar área com CEP, CPF/CNPJ e IE e conferir gravação (e Perfil da Área).
 
 ## Histórico
 - 2026-10-25 — Removida a exportação Excel/PDF da página: botões em `areaproducao.jsp` (antigas linhas 15–21); `main.js` não tinha handler dessa exportação; em `RelatorioExportServlet.java` (autorizado pelo Gerente) removidos `case "areaproducao"`, `exportarAreasExcel/Pdf`, campo/`init` do `AreaProducaoDAO` e imports. Folha e funcionário intactos. JSP copiado para `target`; build pendente.
 - 2026-11-02: padronização visual do botão de novo registro (Gerente)
+- 2026-11-04 — Dados do produtor para o Romaneio: migração `V35__areaproducao_dados_produtor.sql`; model/DAO/controller (create, update, GET) com `cpfCnpjProdutor`, `inscricaoEstadual`, `logradouro`, `bairro`, `municipio`, `uf`; Cadastro/Atualizar passam a gravar endereço (ViaCEP preenche, campos editáveis) + CPF/CNPJ (máscara, 11 ou 14 dígitos, também validado no servidor) e IE; Perfil da Área (`DetalheAreaProducao.jsp`, só o card Propriedade) exibe os novos dados. Aguarda build do Romaneio + teste no navegador (V35 aplicada pelo Flyway no start).
