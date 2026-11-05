@@ -327,8 +327,9 @@ public class RomaneioDAO {
                             + dataColheita.format(BR) + ").");
                 }
                 in.setMotorista(limpar(in.getMotorista(), 80, "Motorista"));
-                in.setPlaca(in.getPlaca() == null ? null : limpar(in.getPlaca().toUpperCase().replaceAll("\\s+", ""), 10, "Placa"));
+                in.setPlaca(placa(in.getPlaca(), "Placa do veículo"));
                 in.setObservacao(limpar(in.getObservacao(), 300, "Observação"));
+                validarTransporte(in);
 
                 // Itens: classificação do alimento, embalagem embalada no lote, caixas > 0, sem repetir o par.
                 Integer idAlimento = (Integer) lote.get("idAlimento");
@@ -451,6 +452,14 @@ public class RomaneioDAO {
                     }
                     try (PreparedStatement st = c.prepareStatement("DELETE FROM romaneio_item WHERE idromaneio=?")) { st.setInt(1, id); st.executeUpdate(); }
                     try (PreparedStatement st = c.prepareStatement("DELETE FROM romaneio_despesa WHERE idromaneio=?")) { st.setInt(1, id); st.executeUpdate(); }
+                }
+                try (PreparedStatement st = c.prepareStatement("UPDATE romaneio SET nota_fiscal=?, serie_nf=?, transportadora=?, "
+                        + "transportadora_doc=?, motorista_cpf=?, motorista_cnh=?, placa_carreta=?, uf_veiculo=?, tipo_veiculo=? WHERE idromaneio=?")) {
+                    st.setString(1, in.getNotaFiscal()); st.setString(2, in.getSerieNf()); st.setString(3, in.getTransportadora());
+                    st.setString(4, in.getTransportadoraDoc()); st.setString(5, in.getMotoristaCpf()); st.setString(6, in.getMotoristaCnh());
+                    st.setString(7, in.getPlacaCarreta()); st.setString(8, in.getUfVeiculo()); st.setString(9, in.getTipoVeiculo());
+                    st.setInt(10, id);
+                    st.executeUpdate();
                 }
                 try (PreparedStatement st = c.prepareStatement("INSERT INTO romaneio_item (idromaneio, idclassificacao, idembalagem, caixas, "
                         + "preco_unitario, valor) VALUES (?,?,?,?,?,?)")) {
@@ -736,6 +745,12 @@ public class RomaneioDAO {
         r.setTotalDespesas(rs.getBigDecimal("total_despesas")); r.setValorLiquido(rs.getBigDecimal("valor_liquido"));
         r.setValorPago(rs.getBigDecimal("valor_pago"));
         r.setObservacao(rs.getString("observacao"));
+        r.setNotaFiscal(rs.getString("nota_fiscal")); r.setSerieNf(rs.getString("serie_nf"));
+        r.setTransportadora(rs.getString("transportadora")); r.setTransportadoraDoc(rs.getString("transportadora_doc"));
+        r.setMotoristaCpf(rs.getString("motorista_cpf")); r.setMotoristaCnh(rs.getString("motorista_cnh"));
+        r.setPlacaCarreta(rs.getString("placa_carreta"));
+        String uf = rs.getString("uf_veiculo"); r.setUfVeiculo(uf == null ? null : uf.trim());
+        r.setTipoVeiculo(rs.getString("tipo_veiculo"));
         return r;
     }
 }
