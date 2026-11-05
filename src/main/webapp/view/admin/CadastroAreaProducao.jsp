@@ -30,20 +30,26 @@
             <input type="text" class="form-control" id="propriedadeareaproducao" maxlength="50"></div>
         </div>
         <div class="row g-2 mt-1">
+          <div class="col-md-4"><label class="form-label">CPF/CNPJ do produtor</label>
+            <input type="text" class="form-control" id="cpfCnpjProdutor" maxlength="18" placeholder="Somente números"></div>
+          <div class="col-md-4"><label class="form-label">Inscrição estadual</label>
+            <input type="text" class="form-control" id="inscricaoEstadual" maxlength="20"></div>
+        </div>
+        <div class="row g-2 mt-1">
           <div class="col-md-3"><label class="form-label">CEP</label>
             <input type="text" class="form-control" id="cepArea" placeholder="00000-000"></div>
           <div class="col-md-5"><label class="form-label">Endereço</label>
-            <input type="text" class="form-control" id="logradouro" readonly></div>
+            <input type="text" class="form-control" id="logradouro" maxlength="120"></div>
           <div class="col-md-2"><label class="form-label">Número</label>
             <input type="number" class="form-control" id="numeroArea" min="0" value="0"></div>
           <div class="col-md-2"><label class="form-label">UF</label>
-            <input type="text" class="form-control" id="uf" readonly></div>
+            <input type="text" class="form-control" id="uf" maxlength="2" style="text-transform:uppercase"></div>
         </div>
         <div class="row g-2 mt-1">
           <div class="col-md-4"><label class="form-label">Bairro</label>
-            <input type="text" class="form-control" id="bairro" readonly></div>
-          <div class="col-md-4"><label class="form-label">Cidade</label>
-            <input type="text" class="form-control" id="cidade" readonly></div>
+            <input type="text" class="form-control" id="bairro" maxlength="60"></div>
+          <div class="col-md-4"><label class="form-label">Município</label>
+            <input type="text" class="form-control" id="cidade" maxlength="60"></div>
           <div class="col-md-4"><label class="form-label">Complemento</label>
             <input type="text" class="form-control" id="complementoArea" maxlength="50"></div>
         </div>

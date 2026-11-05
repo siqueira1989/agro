@@ -31,6 +31,11 @@
         <div class="col-md-3"><small class="text-muted">CEP</small><div class="fw-semibold" id="detCep">—</div></div>
         <div class="col-md-2"><small class="text-muted">Número</small><div class="fw-semibold" id="detNumero">—</div></div>
         <div class="col-md-7"><small class="text-muted">Complemento</small><div class="fw-semibold" id="detComplemento">—</div></div>
+        <div class="col-md-5"><small class="text-muted">Endereço</small><div class="fw-semibold" id="detLogradouro">—</div></div>
+        <div class="col-md-3"><small class="text-muted">Bairro</small><div class="fw-semibold" id="detBairro">—</div></div>
+        <div class="col-md-3"><small class="text-muted">Município / UF</small><div class="fw-semibold" id="detMunicipio">—</div></div>
+        <div class="col-md-3"><small class="text-muted">CPF/CNPJ do produtor</small><div class="fw-semibold" id="detCpfCnpj">—</div></div>
+        <div class="col-md-3"><small class="text-muted">Inscrição estadual</small><div class="fw-semibold" id="detIe">—</div></div>
       </div>
     </div>
   </div>

@@ -20,8 +20,9 @@ public class AreaProducaoDAO {
 
     public void insert(AreaProducao area) throws SQLException {
         String sql = "INSERT INTO areaproducao (propriedadeareaproducao, proprietarioareaproducao, "
-                + "quantidadetotalplantasareaproducao, siglasAreaProducao, cep, numero, complemento) "
-                + "VALUES (?, ?, ?, ?, ?, ?, ?)";
+                + "quantidadetotalplantasareaproducao, siglasAreaProducao, cep, numero, complemento, "
+                + "cpf_cnpj_produtor, inscricao_estadual, logradouro, bairro, municipio, uf) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         try (Connection conn = new PostgresConnection().getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, area.getPropriedadeAreaProducao());
@@ -31,13 +32,20 @@ public class AreaProducaoDAO {
             stmt.setString(5, area.getCep());
             stmt.setInt(6, area.getNumero());
             stmt.setString(7, area.getComplemento());
+            stmt.setString(8, area.getCpfCnpjProdutor());
+            stmt.setString(9, area.getInscricaoEstadual());
+            stmt.setString(10, area.getLogradouro());
+            stmt.setString(11, area.getBairro());
+            stmt.setString(12, area.getMunicipio());
+            stmt.setString(13, area.getUf());
             stmt.executeUpdate();
         }
     }
 
     public void update(AreaProducao area) throws SQLException {
         String sql = "UPDATE areaproducao SET propriedadeareaproducao=?, proprietarioareaproducao=?, "
-                + "quantidadetotalplantasareaproducao=?, siglasAreaProducao=?, cep=?, numero=?, complemento=? "
+                + "quantidadetotalplantasareaproducao=?, siglasAreaProducao=?, cep=?, numero=?, complemento=?, cpf_cnpj_produtor=?, inscricao_estadual=?, "
+                + "logradouro=?, bairro=?, municipio=?, uf=? "
                 + "WHERE idareaproducao=?";
         try (Connection conn = new PostgresConnection().getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -48,7 +56,13 @@ public class AreaProducaoDAO {
             stmt.setString(5, area.getCep());
             stmt.setInt(6, area.getNumero());
             stmt.setString(7, area.getComplemento());
-            stmt.setInt(8, area.getIdAreaProducao());
+            stmt.setString(8, area.getCpfCnpjProdutor());
+            stmt.setString(9, area.getInscricaoEstadual());
+            stmt.setString(10, area.getLogradouro());
+            stmt.setString(11, area.getBairro());
+            stmt.setString(12, area.getMunicipio());
+            stmt.setString(13, area.getUf());
+            stmt.setInt(14, area.getIdAreaProducao());
             stmt.executeUpdate();
         }
     }
@@ -71,8 +85,9 @@ public class AreaProducaoDAO {
         for (Quadra q : quadras) soma += q.getNumeroPlantas();
 
         String sql = "INSERT INTO areaproducao (propriedadeareaproducao, proprietarioareaproducao, "
-                + "quantidadetotalplantasareaproducao, siglasAreaProducao, cep, numero, complemento, situacao) "
-                + "VALUES (?, ?, ?, ?, ?, ?, ?, true)";
+                + "quantidadetotalplantasareaproducao, siglasAreaProducao, cep, numero, complemento, "
+                + "cpf_cnpj_produtor, inscricao_estadual, logradouro, bairro, municipio, uf, situacao) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, true)";
         try (Connection conn = new PostgresConnection().getConnection()) {
             conn.setAutoCommit(false);
             try {
@@ -85,6 +100,12 @@ public class AreaProducaoDAO {
                     stmt.setString(5, area.getCep());
                     stmt.setInt(6, area.getNumero());
                     stmt.setString(7, area.getComplemento());
+                    stmt.setString(8, area.getCpfCnpjProdutor());
+                    stmt.setString(9, area.getInscricaoEstadual());
+                    stmt.setString(10, area.getLogradouro());
+                    stmt.setString(11, area.getBairro());
+                    stmt.setString(12, area.getMunicipio());
+                    stmt.setString(13, area.getUf());
                     stmt.executeUpdate();
                     try (ResultSet keys = stmt.getGeneratedKeys()) {
                         keys.next();
@@ -214,6 +235,12 @@ public class AreaProducaoDAO {
         a.setCep(rs.getString("cep"));
         a.setNumero(rs.getInt("numero"));
         a.setComplemento(rs.getString("complemento"));
+        a.setCpfCnpjProdutor(rs.getString("cpf_cnpj_produtor"));
+        a.setInscricaoEstadual(rs.getString("inscricao_estadual"));
+        a.setLogradouro(rs.getString("logradouro"));
+        a.setBairro(rs.getString("bairro"));
+        a.setMunicipio(rs.getString("municipio"));
+        a.setUf(rs.getString("uf"));
         a.setSituacao(rs.getBoolean("situacao"));
         return a;
     }

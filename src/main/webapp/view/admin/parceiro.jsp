@@ -196,7 +196,7 @@
                             </div>
                             <div class="col-md-7">
                                 <label class="form-label">Endereço</label>
-                                <input type="text" class="form-control" id="logradouro" readonly>
+                                <input type="text" class="form-control" id="logradouro" maxlength="120">
                             </div>
                             <div class="col-md-2">
                                 <label class="form-label">Nº</label>
@@ -206,15 +206,15 @@
                         <div class="row g-2 mt-1">
                             <div class="col-md-4">
                                 <label class="form-label">Bairro</label>
-                                <input type="text" class="form-control" id="bairro" readonly>
+                                <input type="text" class="form-control" id="bairro" maxlength="60">
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label">Cidade</label>
-                                <input type="text" class="form-control" id="cidade" readonly>
+                                <input type="text" class="form-control" id="cidade" maxlength="60">
                             </div>
                             <div class="col-md-2">
                                 <label class="form-label">UF</label>
-                                <input type="text" class="form-control" id="uf" readonly>
+                                <input type="text" class="form-control" id="uf" maxlength="2" style="text-transform:uppercase">
                             </div>
                             <div class="col-md-2">
                                 <label class="form-label">Compl.</label>

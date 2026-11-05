@@ -114,6 +114,13 @@ public class ControllerAreaProducao extends HttpServlet {
         String complemento = getStr(jo, "complemento");
         Integer qtd = getInt(jo, "quantidadetotalplantasareaproducao");
         Integer numero = getInt(jo, "numero");
+        String cpfCnpj = getStr(jo, "cpfCnpjProdutor");
+        String docDigitos = cpfCnpj == null ? "" : cpfCnpj.replaceAll("[^0-9]", "");
+        if (!docDigitos.isEmpty() && docDigitos.length() != 11 && docDigitos.length() != 14) {
+            writeJson(resp, HttpServletResponse.SC_BAD_REQUEST, false,
+                    "CPF/CNPJ do produtor deve ter 11 ou 14 dígitos.", "page");
+            return;
+        }
 
         if (isBlank(propriedade) || isBlank(proprietario) || isBlank(sigla)) {
             writeJson(resp, HttpServletResponse.SC_BAD_REQUEST, false,
@@ -144,6 +151,13 @@ public class ControllerAreaProducao extends HttpServlet {
             area.setCep(cep != null ? cep : "");
             area.setComplemento(complemento != null ? complemento : "");
             area.setNumero(numero != null ? numero : 0);
+            area.setCpfCnpjProdutor(vazioParaNull(cpfCnpj));
+            area.setInscricaoEstadual(vazioParaNull(getStr(jo, "inscricaoEstadual")));
+            area.setLogradouro(vazioParaNull(getStr(jo, "logradouro")));
+            area.setBairro(vazioParaNull(getStr(jo, "bairro")));
+            area.setMunicipio(vazioParaNull(getStr(jo, "municipio")));
+            String uf = vazioParaNull(getStr(jo, "uf"));
+            area.setUf(uf == null ? null : uf.substring(0, Math.min(2, uf.length())).toUpperCase());
             dao.inserirComQuadras(area, quadras);   // qtd = soma das quadras
             writeJson(resp, HttpServletResponse.SC_OK, true, "Área cadastrada com sucesso!", "page");
         } catch (SQLException e) {
@@ -184,6 +198,13 @@ public class ControllerAreaProducao extends HttpServlet {
         String complemento = getStr(jo, "complemento");
         Integer qtd = getInt(jo, "quantidadetotalplantasareaproducao");
         Integer numero = getInt(jo, "numero");
+        String cpfCnpj = getStr(jo, "cpfCnpjProdutor");
+        String docDigitos = cpfCnpj == null ? "" : cpfCnpj.replaceAll("[^0-9]", "");
+        if (!docDigitos.isEmpty() && docDigitos.length() != 11 && docDigitos.length() != 14) {
+            writeJson(resp, HttpServletResponse.SC_BAD_REQUEST, false,
+                    "CPF/CNPJ do produtor deve ter 11 ou 14 dígitos.", "page");
+            return;
+        }
 
         if (id == null || isBlank(propriedade) || isBlank(proprietario) || isBlank(sigla)) {
             writeJson(resp, HttpServletResponse.SC_BAD_REQUEST, false,
@@ -204,6 +225,13 @@ public class ControllerAreaProducao extends HttpServlet {
             area.setCep(cep != null ? cep : "");
             area.setComplemento(complemento != null ? complemento : "");
             area.setNumero(numero != null ? numero : 0);
+            area.setCpfCnpjProdutor(vazioParaNull(cpfCnpj));
+            area.setInscricaoEstadual(vazioParaNull(getStr(jo, "inscricaoEstadual")));
+            area.setLogradouro(vazioParaNull(getStr(jo, "logradouro")));
+            area.setBairro(vazioParaNull(getStr(jo, "bairro")));
+            area.setMunicipio(vazioParaNull(getStr(jo, "municipio")));
+            String uf = vazioParaNull(getStr(jo, "uf"));
+            area.setUf(uf == null ? null : uf.substring(0, Math.min(2, uf.length())).toUpperCase());
             area.setQuantidadeTotalPlantasAreaProducao(qtd != null ? qtd : 0);
             dao.update(area);
             dao.recomputarQtdPlantas(id);   // qtd sempre = soma das quadras ativas
@@ -290,6 +318,8 @@ public class ControllerAreaProducao extends HttpServlet {
     }
 
     private boolean isBlank(String s) { return s == null || s.trim().isEmpty(); }
+
+    private String vazioParaNull(String s) { return s == null || s.trim().isEmpty() ? null : s.trim(); }
 
     private String getStr(JsonObject jo, String campo) {
         return jo.has(campo) && !jo.get(campo).isJsonNull() ? jo.get(campo).getAsString() : null;

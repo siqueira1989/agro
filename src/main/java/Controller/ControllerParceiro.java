@@ -64,6 +64,22 @@ public class ControllerParceiro extends HttpServlet {
        return Model.Model.TipoParceiro.normalizar(tipo);
    }
 
+   /* Endereço (opcional): logradouro, bairro, cidade, uf. UF sempre 2 letras maiúsculas. */
+   private static String texto(JsonObject o, String chave, int max) {
+       if (!o.has(chave) || o.get(chave).isJsonNull()) return null;
+       String v = o.get(chave).getAsString().trim();
+       if (v.isEmpty()) return null;
+       return v.length() > max ? v.substring(0, max) : v;
+   }
+
+   private void lerEndereco(JsonObject o, Parceiro p) {
+       p.setLogradouro(texto(o, "logradouro", 120));
+       p.setBairro(texto(o, "bairro", 60));
+       p.setCidade(texto(o, "cidade", 60));
+       String uf = texto(o, "uf", 2);
+       p.setUf(uf == null ? null : uf.toUpperCase());
+   }
+
    @Override
 protected void doGet(HttpServletRequest request, HttpServletResponse response)
         throws ServletException, IOException {
@@ -190,6 +206,7 @@ System.out.println("acao:"+ acao);
             jsonObject.has("site") && !jsonObject.get("site").isJsonNull() ? jsonObject.get("site").getAsString() : null
         );
         parceiro.setTipoParceiro(lerTipo(jsonObject));
+        lerEndereco(jsonObject, parceiro);
 
         parceiroDao.addParceiro(parceiro);
 
@@ -225,6 +242,7 @@ System.out.println("acao:"+ acao);
             jsonObject.has("site") && !jsonObject.get("site").isJsonNull() ? jsonObject.get("site").getAsString() : null
         );
         parceiro.setTipoParceiro(lerTipo(jsonObject));
+        lerEndereco(jsonObject, parceiro);
 
         parceiroDao.updateParceiro(parceiro);
 

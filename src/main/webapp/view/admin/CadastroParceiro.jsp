@@ -160,7 +160,7 @@
 
                             <div class="col-md-12">
                                 <label>Endereço</label>
-                                <input type="text" class="form-control" id="logradouro" readonly>
+                                <input type="text" class="form-control" id="logradouro" maxlength="120">
                             </div>
                         </div>
 
@@ -174,17 +174,17 @@
 
                             <div class="col-md-4">
                                 <label>Bairro</label>
-                                <input type="text" class="form-control" id="bairro" readonly>
+                                <input type="text" class="form-control" id="bairro" maxlength="60">
                             </div>
 
                             <div class="col-md-4">
                                 <label>Cidade</label>
-                                <input type="text" class="form-control" id="cidade" readonly>
+                                <input type="text" class="form-control" id="cidade" maxlength="60">
                             </div>
 
                             <div class="col-md-2">
                                 <label>UF</label>
-                                <input type="text" class="form-control" id="uf" readonly>
+                                <input type="text" class="form-control" id="uf" maxlength="2" style="text-transform:uppercase">
                             </div>
                         </div>
 

@@ -19,8 +19,9 @@ public class ParceiroDAO {
             + "nomepessoa, usuariopessoa, senhapessoa, nivelpessoa, "
             + "situacaopessoa, emailpessoa,cep ,numero, complemento, "
             + "telefonepessoa, cnpjPessoaCnpj, razaosocialpessoacnpj, "
-            + "inscricaoestadualpessoacnpj, siteparceiro, tipo_parceiro) "
-            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            + "inscricaoestadualpessoacnpj, siteparceiro, tipo_parceiro, "
+            + "logradouro, bairro, cidade, uf) "
+            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         try (Connection conexao = new PostgresConnection().getConnection();
              PreparedStatement stmt = conexao.prepareStatement(sql)) {
@@ -40,6 +41,10 @@ public class ParceiroDAO {
             stmt.setString(13, parceiro.getInscricaoEstadualPessoaCnpj());
             stmt.setString(14, parceiro.getSiteparceiro());
             stmt.setString(15, Model.Model.TipoParceiro.normalizar(parceiro.getTipoParceiro()));
+            stmt.setString(16, parceiro.getLogradouro());
+            stmt.setString(17, parceiro.getBairro());
+            stmt.setString(18, parceiro.getCidade());
+            stmt.setString(19, parceiro.getUf());
             stmt.executeUpdate();
         }
     }
@@ -78,6 +83,7 @@ public class ParceiroDAO {
                     rs.getString("siteParceiro")
                 );
                 parceiro.setTipoParceiro(rs.getString("tipo_parceiro"));
+                preencherEndereco(parceiro, rs);
             }
         }
         return parceiro;
@@ -114,6 +120,7 @@ public class ParceiroDAO {
                     rs.getString("siteparceiro")          // Site do parceiro
                 );
                 parceiro.setTipoParceiro(rs.getString("tipo_parceiro"));
+                preencherEndereco(parceiro, rs);
 
                 parceiroList.add(parceiro);
             }
@@ -207,7 +214,8 @@ public class ParceiroDAO {
        "nivelpessoa = ?, situacaopessoa = ?, emailpessoa = ?,"+
        "numero = ?, complemento = ?, cep = ?, "+
        "telefonepessoa = ?, cnpjPessoaCnpj = ?, razaosocialpessoacnpj = ?,"+
-       "inscricaoestadualpessoacnpj = ?, siteparceiro = ?, tipo_parceiro = ? WHERE idpessoa = ?";
+       "inscricaoestadualpessoacnpj = ?, siteparceiro = ?, tipo_parceiro = ?, "+
+       "logradouro = ?, bairro = ?, cidade = ?, uf = ? WHERE idpessoa = ?";
 
         try (Connection conexao = new PostgresConnection().getConnection();
              PreparedStatement stmt = conexao.prepareStatement(sql)) {
@@ -231,9 +239,20 @@ public class ParceiroDAO {
             stmt.setString(13, parceiro.getInscricaoEstadualPessoaCnpj());
             stmt.setString(14, parceiro.getSiteparceiro());
             stmt.setString(15, Model.Model.TipoParceiro.normalizar(parceiro.getTipoParceiro()));
-            stmt.setInt(16, parceiro.getIdPessoa());
+            stmt.setString(16, parceiro.getLogradouro());
+            stmt.setString(17, parceiro.getBairro());
+            stmt.setString(18, parceiro.getCidade());
+            stmt.setString(19, parceiro.getUf());
+            stmt.setInt(20, parceiro.getIdPessoa());
             stmt.executeUpdate();
         }
+    }
+
+    private static void preencherEndereco(Parceiro p, ResultSet rs) throws SQLException {
+        p.setLogradouro(rs.getString("logradouro"));
+        p.setBairro(rs.getString("bairro"));
+        p.setCidade(rs.getString("cidade"));
+        p.setUf(rs.getString("uf"));
     }
 
     /* Lista parceiros por tipo de negócio (PARCEIRO | FORNECEDOR | INSUMO).
@@ -270,6 +289,7 @@ public class ParceiroDAO {
                     rs.getString("siteparceiro")
                 );
                 parceiro.setTipoParceiro(rs.getString("tipo_parceiro"));
+                preencherEndereco(parceiro, rs);
                 lista.add(parceiro);
             }
         }

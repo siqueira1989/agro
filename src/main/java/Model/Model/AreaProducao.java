@@ -11,6 +11,12 @@ public class AreaProducao {
     private String cep;
     private int numero;
     private String complemento;
+    private String cpfCnpjProdutor;
+    private String inscricaoEstadual;
+    private String logradouro;
+    private String bairro;
+    private String municipio;
+    private String uf;
     private boolean situacao = true;
 
     public int getIdAreaProducao() {
@@ -86,4 +92,22 @@ public class AreaProducao {
     public void setSituacao(boolean situacao) {
         this.situacao = situacao;
     }
+
+    public String getCpfCnpjProdutor() { return cpfCnpjProdutor; }
+    public void setCpfCnpjProdutor(String cpfCnpjProdutor) { this.cpfCnpjProdutor = cpfCnpjProdutor; }
+
+    public String getInscricaoEstadual() { return inscricaoEstadual; }
+    public void setInscricaoEstadual(String inscricaoEstadual) { this.inscricaoEstadual = inscricaoEstadual; }
+
+    public String getLogradouro() { return logradouro; }
+    public void setLogradouro(String logradouro) { this.logradouro = logradouro; }
+
+    public String getBairro() { return bairro; }
+    public void setBairro(String bairro) { this.bairro = bairro; }
+
+    public String getMunicipio() { return municipio; }
+    public void setMunicipio(String municipio) { this.municipio = municipio; }
+
+    public String getUf() { return uf; }
+    public void setUf(String uf) { this.uf = uf; }
 }

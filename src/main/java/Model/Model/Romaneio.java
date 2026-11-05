@@ -32,6 +32,11 @@ public class Romaneio {
     private BigDecimal valorLiquido = BigDecimal.ZERO;
     private BigDecimal valorPago = BigDecimal.ZERO;
     private String observacao;
+    // V37 — transporte e nota fiscal (documento do romaneio). Todos opcionais.
+    private String notaFiscal;      private String serieNf;
+    private String transportadora;  private String transportadoraDoc;
+    private String motoristaCpf;    private String motoristaCnh;
+    private String placaCarreta;    private String ufVeiculo;     private String tipoVeiculo;
     private List<RomaneioItem> itens = new ArrayList<>();
     private List<RomaneioDespesa> despesas = new ArrayList<>();
 
@@ -89,6 +94,24 @@ public class Romaneio {
     public void setValorPago(BigDecimal valorPago) { this.valorPago = valorPago; }
     public String getObservacao() { return observacao; }
     public void setObservacao(String observacao) { this.observacao = observacao; }
+    public String getNotaFiscal() { return notaFiscal; }
+    public void setNotaFiscal(String notaFiscal) { this.notaFiscal = notaFiscal; }
+    public String getSerieNf() { return serieNf; }
+    public void setSerieNf(String serieNf) { this.serieNf = serieNf; }
+    public String getTransportadora() { return transportadora; }
+    public void setTransportadora(String transportadora) { this.transportadora = transportadora; }
+    public String getTransportadoraDoc() { return transportadoraDoc; }
+    public void setTransportadoraDoc(String transportadoraDoc) { this.transportadoraDoc = transportadoraDoc; }
+    public String getMotoristaCpf() { return motoristaCpf; }
+    public void setMotoristaCpf(String motoristaCpf) { this.motoristaCpf = motoristaCpf; }
+    public String getMotoristaCnh() { return motoristaCnh; }
+    public void setMotoristaCnh(String motoristaCnh) { this.motoristaCnh = motoristaCnh; }
+    public String getPlacaCarreta() { return placaCarreta; }
+    public void setPlacaCarreta(String placaCarreta) { this.placaCarreta = placaCarreta; }
+    public String getUfVeiculo() { return ufVeiculo; }
+    public void setUfVeiculo(String ufVeiculo) { this.ufVeiculo = ufVeiculo; }
+    public String getTipoVeiculo() { return tipoVeiculo; }
+    public void setTipoVeiculo(String tipoVeiculo) { this.tipoVeiculo = tipoVeiculo; }
     public List<RomaneioItem> getItens() { return itens; }
     public void setItens(List<RomaneioItem> itens) { this.itens = itens; }
     public List<RomaneioDespesa> getDespesas() { return despesas; }

@@ -1365,6 +1365,10 @@ function salvarParceiroModal() {
         email: $("#email").val(),
         telefone: $("#telefone").val(),
         cep: $("#cep").val(),
+        logradouro: $("#logradouro").val(),
+        bairro: $("#bairro").val(),
+        cidade: $("#cidade").val(),
+        uf: $("#uf").val(),
         numero: $("#numero").val(),
         complemento: $("#complemento").val(),
         situacao: $("#situacao").val(),
@@ -1421,7 +1425,12 @@ function carregarDadosParceiro(id) {
       $("#cep").val(parceiro.Cep || "");
       $("#numero").val(parceiro.numero|| "");
       $("#complemento").val(parceiro.complemento|| "");
-       preencherEnderecoViaCep(parceiro.Cep || "" );
+      // Endereço gravado; o ViaCEP só completa cadastros antigos sem endereço
+      $("#logradouro").val(parceiro.logradouro || "");
+      $("#bairro").val(parceiro.bairro || "");
+      $("#cidade").val(parceiro.cidade || "");
+      $("#uf").val(parceiro.uf || "");
+      if (!parceiro.logradouro && !parceiro.cidade) preencherEnderecoViaCep(parceiro.Cep || "");
       $("#razao").val(parceiro.razaoSocialPessoaCnpj);
       $("#cnpj").val(parceiro.cnpjPessoaCnpj);
       $("#inscricaoestadual").val(parceiro.inscricaoEstadualPessoaCnpj);
@@ -1431,8 +1440,6 @@ function carregarDadosParceiro(id) {
       const sit = (parceiro.situacaoPessoa === true || parceiro.situacaoPessoa === "true") ? "true" : "false";
       $("#situacao").val(sit);
 
-      // Preenche logradouro, bairro, cidade, uf via cep
-      if (parceiro.cepPessoa) preencherEnderecoViaCep(parceiro.cepPessoa);
     },
     error: function (xhr) {
       console.error("Erro GET parceiro:", xhr.responseText);
@@ -1463,6 +1470,10 @@ function salvarParceiroCreateOuUpdate()
     email: $("#email").val(),
     telefone: $("#telefone").val(),
     cep: $("#cep").val(),
+    logradouro: $("#logradouro").val(),
+    bairro: $("#bairro").val(),
+    cidade: $("#cidade").val(),
+    uf: $("#uf").val(),
     numero: $("#numero").val(),
     complemento: $("#complemento").val(),
     situacao: $("#situacao").val(),
@@ -2318,6 +2329,8 @@ $(document).ready(function () {
 
     // Salvar edição do modal
     $("#btnSalvarParceiro").on("click", salvarParceiroModal);
+    // CEP do modal: ViaCEP preenche o endereço (campos continuam editáveis)
+    $("#cep").on("blur", function () { preencherEnderecoViaCep($(this).val()); });
 });
 
 /* ========== AtualizacaoAlimento.jsp ========== */
@@ -4117,11 +4130,30 @@ $(document).on('click', '#btnConfirmarDesativarArea', function () {
     });
 });
 
+/** Máscara dinâmica de CPF (11) / CNPJ (14) no campo do produtor. Usado em: Cadastro/AtualizarAreaProducao.jsp */
+function apMascaraDocProdutor() {
+    $('#cpfCnpjProdutor').on('input', function () {
+        var d = $(this).val().replace(/\D/g, '').substring(0, 14), r;
+        if (d.length <= 11) {
+            r = d.replace(/^(\d{3})(\d)/, '$1.$2').replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3').replace(/\.(\d{3})(\d)/, '.$1-$2');
+        } else {
+            r = d.replace(/^(\d{2})(\d)/, '$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3').replace(/\.(\d{3})(\d)/, '.$1/$2').replace(/(\d{4})(\d)/, '$1-$2');
+        }
+        $(this).val(r);
+    });
+}
+/** Vazio é aceito (campo opcional); preenchido precisa ter 11 ou 14 dígitos. */
+function apDocProdutorValido(v) {
+    var n = (v || '').replace(/\D/g, '').length;
+    return n === 0 || n === 11 || n === 14;
+}
+
 /* ---------------- CADASTRO (CadastroAreaProducao.jsp) ---------------- */
 $(document).ready(function () {
     if (!$('#formCadastroArea').length) return;
     $('#cepArea').mask('00000-000');
     $('#cepArea').on('blur', function () { preencherEnderecoViaCep($(this).val()); });
+    apMascaraDocProdutor();
 
     $.getJSON(AGRO_CTX + '/ControllerAreaProducao?alimentos=1', function (lista) {
         apAlimentosCache = lista;
@@ -4168,10 +4200,19 @@ function apSalvarCadastro() {
         cep: $('#cepArea').val().trim(),
         numero: parseInt($('#numeroArea').val()) || 0,
         complemento: $('#complementoArea').val().trim(),
+        logradouro: $('#logradouro').val().trim(),
+        bairro: $('#bairro').val().trim(),
+        municipio: $('#cidade').val().trim(),
+        uf: $('#uf').val().trim().toUpperCase(),
+        cpfCnpjProdutor: $('#cpfCnpjProdutor').val().trim(),
+        inscricaoEstadual: $('#inscricaoEstadual').val().trim(),
         quadras: quadras
     };
     if (!payload.propriedadeareaproducao || !payload.proprietarioareaproducao || !payload.siglasareaproducao) {
         mostrarAlerta('Propriedade, proprietário e sigla são obrigatórios.', 'danger', '#alertFormArea'); return;
+    }
+    if (!apDocProdutorValido(payload.cpfCnpjProdutor)) {
+        mostrarAlerta('CPF/CNPJ do produtor deve ter 11 ou 14 dígitos.', 'danger', '#alertFormArea'); return;
     }
     if (quadras.length === 0) { mostrarAlerta('Cadastre ao menos uma quadra (com nome).', 'danger', '#alertFormArea'); return; }
     $.ajax({
@@ -4194,6 +4235,7 @@ $(document).ready(function () {
     $('#areaId').val(id);
     $('#cepAreaEdit').mask('00000-000');
     $('#cepAreaEdit').on('blur', function () { preencherEnderecoViaCep($(this).val()); });
+    apMascaraDocProdutor();
 
     $.getJSON(AGRO_CTX + '/ControllerAreaProducao?id=' + id, function (a) {
         $('#propEdit').val(a.PropriedadeAreaProducao);
@@ -4201,7 +4243,13 @@ $(document).ready(function () {
         $('#siglaEdit').val(a.SiglasAreaProducao);
         $('#qtdEdit').val(a.QuantidadeTotalPlantasAreaProducao);
         $('#cepAreaEdit').val(a.cep);
-        preencherEnderecoViaCep(a.cep);
+        // endereço gravado na área (não consulta o ViaCEP aqui para não sobrescrever o que foi editado)
+        $('#logradouro').val(a.logradouro || '');
+        $('#bairro').val(a.bairro || '');
+        $('#cidade').val(a.municipio || '');
+        $('#uf').val(a.uf || '');
+        $('#cpfCnpjProdutor').val(a.cpfCnpjProdutor || '').trigger('input');
+        $('#inscricaoEstadual').val(a.inscricaoEstadual || '');
         $('#numeroAreaEdit').val(a.numero);
         $('#complementoAreaEdit').val(a.complemento);
     });
@@ -4244,10 +4292,19 @@ function apAtualizarArea() {
         siglasareaproducao: $('#siglaEdit').val().trim(),
         cep: $('#cepAreaEdit').val().trim(),
         numero: parseInt($('#numeroAreaEdit').val()) || 0,
-        complemento: $('#complementoAreaEdit').val().trim()
+        complemento: $('#complementoAreaEdit').val().trim(),
+        logradouro: $('#logradouro').val().trim(),
+        bairro: $('#bairro').val().trim(),
+        municipio: $('#cidade').val().trim(),
+        uf: $('#uf').val().trim().toUpperCase(),
+        cpfCnpjProdutor: $('#cpfCnpjProdutor').val().trim(),
+        inscricaoEstadual: $('#inscricaoEstadual').val().trim()
     };
     if (!payload.propriedadeareaproducao || !payload.proprietarioareaproducao || !payload.siglasareaproducao) {
         mostrarAlerta('Propriedade, proprietário e sigla são obrigatórios.', 'danger', '#alertFormAreaEdit'); return;
+    }
+    if (!apDocProdutorValido(payload.cpfCnpjProdutor)) {
+        mostrarAlerta('CPF/CNPJ do produtor deve ter 11 ou 14 dígitos.', 'danger', '#alertFormAreaEdit'); return;
     }
     $.ajax({
         url: AGRO_CTX + '/ControllerAreaProducao', method: 'POST', contentType: 'application/json', data: JSON.stringify(payload),
@@ -4302,6 +4359,11 @@ $(document).ready(function () {
         $('#detCep').text(a.cep || '—');
         $('#detNumero').text(a.numero || '—');
         $('#detComplemento').text(a.complemento || '—');
+        $('#detLogradouro').text(a.logradouro || '—');
+        $('#detBairro').text(a.bairro || '—');
+        $('#detMunicipio').text(a.municipio ? a.municipio + (a.uf ? ' / ' + a.uf : '') : (a.uf || '—'));
+        $('#detCpfCnpj').text(a.cpfCnpjProdutor || '—');
+        $('#detIe').text(a.inscricaoEstadual || '—');
         $('#detSituacao').html(a.situacao ? '<span class="badge bg-success">Ativa</span>' : '<span class="badge bg-secondary">Inativa</span>');
     });
     $.getJSON(AGRO_CTX + '/ControllerAreaProducao?quadras=' + id + '&ativas=false', function (lista) {
