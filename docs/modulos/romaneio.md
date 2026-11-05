@@ -9,11 +9,12 @@
 | Controller | `Controller/ControllerRomaneio.java`, URL `/ControllerRomaneio` |
 | DAO | `Model/Dao/RomaneioDAO.java` |
 | Model | `Romaneio.java`, `RomaneioItem.java`, `RomaneioDespesa.java`, `RomaneioPagamento.java` |
-| View | `view/admin/romaneio.jsp` (lista, cards, modais "Romaneio Cad.", "Registrar pagamento" e histórico), `view/admin/cadastroRomaneio.jsp` (passo MR1) |
+| View | `view/admin/romaneio.jsp` (lista, cards, modais "Romaneio Cad.", "Registrar pagamento" e histórico), `view/admin/cadastroRomaneio.jsp` (passo MR1), `view/admin/romaneioDocumento.jsp` (documento para visualizar/imprimir) |
+| Documento PDF | `Service/RomaneioDocumentoPdf.java` (OpenPDF que vem com o JasperReports). Modelo de referência: `docs/modelos/Romaneio_Agricola_Moderno.docx`; exemplo gerado: `docs/modelos/Romaneio_exemplo_gerado.pdf` |
 | JS | `main.js` → seção `MÓDULO ROMANEIO` (funções `rm*` da lista, `rp*` do pagamento, `cr*` do cadastro) + bloco `romaneio.jsp / cadastroRomaneio.jsp init` |
 | Núcleo (autorizado) | `WEB-INF/web.xml` (servlet + mapping), `pagina/menu.jsp` (item "Romaneio" em Produção) |
 
-**GET:** lista (`[?status=]`), `?lotes=1`, `?contexto=1&lote=<idLote>` ou `&id=<idromaneio>`, `?id=<idromaneio>`, `?parceiros=1`, `?pendentes=<idParceiro>`, `?pagamentos=<idromaneio>`.
+**GET:** lista (`[?status=]`), `?lotes=1`, `?contexto=1&lote=<idLote>` ou `&id=<idromaneio>`, `?id=<idromaneio>`, `?parceiros=1`, `?pendentes=<idParceiro>`, `?pagamentos=<idromaneio>`, `?pdf=<idromaneio>` (PDF, `Content-Disposition: attachment; filename="Romaneio_<numero>.pdf"`; 404/400 em JSON).
 **POST (JSON, `acao`):** `salvar`, `cancelar`, `pagar`, `estornar`. Resposta `{ok, msg, target}` (+ `romaneio` / `idPagamento`). Regra violada ⇒ HTTP 400 com a mensagem; erro técnico ⇒ 500 com o código do `LogUtil`.
 
 ## Banco: V33 (`V33__romaneio.sql`)
@@ -22,6 +23,7 @@
 - `romaneio_despesa`: `iddespesascusto`, `descricao`, `forma_calculo` (`FIXO|PERCENTUAL_VENDA|POR_CAIXA`; `EMBALAGEM` continua no CHECK só por compatibilidade, porque a linha automática de embalagem não é mais gerada), `percentual`, `quantidade`, `valor_unitario`, `valor`. É snapshot: mudar o cadastro de despesas não altera romaneios gravados.
 - `romaneio_pagamento`: `id_parceiro`, `data_pagamento`, `forma` (`DINHEIRO|PIX|CHEQUE_PROPRIO|CHEQUE_TERCEIRO`), `valor` > 0, `banco`, `numero_cheque`, `emitente`, `bom_para`, `observacao`, `criado_em`.
 - `romaneio_pagamento_item`: `idpagamento` (cascade), `idromaneio`, `valor` > 0.
+- **V37** (`V37__romaneio_transporte_nf.sql`), em `romaneio`, todos opcionais: `nota_fiscal` (20), `serie_nf` (5), `transportadora` (100), `transportadora_doc` (18, gravado formatado como CNPJ ou CPF), `motorista_cpf` (14, gravado `000.000.000-00`), `motorista_cnh` (20), `placa_carreta` (10), `uf_veiculo` char(2), `tipo_veiculo` (30).
 
 ### Contrato para a Safra
 Somar por safra e por talhão `valor_bruto`, `total_despesas` e `valor_liquido` de `romaneio` com `status <> 'CANCELADO'`, usando `romaneio.id_safra` e `romaneio.id_quadra`. Os quatro valores (`valor_bruto`, `total_despesas`, `valor_liquido`, `valor_pago`) são recalculados e gravados pelo `RomaneioDAO` em todo `salvar`, `pagar` e `estornar`. Nenhum outro caminho grava esses campos.
@@ -44,21 +46,51 @@ Observação: romaneios ABERTO entram com a venda parcial, porque os itens sem p
 7. **Pagamento em grupo** (`pagar`): parceiro, data, forma e valor. Cheque exige banco e número; cheque de terceiro exige o emitente; "bom para" ≥ data. A tela distribui o valor do romaneio mais antigo para o mais novo, até o saldo de cada um, e as partes são editáveis. No servidor: cada parte > 0 e ≤ saldo, o romaneio precisa ser do parceiro e estar PENDENTE, e Σ partes = valor.
 8. **Estorno** (`estornar`): exclui o pagamento inteiro (todas as partes) e recalcula `valor_pago`/situação de cada romaneio afetado (FINALIZADO → PENDENTE). O modal avisa quando o pagamento foi dividido com outros romaneios.
 9. **Cancelar:** só ABERTO/PENDENTE sem pagamento. Libera as caixas do lote.
+10. **Transporte e nota fiscal** (bloco no MR1, V37): todos opcionais.
+    - CPF do motorista com 11 dígitos; CNPJ/CPF da transportadora com 14 ou 11 dígitos.
+    - UF com 2 letras.
+    - Placa do veículo e da carreta no formato antigo (`ABC1234`) ou Mercosul (`ABC1D23`); aceita hífen e espaço e grava em maiúsculas, sem eles.
+11. **Documento do romaneio** (modelo do usuário, A4): `RomaneioDAO.documento(id)` monta os textos e a página e o PDF usam os mesmos dados.
+    - **Cabeçalho:** Nº = `numero`; SAFRA = ano inicial / ano final da safra do romaneio.
+    - **01 Origem:** área do lote (V35: `proprietarioareaproducao`, `cpf_cnpj_produtor`, `propriedadeareaproducao`, `siglasareaproducao`, `inscricao_estadual`, endereço com `logradouro`, `numero`, `complemento`, `bairro`, `cep` e `municipio / uf`), mais emissão, NF, série e talhão/lote ("quadra · Lote N (diário X)").
+    - **02 Destino:** o parceiro (V36). Empresa = razão social (ou o nome), CNPJ, endereço, CEP, IE, cidade, UF e telefone.
+    - **03 Transporte:** campos da V37, mais motorista e placa.
+    - **04 Mercadorias:** uma linha por item. Descrição = alimento; embalagem; classificação; quantidade = caixas; unid. CX; peso = caixas × `embalagem.peso_kg`; observação vazia. Linha TOTAIS com caixas e peso. Mínimo de 7 linhas (completa com vazias) e cresce se houver mais.
+    - **Sem preços.** Campo sem dado sai vazio. Na página, todo texto do banco passa por `HtmlUtil.esc`.
+    - **Botões:** Visualizar (nova aba) e Baixar PDF na lista (exceto cancelados) e no MR1 depois de salvo. A página tem Imprimir (CSS `@page A4`), Baixar PDF, Abrir romaneio e Voltar.
 
 ## Dependências
 - **Colheita e Estoque:** lê `colheita_lote`, `colheita_processamento(_embalagem)` (soma por `idembalagem`, a mesma regra de `?caixasembaladas=`) e `embalagem` (`EmbalagemDAO.buscar`: só descrição e peso; desde 02/11 o Romaneio **não lê** `preco_compra`). Contrato de URL: `cadastroRomaneio.jsp?lote=<idLote>` (redirecionamento do "Finalizar lote", onda C).
 - **Despesas e Custos:** `DespesasCustosDAO.listarRomaneio(Connection)` e `listAll()` (campos `iddespesascusto`, `despesascusto`, `valordespesascustos`, `formaCalculo`, `categoria`).
 - **Safra:** `SafraDAO.resolverSafra` (leitura). A Safra **consome** `romaneio` (contrato acima).
-- **Parceiro:** lê `parceiro` (`tipo_parceiro = 'PARCEIRO'`, `situacaopessoa`, `nomepessoa`).
+- **Parceiro:** lê `parceiro` (`tipo_parceiro = 'PARCEIRO'`, `situacaopessoa`, `nomepessoa`). No documento também lê `razaosocialpessoacnpj`, `cnpjpessoacnpj`, `inscricaoestadualpessoacnpj`, `telefonepessoa`, `cep`, `numero`, `complemento` e as colunas da **V36** (`logradouro`, `bairro`, `cidade`, `uf`).
+- **Área de Produção:** no documento, lê `areaproducao` (proprietário, propriedade, sigla, `cep`, `numero`, `complemento`) e as colunas da **V35** (`cpf_cnpj_produtor`, `inscricao_estadual`, `logradouro`, `bairro`, `municipio`, `uf`). Renomear essas colunas quebra o documento.
 - **Alimento / Classificação:** lê `alimentoclassificacao` e `classificacao`.
 
 ## Pendências
 - [x] Conferência visual feita pelo Gerente Geral em 02/11 no teste integrado (navegador do app, tela visível): lista e cards, "Romaneio Cad.", MR1 com grade classificação × embalagem, despesas, caixas embaladas e resumo. Tudo ok.
 - [ ] Estorno é exclusão (sem trilha de auditoria). Se o usuário quiser histórico de estornos, acrescentar `estornado_em`/motivo em vez de apagar.
 - [ ] Processamentos anteriores à V31 (sem `idembalagem`) não entram no saldo do romaneio.
-- [ ] Impressão/PDF do romaneio (não pedido ainda).
+- [x] Impressão/PDF do romaneio (feito em 04/11, ver Histórico).
+- [ ] O PDF usa a Calibri do Windows (`C:\Windows\Fonts`). Em servidor sem essa fonte, cai para Helvetica (o layout se mantém, mas a fonte muda).
+- [ ] O modelo tem "variedade" junto da descrição, e o cadastro de alimento não tem variedade separada: sai só o nome do alimento.
 
 ## Histórico
+- 2026-11-04: **documento do romaneio (visualizar, imprimir e baixar PDF)**, no modelo do usuário, a pedido do Gerente.
+  - **V37:** transporte e NF em `romaneio`. Bean, DAO (validação e gravação) e controller com os 9 campos. Bloco "Transporte e nota fiscal" no MR1, com motorista e placa movidos para ele e uma lista de sugestões de tipo de veículo.
+  - **Documento:** `RomaneioDAO.documento(id)`, `romaneioDocumento.jsp` (A4, CSS de impressão), `Service/RomaneioDocumentoPdf` e `GET ?pdf=`. Botões na lista e no MR1.
+  - **Medidas do modelo:** convertido com LibreOffice e lido no XML. Grade de 12 colunas de 43,5 pt, margens 36,65/24 pt e as cores do modelo.
+  - **Build único** (com a V35 da Área e a V36 do Parceiro); V35–V37 aplicadas no startup.
+  - **Verificado:**
+    - pelo DAO: recusas de CPF curto, UF inválida, placa e carreta inválidas e documento da transportadora com nº de dígitos errado; normalização de placa, CPF e CNPJ; mapeamento completo;
+    - PDF comparado com o modelo bloco a bloco; com 10 itens, a tabela cresce;
+    - no Chrome logado:
+      - botões na lista e no MR1;
+      - o MR1 carrega e salva os campos e recusa CPF e UF inválidos;
+      - `?pdf=` devolve `application/pdf` e `attachment` com `Romaneio_2026-000002.pdf` (`%PDF-`), e 404 para id inexistente;
+      - a página do documento é igual ao modelo (screenshot) e o `<img onerror>` gravado no banco aparece como texto (escape ok).
+  - **Console sem erros de JavaScript** em `areaproducao.jsp`, `CadastroAreaProducao.jsp` e `parceiro.jsp` (pedido do Gerente).
+  - **Dados de teste apagados:** área 3, talhão 10, safra 6, parceiro 85, embalagens 17/18, diário 122, lote 23, romaneio 10. O romaneio real 2026-000001 não foi tocado.
 - 2026-11-02: **"Custo de embalagem" sai das despesas de venda** (pedido do Gerente, decisão do usuário). A embalagem passa a ser custo de produção (estoque → diário de Processamento → Safra); no Romaneio contaria duas vezes.
   - `RomaneioDAO.salvar` não gera mais a linha `EMBALAGEM` e descarta as que vierem; o `contexto` não devolve mais `precoCompra` nas embalagens.
   - `main.js` (`crRenderDespesas`/`crRecalcular`) sem a linha automática. O quadro "Caixas embaladas do lote" foi mantido.
