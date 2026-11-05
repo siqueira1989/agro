@@ -32,6 +32,7 @@ import java.util.Map;
  * GET  ?parceiros=1                   → parceiros PARCEIRO com qtd/saldo de romaneios PENDENTES
  * GET  ?pendentes=ID_PARCEIRO         → romaneios PENDENTES do parceiro (mais antigo primeiro)
  * GET  ?pagamentos=ID_ROMANEIO        → histórico de pagamentos do romaneio
+ * GET  ?pdf=ID_ROMANEIO               → documento do romaneio em PDF (attachment Romaneio_<numero>.pdf)
  * POST acao=salvar     → {idRomaneio?, idLote, idParceiro, dataEmissao, motorista?, placa?, observacao?,
  *                         itens[{idClassificacao, idEmbalagem, caixas, precoUnitario?}],
  *                         despesas[{idDespesasCusto?, descricao, formaCalculo, percentual?, valorUnitario?, valor?}]}
@@ -52,6 +53,7 @@ public class ControllerRomaneio extends HttpServlet {
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        if (req.getParameter("pdf") != null) { handlePdf(req, resp); return; }
         resp.setContentType("application/json");
         resp.setCharacterEncoding(StandardCharsets.UTF_8.name());
         try {
@@ -123,6 +125,15 @@ public class ControllerRomaneio extends HttpServlet {
         r.setMotorista(getStr(jo, "motorista"));
         r.setPlaca(getStr(jo, "placa"));
         r.setObservacao(getStr(jo, "observacao"));
+        r.setNotaFiscal(getStr(jo, "notaFiscal"));
+        r.setSerieNf(getStr(jo, "serieNf"));
+        r.setTransportadora(getStr(jo, "transportadora"));
+        r.setTransportadoraDoc(getStr(jo, "transportadoraDoc"));
+        r.setMotoristaCpf(getStr(jo, "motoristaCpf"));
+        r.setMotoristaCnh(getStr(jo, "motoristaCnh"));
+        r.setPlacaCarreta(getStr(jo, "placaCarreta"));
+        r.setUfVeiculo(getStr(jo, "ufVeiculo"));
+        r.setTipoVeiculo(getStr(jo, "tipoVeiculo"));
         if (jo.has("itens") && jo.get("itens").isJsonArray()) {
             for (JsonElement el : jo.getAsJsonArray("itens")) {
                 JsonObject o = el.getAsJsonObject();
@@ -181,6 +192,32 @@ public class ControllerRomaneio extends HttpServlet {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("ok", true); m.put("msg", "Pagamento registrado."); m.put("target", target); m.put("idPagamento", id);
         writeJsonRaw(resp, 200, m);
+    }
+
+    /** Documento do romaneio em PDF (modelo do usuário), para baixar: Romaneio_<numero>.pdf. */
+    private void handlePdf(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        Integer id = intOrNull(req.getParameter("pdf"));
+        if (id == null) {
+            resp.setContentType("application/json"); resp.setCharacterEncoding(StandardCharsets.UTF_8.name());
+            writeJson(resp, 400, false, "Romaneio inválido.", "page"); return;
+        }
+        try {
+            Map<String, Object> doc = dao.documento(id);
+            if (doc == null) {
+                resp.setContentType("application/json"); resp.setCharacterEncoding(StandardCharsets.UTF_8.name());
+                writeJson(resp, 404, false, "Romaneio não encontrado.", "page"); return;
+            }
+            byte[] pdf = Service.RomaneioDocumentoPdf.gerar(doc);
+            String nome = "Romaneio_" + String.valueOf(doc.get("numero")).replaceAll("[^A-Za-z0-9_-]", "") + ".pdf";
+            resp.setContentType("application/pdf");
+            resp.setHeader("Content-Disposition", "attachment; filename=\"" + nome + "\"");
+            resp.setContentLength(pdf.length);
+            resp.getOutputStream().write(pdf);
+        } catch (Exception e) {
+            String cod = Util.LogUtil.erro(ControllerRomaneio.class, "Falha ao gerar o PDF do romaneio " + id + ".", e);
+            resp.reset();
+            writeJson(resp, 500, false, Util.LogUtil.mensagemUsuario("gerar o PDF do romaneio", cod), "page");
+        }
     }
 
     private int intParam(HttpServletRequest req, String k) {

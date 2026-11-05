@@ -709,6 +709,184 @@ public class RomaneioDAO {
         return String.format("%d-%06d", ano, seq);
     }
 
+    /** Transporte e nota fiscal (V37): opcionais; CPF com 11 dígitos, CNPJ/CPF com 14/11, UF com 2 letras, placas válidas. */
+    private static void validarTransporte(Romaneio in) {
+        in.setNotaFiscal(limpar(in.getNotaFiscal(), 20, "Nota fiscal"));
+        in.setSerieNf(limpar(in.getSerieNf(), 5, "Série da NF"));
+        in.setTransportadora(limpar(in.getTransportadora(), 100, "Transportadora"));
+        String doc = limpar(in.getTransportadoraDoc(), 18, "CNPJ/CPF da transportadora");
+        if (doc != null) {
+            String d = doc.replaceAll("\\D", "");
+            if (d.length() == 11) doc = formatarCpf(d);
+            else if (d.length() == 14) doc = d.replaceFirst("(\\d{2})(\\d{3})(\\d{3})(\\d{4})(\\d{2})", "$1.$2.$3/$4-$5");
+            else throw new IllegalArgumentException("O CNPJ/CPF da transportadora deve ter 14 ou 11 dígitos.");
+        }
+        in.setTransportadoraDoc(doc);
+        String cpf = limpar(in.getMotoristaCpf(), 14, "CPF do motorista");
+        if (cpf != null) {
+            String d = cpf.replaceAll("\\D", "");
+            if (d.length() != 11) throw new IllegalArgumentException("O CPF do motorista deve ter 11 dígitos.");
+            cpf = formatarCpf(d);
+        }
+        in.setMotoristaCpf(cpf);
+        in.setMotoristaCnh(limpar(in.getMotoristaCnh(), 20, "CNH"));
+        in.setPlacaCarreta(placa(in.getPlacaCarreta(), "Placa da carreta"));
+        String uf = limpar(in.getUfVeiculo(), 2, "UF do veículo");
+        if (uf != null) {
+            uf = uf.toUpperCase();
+            if (!uf.matches("[A-Z]{2}")) throw new IllegalArgumentException("A UF do veículo deve ter 2 letras.");
+        }
+        in.setUfVeiculo(uf);
+        in.setTipoVeiculo(limpar(in.getTipoVeiculo(), 30, "Tipo de veículo"));
+    }
+
+    private static String formatarCpf(String d) { return d.replaceFirst("(\\d{3})(\\d{3})(\\d{3})(\\d{2})", "$1.$2.$3-$4"); }
+
+    /** Placa no formato antigo (ABC1234) ou Mercosul (ABC1D23); aceita hífen/espaço e grava sem eles, em maiúsculas. */
+    private static String placa(String s, String campo) {
+        if (s == null) return null;
+        String p = s.toUpperCase().replaceAll("[\\s-]", "");
+        if (p.isEmpty()) return null;
+        if (!p.matches("[A-Z]{3}[0-9][A-Z0-9][0-9]{2}")) {
+            throw new IllegalArgumentException(campo + " inválida: use o formato ABC1234 ou o Mercosul ABC1D23.");
+        }
+        return p;
+    }
+
+    /* ============================== DOCUMENTO (impressão / PDF) ============================== */
+
+    /**
+     * Dados do documento do romaneio (modelo docs/modelos/Romaneio_Agricola_Moderno.docx), já formatados
+     * como texto: origem (área do lote, V35), destino (parceiro, V36), transporte/NF (V37) e uma linha
+     * por item (classificação × embalagem) com caixas e peso. Campo sem dado = "" (nunca null). Sem preços.
+     * Usado por romaneioDocumento.jsp e pelo PDF (Service.RomaneioDocumentoPdf). null se o romaneio não existe.
+     */
+    public Map<String, Object> documento(int id) throws SQLException {
+        String sql = "SELECT r.*, a.proprietarioareaproducao, a.propriedadeareaproducao, a.siglasareaproducao, "
+                + "a.cpf_cnpj_produtor, a.inscricao_estadual AS a_ie, a.logradouro AS a_logradouro, a.numero AS a_numero, "
+                + "a.complemento AS a_complemento, a.bairro AS a_bairro, a.cep AS a_cep, a.municipio AS a_municipio, a.uf AS a_uf, "
+                + "p.nomepessoa, p.razaosocialpessoacnpj, p.cnpjpessoacnpj, p.inscricaoestadualpessoacnpj, p.telefonepessoa, "
+                + "p.logradouro AS p_logradouro, p.numero AS p_numero, p.complemento AS p_complemento, p.bairro AS p_bairro, "
+                + "p.cep AS p_cep, p.cidade AS p_cidade, p.uf AS p_uf, "
+                + "q.nome_quadra, al.nomeproduto, d.numero_diario, s.nome AS nome_safra, s.data_inicial, s.data_final "
+                + "FROM romaneio r "
+                + "LEFT JOIN areaproducao a ON a.idareaproducao = r.id_area "
+                + "LEFT JOIN parceiro p ON p.idpessoa = r.id_parceiro "
+                + "LEFT JOIN quadra q ON q.idquadra = r.id_quadra "
+                + "LEFT JOIN alimento al ON al.idproduto = r.id_alimento "
+                + "LEFT JOIN safra s ON s.idsafra = r.id_safra "
+                + "JOIN colheita_lote cl ON cl.idlote = r.idlote "
+                + "LEFT JOIN diario_campo d ON d.iddiario = cl.iddiario WHERE r.idromaneio=?";
+        Map<String, Object> m = new LinkedHashMap<>();
+        try (Connection c = new PostgresConnection().getConnection()) {
+            String alimento;
+            try (PreparedStatement st = c.prepareStatement(sql)) {
+                st.setInt(1, id);
+                try (ResultSet rs = st.executeQuery()) {
+                    if (!rs.next()) return null;
+                    m.put("idRomaneio", id);
+                    m.put("numero", s(rs.getString("numero")));
+                    m.put("status", s(rs.getString("status")));
+                    Date di = rs.getDate("data_inicial"), df = rs.getDate("data_final");
+                    m.put("safraInicio", di == null ? "" : String.valueOf(di.toLocalDate().getYear()));
+                    m.put("safraFim", df == null ? "" : String.valueOf(df.toLocalDate().getYear()));
+                    m.put("safraNome", s(rs.getString("nome_safra")));
+                    // 01 Origem
+                    m.put("prodNome", s(rs.getString("proprietarioareaproducao")));
+                    m.put("prodDoc", s(rs.getString("cpf_cnpj_produtor")));
+                    m.put("propriedade", s(rs.getString("propriedadeareaproducao")));
+                    m.put("sigla", s(rs.getString("siglasareaproducao")));
+                    m.put("prodIe", s(rs.getString("a_ie")));
+                    String cepA = s(rs.getString("a_cep"));
+                    m.put("prodEndereco", endereco(rs.getString("a_logradouro"), rs.getObject("a_numero"), rs.getString("a_complemento"),
+                            rs.getString("a_bairro")) + (cepA.isEmpty() ? "" : " – CEP " + cepA));
+                    m.put("prodMunicipioUf", juntar(" / ", rs.getString("a_municipio"), rs.getString("a_uf")));
+                    m.put("dataEmissao", rs.getDate("data_emissao").toLocalDate().format(BR));
+                    m.put("notaFiscal", s(rs.getString("nota_fiscal")));
+                    m.put("serieNf", s(rs.getString("serie_nf")));
+                    m.put("talhaoLote", juntar(" · ", rs.getString("nome_quadra"), "Lote " + rs.getInt("idlote")
+                            + (rs.getString("numero_diario") == null ? "" : " (diário " + rs.getString("numero_diario") + ")")));
+                    // 02 Destino
+                    String razao = s(rs.getString("razaosocialpessoacnpj"));
+                    m.put("destEmpresa", razao.isEmpty() ? s(rs.getString("nomepessoa")) : razao);
+                    m.put("destCnpj", s(rs.getString("cnpjpessoacnpj")));
+                    m.put("destEndereco", endereco(rs.getString("p_logradouro"), rs.getObject("p_numero"), rs.getString("p_complemento"), rs.getString("p_bairro")));
+                    m.put("destCep", s(rs.getString("p_cep")));
+                    m.put("destIe", s(rs.getString("inscricaoestadualpessoacnpj")));
+                    m.put("destCidade", s(rs.getString("p_cidade")));
+                    m.put("destUf", s(rs.getString("p_uf")));
+                    m.put("destTelefone", s(rs.getString("telefonepessoa")));
+                    // 03 Transporte
+                    m.put("transportadora", s(rs.getString("transportadora")));
+                    m.put("transportadoraDoc", s(rs.getString("transportadora_doc")));
+                    m.put("motorista", s(rs.getString("motorista")));
+                    m.put("motoristaCpf", s(rs.getString("motorista_cpf")));
+                    m.put("motoristaCnh", s(rs.getString("motorista_cnh")));
+                    m.put("placa", s(rs.getString("placa")));
+                    m.put("placaCarreta", s(rs.getString("placa_carreta")));
+                    m.put("ufVeiculo", s(rs.getString("uf_veiculo")));
+                    m.put("tipoVeiculo", s(rs.getString("tipo_veiculo")));
+                    alimento = s(rs.getString("nomeproduto"));
+                }
+            }
+            // 04 Mercadorias: uma linha por item, peso = caixas × peso da embalagem.
+            List<Map<String, String>> itens = new ArrayList<>();
+            BigDecimal totCx = BigDecimal.ZERO, totPeso = BigDecimal.ZERO;
+            try (PreparedStatement st = c.prepareStatement("SELECT ri.caixas, e.descricao, e.peso_kg, cf.classificacao FROM romaneio_item ri "
+                    + "JOIN embalagem e ON e.idembalagem = ri.idembalagem JOIN classificacao cf ON cf.idclassificacao = ri.idclassificacao "
+                    + "WHERE ri.idromaneio=? ORDER BY cf.classificacao, e.peso_kg, ri.id")) {
+                st.setInt(1, id);
+                try (ResultSet rs = st.executeQuery()) {
+                    while (rs.next()) {
+                        BigDecimal cx = rs.getBigDecimal("caixas");
+                        BigDecimal peso = rs.getBigDecimal("peso_kg") == null ? BigDecimal.ZERO : cx.multiply(rs.getBigDecimal("peso_kg"));
+                        totCx = totCx.add(cx); totPeso = totPeso.add(peso);
+                        Map<String, String> i = new LinkedHashMap<>();
+                        i.put("descricao", alimento);
+                        i.put("embalagem", s(rs.getString("descricao")));
+                        i.put("classificacao", s(rs.getString("classificacao")));
+                        i.put("quantidade", fmt(cx));
+                        i.put("unid", "CX");
+                        i.put("peso", fmtPeso(peso));
+                        i.put("observacao", "");
+                        itens.add(i);
+                    }
+                }
+            }
+            m.put("itens", itens);
+            m.put("totalQuantidade", fmt(totCx));
+            m.put("totalPeso", fmtPeso(totPeso));
+        }
+        return m;
+    }
+
+    private static String s(String v) { return v == null ? "" : v.trim(); }
+
+    private static String juntar(String sep, String... partes) {
+        StringBuilder sb = new StringBuilder();
+        for (String p : partes) {
+            if (p == null || p.isBlank()) continue;
+            if (sb.length() > 0) sb.append(sep);
+            sb.append(p.trim());
+        }
+        return sb.toString();
+    }
+
+    private static String endereco(String logradouro, Object numero, String complemento, String bairro) {
+        String rua = s(logradouro);
+        String num = numero == null || "0".equals(String.valueOf(numero)) ? "" : String.valueOf(numero);
+        String compl = s(complemento);
+        if (compl.matches("[-–—.\\s]*")) compl = "";
+        String linha = rua.isEmpty() ? (num.isEmpty() ? "" : "nº " + num) : rua + (num.isEmpty() ? "" : ", " + num);
+        return juntar(" – ", juntar(", ", linha, compl), bairro);
+    }
+
+    private static String fmtPeso(BigDecimal v) {
+        java.text.NumberFormat nf = java.text.NumberFormat.getNumberInstance(Locale.forLanguageTag("pt-BR"));
+        nf.setMinimumFractionDigits(2); nf.setMaximumFractionDigits(2);
+        return nf.format(v);
+    }
+
     private static String limpar(String s, int max, String campo) {
         if (s == null) return null;
         s = s.trim();

@@ -7790,6 +7790,7 @@ function rmCarregarLista() {
                 : '<a class="btn btn-sm btn-outline-secondary ms-1" title="Ver" href="' + urlCad + '"><i class="fas fa-eye"></i></a>';
             if (r.status !== 'ABERTO' && r.status !== 'CANCELADO')
                 acoes += '<button class="btn btn-sm btn-outline-success ms-1" title="Pagamentos" onclick="rmHistorico(' + id + ')"><i class="fas fa-receipt"></i></button>';
+            if (r.status !== 'CANCELADO') acoes += rmBotoesDocumento(id);
             if (editavel && Number(r.valorPago || 0) === 0)
                 acoes += '<button class="btn btn-sm btn-outline-danger ms-1" title="Cancelar" onclick="rmCancelar(' + id + ')"><i class="fas fa-ban"></i></button>';
             $b.append('<tr><td class="fw-semibold">' + rmEsc(r.numero) + '</td><td>' + formatarData(r.dataEmissao) + '</td>' +
@@ -7803,6 +7804,14 @@ function rmCarregarLista() {
                 '<td>' + rmBadge(r.status) + '</td><td class="text-end text-nowrap">' + acoes + '</td></tr>');
         });
     }).fail(function (xhr) { mostrarAlerta(rmMsgXhr(xhr, 'Erro ao carregar os romaneios.'), 'danger', '#alertaRomaneio'); });
+}
+
+/** Documento do romaneio (modelo do usuário): Visualizar (página de impressão, nova aba) e Baixar PDF. */
+function rmBotoesDocumento(id) {
+    return '<a class="btn btn-sm btn-outline-dark ms-1" title="Visualizar documento" target="_blank" rel="noopener" href="' +
+        AGRO_CTX + '/view/admin/romaneioDocumento.jsp?id=' + Number(id) + '"><i class="fas fa-file-lines"></i></a>' +
+        '<a class="btn btn-sm btn-outline-secondary ms-1" title="Baixar PDF" href="' + AGRO_CTX + '/ControllerRomaneio?pdf=' + Number(id) +
+        '"><i class="fas fa-file-pdf"></i></a>';
 }
 
 function rmCancelar(id) {
@@ -8009,6 +8018,10 @@ function initRomaneio() {
 var crCtx = null;          // resposta de ?contexto=1
 var crDespesas = [];       // despesas de venda em edição (sem a linha automática de embalagem)
 var crSomenteLeitura = false;
+/** Transporte e nota fiscal (V37): [id do campo na tela, propriedade do romaneio]. */
+var CR_CAMPOS_TRANSPORTE = [['crNotaFiscal', 'notaFiscal'], ['crSerieNf', 'serieNf'], ['crTransportadora', 'transportadora'],
+    ['crTransportadoraDoc', 'transportadoraDoc'], ['crMotoristaCpf', 'motoristaCpf'], ['crMotoristaCnh', 'motoristaCnh'],
+    ['crPlacaCarreta', 'placaCarreta'], ['crUfVeiculo', 'ufVeiculo'], ['crTipoVeiculo', 'tipoVeiculo']];
 
 function initCadastroRomaneio() {
     var qs = new URLSearchParams(window.location.search);
@@ -8030,6 +8043,13 @@ function crMontar() {
     else $('#crSafra').addClass('text-danger').text('Nenhuma safra cobre o talhão na data da colheita — cadastre a safra antes de salvar.');
     $('#crTitulo').text(r ? 'Romaneio ' + r.numero : 'Novo romaneio');
     $('#crStatusBadge').html(r ? rmBadge(r.status) : '');
+    // Documento (Visualizar / Baixar PDF) só depois de salvo e se não estiver cancelado.
+    var temDoc = !!r && r.status !== 'CANCELADO';
+    $('#crDocBotoes').toggleClass('d-none', !temDoc);
+    if (temDoc) {
+        $('#crDocVer').attr('href', AGRO_CTX + '/view/admin/romaneioDocumento.jsp?id=' + Number(r.idRomaneio));
+        $('#crDocPdf').attr('href', AGRO_CTX + '/ControllerRomaneio?pdf=' + Number(r.idRomaneio));
+    }
     document.title = 'Agro - ' + (r ? 'Romaneio ' + r.numero : 'Novo romaneio');
     if (!r && L.status !== 'PROCESSADO' && L.status !== 'FINALIZADO')
         rmAlerta('#alertaCadRomaneio', 'Este lote ainda não está Processado (situação ' + rmEsc(L.status) + '): o romaneio não poderá ser salvo.', 'warning');
@@ -8043,6 +8063,7 @@ function crMontar() {
     $('#crMotorista').val(r ? r.motorista || '' : '');
     $('#crPlaca').val(r ? r.placa || '' : '');
     $('#crObservacao').val(r ? r.observacao || '' : '');
+    CR_CAMPOS_TRANSPORTE.forEach(function (c) { $('#' + c[0]).val(r ? r[c[1]] || '' : ''); });
 
     // Itens: uma linha por classificação × embalagem embalada no lote.
     var porChave = {};
@@ -8187,6 +8208,9 @@ function crSalvar() {
         acao: 'salvar', target: '#alertaCadRomaneio', idRomaneio: r ? r.idRomaneio : 0, idLote: crCtx.lote.idLote,
         idParceiro: Number($('#crParceiro').val() || 0), dataEmissao: $('#crDataEmissao').val(),
         motorista: $('#crMotorista').val(), placa: $('#crPlaca').val(), observacao: $('#crObservacao').val(),
+        notaFiscal: $('#crNotaFiscal').val(), serieNf: $('#crSerieNf').val(), transportadora: $('#crTransportadora').val(),
+        transportadoraDoc: $('#crTransportadoraDoc').val(), motoristaCpf: $('#crMotoristaCpf').val(), motoristaCnh: $('#crMotoristaCnh').val(),
+        placaCarreta: $('#crPlacaCarreta').val(), ufVeiculo: $('#crUfVeiculo').val(), tipoVeiculo: $('#crTipoVeiculo').val(),
         itens: itens, despesas: crDespesas
     };
     if (!dados.idParceiro) { rmAlerta('#alertaCadRomaneio', 'Escolha o parceiro comprador.'); window.scrollTo(0, 0); return; }
@@ -8218,7 +8242,7 @@ function initCadastroRomaneioEventos() {
         crRenderDespesas(); crRecalcular();
     });
     $('#crDespesaIncluirBtn').off('click').on('click', crIncluirDespesa);
-    $('#crPlaca').off('input').on('input', function () { this.value = this.value.toUpperCase(); });
+    $('#crPlaca, #crPlacaCarreta, #crUfVeiculo').off('input').on('input', function () { this.value = this.value.toUpperCase(); });
     $('#crSalvar').off('click').on('click', crSalvar);
 }
 

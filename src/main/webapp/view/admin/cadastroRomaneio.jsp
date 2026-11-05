@@ -16,6 +16,10 @@
     <h2 class="m-0"><i class="fas fa-truck me-2"></i><span id="crTitulo">Novo romaneio</span></h2>
     <div class="d-flex gap-2 align-items-center">
       <span id="crStatusBadge"></span>
+      <span id="crDocBotoes" class="d-none d-flex gap-2">
+        <a class="btn btn-light btn-sm" id="crDocVer" target="_blank" rel="noopener" href="#"><i class="fas fa-file-lines me-1"></i>Visualizar</a>
+        <a class="btn btn-light btn-sm" id="crDocPdf" href="#"><i class="fas fa-file-pdf me-1"></i>Baixar PDF</a>
+      </span>
       <a class="btn btn-light btn-sm" href="<%=request.getContextPath()%>/view/admin/romaneio.jsp"><i class="fas fa-arrow-left me-1"></i>Romaneios</a>
     </div>
   </div>
@@ -44,13 +48,40 @@
             <select class="form-select form-select-sm" id="crParceiro"></select></div>
           <div class="col-6 col-md-3"><label class="form-label small mb-0" for="crDataEmissao">Data de emissão *</label>
             <input type="date" class="form-control form-control-sm" id="crDataEmissao"></div>
-          <div class="col-6 col-md-4"></div>
-          <div class="col-8 col-md-5"><label class="form-label small mb-0" for="crMotorista">Motorista</label>
-            <input type="text" class="form-control form-control-sm" id="crMotorista" maxlength="80"></div>
-          <div class="col-4 col-md-3"><label class="form-label small mb-0" for="crPlaca">Placa do caminhão</label>
-            <input type="text" class="form-control form-control-sm text-uppercase" id="crPlaca" maxlength="10" placeholder="ABC1D23"></div>
           <div class="col-12 col-md-4"><label class="form-label small mb-0" for="crObservacao">Observação</label>
             <input type="text" class="form-control form-control-sm" id="crObservacao" maxlength="300"></div>
+        </div>
+      </div></div>
+
+      <!-- Transporte e nota fiscal (V37): opcionais, saem no documento do romaneio (blocos 01 e 03) -->
+      <div class="card shadow-sm border-0 mb-3"><div class="card-body py-2">
+        <div class="small text-muted text-uppercase fw-semibold mb-1"><i class="fas fa-truck-moving me-1"></i>Transporte e nota fiscal</div>
+        <div class="row g-2 align-items-end">
+          <div class="col-6 col-md-3"><label class="form-label small mb-0" for="crNotaFiscal">Nota fiscal</label>
+            <input type="text" class="form-control form-control-sm" id="crNotaFiscal" maxlength="20"></div>
+          <div class="col-6 col-md-2"><label class="form-label small mb-0" for="crSerieNf">Série</label>
+            <input type="text" class="form-control form-control-sm" id="crSerieNf" maxlength="5"></div>
+          <div class="col-12 col-md-7"></div>
+          <div class="col-12 col-md-7"><label class="form-label small mb-0" for="crTransportadora">Transportadora</label>
+            <input type="text" class="form-control form-control-sm" id="crTransportadora" maxlength="100"></div>
+          <div class="col-12 col-md-5"><label class="form-label small mb-0" for="crTransportadoraDoc">CNPJ / CPF da transportadora</label>
+            <input type="text" class="form-control form-control-sm" id="crTransportadoraDoc" maxlength="18" placeholder="00.000.000/0000-00"></div>
+          <div class="col-12 col-md-5"><label class="form-label small mb-0" for="crMotorista">Motorista</label>
+            <input type="text" class="form-control form-control-sm" id="crMotorista" maxlength="80"></div>
+          <div class="col-6 col-md-4"><label class="form-label small mb-0" for="crMotoristaCpf">CPF do motorista</label>
+            <input type="text" class="form-control form-control-sm" id="crMotoristaCpf" maxlength="14" placeholder="000.000.000-00"></div>
+          <div class="col-6 col-md-3"><label class="form-label small mb-0" for="crMotoristaCnh">CNH</label>
+            <input type="text" class="form-control form-control-sm" id="crMotoristaCnh" maxlength="20"></div>
+          <div class="col-6 col-md-3"><label class="form-label small mb-0" for="crPlaca">Placa do veículo</label>
+            <input type="text" class="form-control form-control-sm text-uppercase" id="crPlaca" maxlength="8" placeholder="ABC1D23"></div>
+          <div class="col-6 col-md-3"><label class="form-label small mb-0" for="crPlacaCarreta">Placa da carreta</label>
+            <input type="text" class="form-control form-control-sm text-uppercase" id="crPlacaCarreta" maxlength="8" placeholder="ABC1D23"></div>
+          <div class="col-4 col-md-2"><label class="form-label small mb-0" for="crUfVeiculo">UF</label>
+            <input type="text" class="form-control form-control-sm text-uppercase" id="crUfVeiculo" maxlength="2" placeholder="SP"></div>
+          <div class="col-8 col-md-4"><label class="form-label small mb-0" for="crTipoVeiculo">Tipo de veículo</label>
+            <input type="text" class="form-control form-control-sm" id="crTipoVeiculo" maxlength="30" list="crTiposVeiculo" placeholder="Truck, Toco, Carreta…">
+            <datalist id="crTiposVeiculo"><option value="Caminhonete"><option value="VUC"><option value="Toco"><option value="Truck">
+              <option value="Bitruck"><option value="Carreta"><option value="Bitrem"><option value="Rodotrem"></datalist></div>
         </div>
       </div></div>
 
