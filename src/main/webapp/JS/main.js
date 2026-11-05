@@ -1408,7 +1408,7 @@ function salvarParceiroModal() {
 /** Busca os dados de um parceiro por id e preenche o formulário para edição. Usado em: CadastroParceiro.jsp (modo update via ?id=) */
 function carregarDadosParceiro(id) {
   $.ajax({
-    url: `/ControllerParceiro?id=${id}`,
+    url: `${AGRO_CTX}/ControllerParceiro?id=${id}`,
     method: "GET",
     dataType: "json",
     success: function (parceiro) {
@@ -1502,12 +1502,12 @@ function salvarParceiroCreateOuUpdate()
           let msgSucesso =resp.msg || "Parceiro cadastrado com sucesso!";
            sessionStorage.setItem("mensagemAlerta", msgSucesso);
       sessionStorage.setItem("tipoAlerta", "success");
-      window.location.href = "/view/admin/parceiro.jsp";
+      window.location.href = AGRO_CTX + "/view/admin/parceiro.jsp";
       }else{
           let msgSucesso =resp.msg || "Parceiro atualizado com sucesso!";
            sessionStorage.setItem("mensagemAlerta", msgSucesso);
       sessionStorage.setItem("tipoAlerta", "success");
-      window.location.href = "/view/admin/parceiro.jsp";
+      window.location.href = AGRO_CTX + "/view/admin/parceiro.jsp";
       }
     
      

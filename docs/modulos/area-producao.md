@@ -26,9 +26,9 @@
 
 ## Pendências
 - [ ] A mudança em `RelatorioExportServlet.java` (remoção do `case "areaproducao"`) só entra no próximo build Maven; até lá o servlet compilado no Tomcat ainda aceita a URL antiga.
-- [ ] Testar no navegador após o build: cadastrar/editar área com CEP, CPF/CNPJ e IE e conferir gravação (e Perfil da Área).
 
 ## Histórico
 - 2026-10-25 — Removida a exportação Excel/PDF da página: botões em `areaproducao.jsp` (antigas linhas 15–21); `main.js` não tinha handler dessa exportação; em `RelatorioExportServlet.java` (autorizado pelo Gerente) removidos `case "areaproducao"`, `exportarAreasExcel/Pdf`, campo/`init` do `AreaProducaoDAO` e imports. Folha e funcionário intactos. JSP copiado para `target`; build pendente.
 - 2026-11-02: padronização visual do botão de novo registro (Gerente)
 - 2026-11-04 — Dados do produtor para o Romaneio: migração `V35__areaproducao_dados_produtor.sql`; model/DAO/controller (create, update, GET) com `cpfCnpjProdutor`, `inscricaoEstadual`, `logradouro`, `bairro`, `municipio`, `uf`; Cadastro/Atualizar passam a gravar endereço (ViaCEP preenche, campos editáveis) + CPF/CNPJ (máscara, 11 ou 14 dígitos, também validado no servidor) e IE; Perfil da Área (`DetalheAreaProducao.jsp`, só o card Propriedade) exibe os novos dados. Aguarda build do Romaneio + teste no navegador (V35 aplicada pelo Flyway no start).
+- 2026-11-04 — Teste no navegador (pós-build, V35 aplicada): cadastro com CEP 01310-100 (ViaCEP), CPF/CNPJ com máscara, IE; edição; Perfil da Área; validação do servidor (400 com 3 dígitos); sem erros no console. Área de teste `TV35` (id 4) ficou **inativa** — a ação `delete` do controller só desativa; excluir de vez exige SQL.
